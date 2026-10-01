@@ -148,6 +148,7 @@ def cmd_send(to, title, body, sid):
 
 
 # ── Discord transport (default): channels = Discord, no git per message ──
+BROADCAST = "03-sys-admin"  # BD 2026-10-02: #org хаагдав; бүх сешнд хамаатай мэдээ = Sys Admin суваг
 import urllib.request, urllib.error
 API = "https://discord.com/api/v10"
 DTOKEN_F = Path.home() / ".fmos_discord_token"
@@ -181,7 +182,7 @@ def d_inbox(hook):
     sid = hook.get("session_id", ""); event = hook.get("hook_event_name", "")
     state = load(STATE, {}); reg = load(REG, {"sessions": {}})
     me = reg["sessions"].get(sid)
-    names = ["org"] + ([chmap().get(sid, chname(me))] if me else [])
+    names = list(dict.fromkeys([BROADCAST] + ([chmap().get(sid, chname(me))] if me else [])))
     ch = dchannels(state); cur = state.setdefault(sid, {}); out = []
     my_tag = f"[{me['name']}]" if me else None
     for n in names:
@@ -215,7 +216,7 @@ def d_inbox(hook):
 def d_send(to, text, sid):
     reg = load(REG, {"sessions": {}}); me = reg["sessions"].get(sid, {"name": f"{DEVICE}-{sid[:6]}"})
     state = load(STATE, {}); ch = dchannels(state); save(STATE, state)
-    name = "org" if to in ("all", "@all", "org") else to.lstrip("@").lower()
+    name = BROADCAST if to in ("all", "@all", "org", "sys") else to.lstrip("@").lower()
     cid = ch[name]; msg = f"[{me['name']}] {text}"
     for i in range(0, len(msg), 1900):
         dapi("POST", f"/channels/{cid}/messages", {"content": msg[i:i+1900]})
@@ -225,7 +226,7 @@ def d_send(to, text, sid):
 def d_watch(sid, every=20):
     """Continuous: print one line per new Discord message for this session (own messages skipped)."""
     reg = load(REG, {"sessions": {}}); me = reg["sessions"].get(sid)
-    names = ["org"] + ([chmap().get(sid, chname(me))] if me else [])
+    names = list(dict.fromkeys([BROADCAST] + ([chmap().get(sid, chname(me))] if me else [])))
     tag = f"[{me['name']}]" if me else None
     st = load(STATE, {}); ch = dchannels(st); save(STATE, st)
     last = {}
@@ -328,7 +329,7 @@ def chmap():
     return {sid: names[key(v)] for sid, v in regs}
 
 CATS = {"tasks": "01 Tasks", "projects": "02 Projects", "areas": "03 Areas", "resources": "04 Resources", "research": "05 Research", "development": "06 Development", "system": "07 System", "archive": "08 Archive"}
-SYSTEM_CH = ["org", "status", "status-data", "general", "relay"]
+SYSTEM_CH = ["status", "status-data", "general", "relay"]  # #org хаагдсан (2026-10-02) → Archive
 
 def d_sync():
     """Discord = sidebar: category per PARA group, one channel per project slug. Never deletes — old channels → Archive."""
