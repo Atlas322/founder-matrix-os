@@ -66,7 +66,7 @@ def entries(path, offset):
 
 def cmd_inbox():
     try:
-        hook = json.load(sys.stdin)
+        hook = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
     except Exception:
         hook = {}
     sid = hook.get("session_id", "")
@@ -227,7 +227,7 @@ def main():
     if "--sid" in a:
         i = a.index("--sid"); sid = a[i + 1]; del a[i:i + 2]
     if not a or a[0] == "inbox":
-        try: hook = json.load(sys.stdin)
+        try: hook = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
         except Exception: hook = {}
         try: return d_inbox(hook)
         except Exception as e:
