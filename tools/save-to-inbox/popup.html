@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 13px -apple-system, system-ui, sans-serif; width: 330px; padding: 14px; margin: 0; }
+  h3 { margin: 0 0 10px; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .f { margin-bottom: 9px; }
+  label { display: block; color: #888; font-size: 11px; margin-bottom: 3px; }
+  input, textarea, select { width: 100%; box-sizing: border-box; padding: 7px; border: 1px solid #bbb; border-radius: 7px; font: inherit; background: transparent; color: inherit; }
+  textarea { height: 56px; resize: vertical; }
+  .url { color: #999; font-size: 11px; word-break: break-all; margin: -4px 0 9px; }
+  button { width: 100%; padding: 9px; border: none; border-radius: 7px; background: #5B3E8C; color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; }
+  button:disabled { opacity: .6; cursor: default; }
+  .ok { color: #2ecc71; font-size: 12px; text-align: center; margin-top: 8px; min-height: 16px; }
+  .row { display: flex; gap: 8px; }
+  .row > div { flex: 1; }
+</style>
+</head>
+<body>
+  <h3>📥 Save to Inbox</h3>
+  <div class="f"><label>Гарчиг</label><input id="title" autocomplete="off"></div>
+  <div class="url" id="url"></div>
+  <div class="f" id="mediawrap" style="display:none">
+    <label>🖼 Зураг сонго <span id="mediacount" style="color:#999;font-weight:400;font-size:11px"></span></label>
+    <div id="gallery" style="display:flex;gap:8px;overflow-x:auto;padding:2px 0 6px"></div>
+    <div style="font-size:11px;color:#888;display:flex;align-items:center;gap:12px">
+      <a id="selAll" href="#" style="color:var(--interactive-accent,#5B3E8C)">бүгд</a>
+      <a id="selNone" href="#" style="color:var(--interactive-accent,#5B3E8C)">аль нь ч үгүй</a>
+      <span id="selCount" style="margin-left:auto"></span>
+    </div>
+  </div>
+  <div class="f" id="videowrap" style="display:none">
+    <label>🎬 Видео <span id="videoinfo" style="color:#999;font-weight:400;font-size:11px"></span></label>
+    <label id="vdlwrap" style="font-weight:400;display:none;align-items:center;gap:6px;color:#888;font-size:12px"><input type="checkbox" id="dlVideo" style="width:auto;margin:0"> Видео файлыг татаж хадгалах</label>
+  </div>
+  <div class="f" id="thumbwrap" style="display:none">
+    <label>📸 Screenshot (контент зураг олдоогүй үед)</label>
+    <img id="thumb" alt="" style="width:100%;border-radius:8px;border:1px solid #ccc;display:block;margin-bottom:5px">
+    <button id="reshot" type="button" style="width:auto;padding:3px 10px;font-size:11px;font-weight:500;background:transparent;border:1px solid #bbb;border-radius:6px;color:inherit;cursor:pointer">📸 Дахин авах</button>
+  </div>
+  <div class="row">
+    <div class="f"><label>Төрөл (reftype)</label>
+      <select id="reftype">
+        <option value="website">website</option>
+        <option value="video">video</option>
+        <option value="article">article</option>
+        <option value="product">product</option>
+        <option value="template">template</option>
+        <option value="post">post</option>
+        <option value="book">book</option>
+        <option value="tool">tool</option>
+      </select>
+    </div>
+    <div class="f"><label>Төсөл (сонголт)</label><input id="project" placeholder="TBD" autocomplete="off"></div>
+  </div>
+  <div class="f"><label>🤖 Claude-д даалгавар (боловсруулахад юу хийх вэ)</label><textarea id="claudeTask" placeholder="Ж: гол санааг монголоор дүгнэ, action item гарга, орчуул, миний төсөлтэй хэрхэн холбогдохыг хэл..."></textarea></div>
+  <div class="f"><label>✍️ Миний тэмдэглэл</label><textarea id="note" placeholder="Яагаад хадгалав, өөрийн бодол..."></textarea></div>
+  <button id="save">Vault Inbox руу хадгалах</button>
+  <div class="ok" id="ok"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
