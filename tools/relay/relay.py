@@ -299,9 +299,14 @@ def d_next(text, sid):
 
 import re as _re
 def chname(v):
-    """Discord channel name from the Claude app session title (same title on PC & Mac → same channel)."""
-    t = v.get("title") or v.get("project") or v["name"]
-    return _re.sub(r"-+", "-", _re.sub(r"[^\w\-]+", "-", t.strip().lower(), flags=_re.U)).strip("-")[:90]
+    """Discord channel name from the Claude app session title (same title on PC & Mac → same channel).
+    Leading status emoji (🔥 📐 ⏸ ✅ …) is kept so Discord mirrors the sidebar."""
+    t = (v.get("title") or v.get("project") or v["name"]).strip()
+    m = _re.match(r"^([^\w\s\[\(]+)\s*", t)
+    emo = m.group(1) if m else ""
+    rest = t[m.end():] if m else t
+    body = _re.sub(r"-+", "-", _re.sub(r"[^\w\-]+", "-", rest.lower(), flags=_re.U)).strip("-")
+    return ((emo + "-") if emo else "") + body[:85]
 
 def chmap():
     """session_id → numbered Discord channel. Same project slug on PC & Mac → ONE channel (named by the first titled session)."""
@@ -314,10 +319,11 @@ def chmap():
     names = {}; counter = {}
     for k, v in first.items():
         base = chname(v)
-        if not _re.match(r"^\d", base):
+        emo, _, core = base.partition("-") if not _re.match(r"^\w", base) else ("", "", base)
+        if not _re.match(r"^\d", core):
             counter[v["group"]] = counter.get(v["group"], 0) + 1
-            base = f"{counter[v['group']]:02d}-{base}"
-        names[k] = base
+            core = f"{counter[v['group']]:02d}-{core}"
+        names[k] = (emo + "-" if emo else "") + core
     return {sid: names[key(v)] for sid, v in regs}
 
 CATS = {"tasks": "01 Tasks", "projects": "02 Projects", "areas": "03 Areas", "resources": "04 Resources", "research": "05 Research", "development": "06 Development", "system": "07 System", "archive": "08 Archive"}
