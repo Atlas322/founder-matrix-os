@@ -253,10 +253,11 @@ def d_baton(hook, push_every=300):
     f = REPO / "state" / f"{me['project']}.md"; f.parent.mkdir(exist_ok=True)
     old = f.read_text(encoding="utf-8") if f.exists() else ""
     hist = old.split("## ТҮҮХ", 1)[1].strip() if "## ТҮҮХ" in old else ""
+    nxt = [l for l in old.split("## ТҮҮХ")[0].splitlines() if l.startswith("**Дараагийн алхам")]
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     first = asst.split("\n")[0][:140]
     now = (f"# {me['project']}\n\n## ОДОО · {ts} · {me['name']} ({DEVICE})\n"
-           f"**BD-ийн сүүлийн хүсэлт:** {user[:500]}\n\n**Хаана зогссон (сүүлийн хариу):**\n{asst[:2500]}\n")
+           + (nxt[0] + "\n" if nxt else "") + f"**BD-ийн сүүлийн хүсэлт:** {user[:500]}\n\n**Хаана зогссон (сүүлийн хариу):**\n{asst[:2500]}\n")
     line = f"- {ts} · {DEVICE} · {me['name']} · {first}"
     f.write_text(now + "\n## ТҮҮХ\n" + (hist + "\n" if hist else "") + line + "\n", encoding="utf-8")
     st = load(STATE, {}); k = "_baton_push_" + me["project"]
@@ -264,6 +265,21 @@ def d_baton(hook, push_every=300):
         git("add", str(f)); git("commit", "-qm", f"baton {me['project']} · {me['name']} ({DEVICE})")
         git("pull", "-q", "--rebase", "--autostash"); git("push", "-q")
         st[k] = time.time(); save(STATE, st)
+
+
+def d_next(text, sid):
+    """Pin 'Дараагийн алхам' in state/<project>.md (kept across auto baton writes)."""
+    me = load(REG, {"sessions": {}})["sessions"].get(sid)
+    if not me or not me.get("project"): print("project алга"); return
+    f = REPO / "state" / f"{me['project']}.md"; old = f.read_text(encoding="utf-8") if f.exists() else f"# {me['project']}\n\n## ТҮҮХ\n"
+    head, _, tail = old.partition("## ТҮҮХ")
+    lines = [l for l in head.splitlines() if not l.startswith("**Дараагийн алхам")]
+    i = next((k + 1 for k, l in enumerate(lines) if l.startswith("## ОДОО")), len(lines))
+    ts = datetime.datetime.now().strftime("%m-%d %H:%M")
+    lines.insert(i, f"**Дараагийн алхам ({me['name']}, {ts}):** {text}")
+    f.write_text("\n".join(lines).rstrip() + "\n\n## ТҮҮХ" + tail, encoding="utf-8")
+    git("add", str(f)); git("commit", "-qm", f"baton next {me['project']}"); git("pull", "-q", "--rebase", "--autostash"); git("push", "-q")
+    print("pinned")
 
 
 def main():
@@ -285,6 +301,8 @@ def main():
         return d_send(a[1], " ".join(a[2:]), sid)
     if a[0] == "gsend":  # old git transport
         return cmd_send(a[1], a[2], a[3] if len(a) > 3 else "", sid)
+    if a[0] == "next":
+        return d_next(" ".join(a[1:]), sid)
     if a[0] == "baton":
         try: hook = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
         except Exception: return
