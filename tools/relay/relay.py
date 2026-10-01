@@ -197,6 +197,29 @@ def d_send(to, text, sid):
     print("sent →", name)
 
 
+def d_watch(sid, every=20):
+    """Continuous: print one line per new Discord message for this session (own messages skipped)."""
+    reg = load(REG, {"sessions": {}}); me = reg["sessions"].get(sid)
+    names = ["org"] + ([me["group"]] if me else [])
+    tag = f"[{me['name']}]" if me else None
+    st = load(STATE, {}); ch = dchannels(st); save(STATE, st)
+    last = {}
+    for n in names:
+        lm = dapi("GET", f"/channels/{ch[n]}/messages?limit=1") if n in ch else []
+        last[n] = lm[0]["id"] if lm else "0"
+    while True:
+        time.sleep(every)
+        for n in names:
+            if n not in ch: continue
+            try: msgs = sorted(dapi("GET", f"/channels/{ch[n]}/messages?after={last[n]}&limit=20"), key=lambda m: int(m["id"]))
+            except Exception as e: print(f"[watch error] {e}", flush=True); continue
+            for m in msgs:
+                last[n] = m["id"]
+                if tag and m["content"].startswith(tag): continue
+                who = m["author"].get("global_name") or m["author"]["username"]
+                print(f"#{n} · {who}: " + m["content"].replace("\n", " ⏎ ")[:600], flush=True)
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     a = sys.argv[1:]
@@ -215,6 +238,8 @@ def main():
         return d_send(a[1], " ".join(a[2:]), sid)
     if a[0] == "gsend":  # old git transport
         return cmd_send(a[1], a[2], a[3] if len(a) > 3 else "", sid)
+    if a[0] == "watch":
+        return d_watch(sid)
     if a[0] == "who":
         for k, v in load(REG, {"sessions": {}})["sessions"].items():
             print(f"{v['name']:<24} @{v['group']:<10} {v['device']:<4} {k}")
