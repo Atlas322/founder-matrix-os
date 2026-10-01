@@ -10,7 +10,7 @@ BD-ийн зорилго (2026-10-02): **BD хаана ч (PC / Mac / утас) 
 | **Projects** | Projects | `#projects` | хугацаатай төсөл (probaitsaa, byd, inai-website…) |
 | **Areas** | Areas | `#areas` | байнгын хариуцлага — **admin-ууд**: 00 Inbox, 01 Project, 02 Area, 03 System |
 | **Resources** | Resources | `#resources` | лавлах, хэрэгсэл — Creative Director, Wiki |
-| (бүгд) | — | `#org` | бүх сешн сонсоно, Mac ↔ PC ↔ BD |
+| (бүгд) | — | `#03-sys-admin` | бүх сешн сонсоно, Mac ↔ PC ↔ BD |
 | (төлөв) | — | `#status` | сешн бүрийн амьд төлөв |
 
 Хувийн (Home) сешн: Areas-д, `--private` — Discord/status/git-д юу ч гарахгүй.
@@ -22,11 +22,11 @@ BD-ийн зорилго (2026-10-02): **BD хаана ч (PC / Mac / утас) 
 
 **Дүрэм — сешн бүр өөрийн Discord сувагтай (BD, 2026-10-02):**
 - Бүртгэлтэй сешн бүр өөрийн нэр бүхий Discord сувагтай байх ёстой. Нэг төслийн PC, Mac хос сешн тэр сувгаа хамт ашиглана.
-- Суваггүй сешн олдвол (эсвэл бүтэц нь энэ дүрэмд таарахгүй бол) Mac, PC хоёр `#org` дээр ярилцаж тохирно. Дараа нь нэг тал (03 Sys Admin) энэ файлын дүрэм, `registry.json`-ийг шинэчлээд push хийж, `sync-discord` ажиллуулна. Нөгөө тал `git pull` хийнэ.
+- Суваггүй сешн олдвол (эсвэл бүтэц нь энэ дүрэмд таарахгүй бол) Mac, PC хоёр `#03-sys-admin` дээр ярилцаж тохирно. Дараа нь нэг тал (03 Sys Admin) энэ файлын дүрэм, `registry.json`-ийг шинэчлээд push хийж, `sync-discord` ажиллуулна. Нөгөө тал `git pull` хийнэ.
 
 ## 3. Харилцаа (Discord, git-гүй)
 
-- Сонсох: hook (`SessionStart`, `UserPromptSubmit`) → `#org` + өөрийн группийн сувгийн шинэ мессеж.
+- Сонсох: hook (`SessionStart`, `UserPromptSubmit`) → `#03-sys-admin` + өөрийн группийн сувгийн шинэ мессеж.
 - Тасралтгүй: `relay.py watch` (Monitor).
 - Бичих: `relay.py send <org|group> "текст"` → `[сешний нэр] текст`.
 
