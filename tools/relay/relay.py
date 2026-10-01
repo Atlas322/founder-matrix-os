@@ -20,7 +20,7 @@ REPO = Path(os.environ.get("FMOS_REPO", Path(__file__).resolve().parents[2]))
 RELAY = REPO / "relay"
 REG = RELAY / "registry.json"
 STATE = Path.home() / ".fmos_relay_state.json"   # per-machine read cursors (not in git)
-GROUPS = ["tasks", "projects", "areas", "resources", "rnd", "archive"]
+GROUPS = ["tasks", "projects", "areas", "resources", "research", "development", "archive"]
 DEVICE = os.environ.get("FMOS_DEVICE") or ("Mac" if sys.platform == "darwin" else "PC")
 PULL_EVERY = 45  # seconds
 
@@ -320,7 +320,7 @@ def chmap():
         names[k] = base
     return {sid: names[key(v)] for sid, v in regs}
 
-CATS = {"tasks": "01 Tasks", "projects": "02 Projects", "areas": "03 Areas", "resources": "04 Resources", "rnd": "05 R&D", "system": "06 System", "archive": "07 Archive"}
+CATS = {"tasks": "01 Tasks", "projects": "02 Projects", "areas": "03 Areas", "resources": "04 Resources", "research": "05 Research", "development": "06 Development", "system": "07 System", "archive": "08 Archive"}
 SYSTEM_CH = ["org", "status", "status-data", "general", "relay"]
 
 def d_sync():
@@ -328,7 +328,7 @@ def d_sync():
     gid = load(DCFG, {})["guild"]["id"]
     reg = [v for v in load(REG, {"sessions": {}})["sessions"].values() if not v.get("private")]
     allc = dapi("GET", f"/guilds/{gid}/channels")
-    byname = {_re.sub(r"^\d+\s*", "", c["name"]).lower().replace("r&d", "rnd"): c for c in allc if c["type"] == 4}
+    byname = {_re.sub(r"^\d+\s*", "", c["name"]).lower().replace("r&d", "research"): c for c in allc if c["type"] == 4}
     cats = {}
     for i, (k, name) in enumerate(CATS.items()):
         c = byname.get(k)
