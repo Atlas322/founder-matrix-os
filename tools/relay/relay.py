@@ -165,7 +165,7 @@ def d_inbox(hook):
     sid = hook.get("session_id", ""); event = hook.get("hook_event_name", "")
     state = load(STATE, {}); reg = load(REG, {"sessions": {}})
     me = reg["sessions"].get(sid)
-    names = ["org"] + ([me["group"]] if me else [])
+    names = ["org"] + ([me.get("project") or me["group"]] if me else [])
     ch = dchannels(state); cur = state.setdefault(sid, {}); out = []
     my_tag = f"[{me['name']}]" if me else None
     for n in names:
@@ -209,7 +209,7 @@ def d_send(to, text, sid):
 def d_watch(sid, every=20):
     """Continuous: print one line per new Discord message for this session (own messages skipped)."""
     reg = load(REG, {"sessions": {}}); me = reg["sessions"].get(sid)
-    names = ["org"] + ([me["group"]] if me else [])
+    names = ["org"] + ([me.get("project") or me["group"]] if me else [])
     tag = f"[{me['name']}]" if me else None
     st = load(STATE, {}); ch = dchannels(st); save(STATE, st)
     last = {}
@@ -282,6 +282,39 @@ def d_next(text, sid):
     print("pinned")
 
 
+CATS = {"tasks": "Tasks", "projects": "Projects", "areas": "Areas", "resources": "Resources", "system": "System", "archive": "Archive"}
+SYSTEM_CH = ["org", "status", "status-data", "general", "relay"]
+
+def d_sync():
+    """Discord = sidebar: category per PARA group, one channel per project slug. Never deletes — old channels → Archive."""
+    gid = load(DCFG, {})["guild"]["id"]
+    reg = [v for v in load(REG, {"sessions": {}})["sessions"].values() if not v.get("private")]
+    allc = dapi("GET", f"/guilds/{gid}/channels")
+    cats = {c["name"].lower(): c["id"] for c in allc if c["type"] == 4}
+    for k, name in CATS.items():
+        if k not in cats:
+            cats[k] = dapi("POST", f"/guilds/{gid}/channels", {"name": name, "type": 4})["id"]; print("category +", name)
+    text = {c["name"]: c for c in allc if c["type"] == 0}
+    want = {}
+    for v in reg:
+        slug = v.get("project") or v["name"].lower()
+        want.setdefault(slug, v["group"])
+    for slug, grp in want.items():
+        parent = cats[grp if grp in CATS else "archive"]
+        if slug in text:
+            if text[slug].get("parent_id") != parent:
+                dapi("PATCH", f"/channels/{text[slug]['id']}", {"parent_id": parent}); print("move", slug, "→", grp)
+        else:
+            dapi("POST", f"/guilds/{gid}/channels", {"name": slug, "type": 0, "parent_id": parent}); print("channel +", slug, "@", grp)
+            time.sleep(0.6)
+    for n, c in text.items():
+        if n in want: continue
+        tgt = cats["system"] if n in SYSTEM_CH else cats["archive"]
+        if c.get("parent_id") != tgt:
+            dapi("PATCH", f"/channels/{c['id']}", {"parent_id": tgt}); print("move", n, "→", "System" if n in SYSTEM_CH else "Archive")
+    st = load(STATE, {}); st.pop("_dch", None); save(STATE, st)
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     a = sys.argv[1:]
@@ -301,6 +334,8 @@ def main():
         return d_send(a[1], " ".join(a[2:]), sid)
     if a[0] == "gsend":  # old git transport
         return cmd_send(a[1], a[2], a[3] if len(a) > 3 else "", sid)
+    if a[0] == "sync-discord":
+        return d_sync()
     if a[0] == "next":
         return d_next(" ".join(a[1:]), sid)
     if a[0] == "baton":
