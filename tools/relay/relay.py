@@ -109,6 +109,7 @@ def cmd_register(name, group, sid, project=None):
                             "host": socket.gethostname(), "since": datetime.date.today().isoformat()}
     if project: reg["sessions"][sid]["project"] = project
     if "--private" in sys.argv: reg["sessions"][sid]["private"] = True
+    if "--title" in sys.argv: reg["sessions"][sid]["title"] = sys.argv[sys.argv.index("--title") + 1]
     save(REG, reg)
     (RELAY / "s").mkdir(exist_ok=True)
     git("add", str(REG))
@@ -165,7 +166,7 @@ def d_inbox(hook):
     sid = hook.get("session_id", ""); event = hook.get("hook_event_name", "")
     state = load(STATE, {}); reg = load(REG, {"sessions": {}})
     me = reg["sessions"].get(sid)
-    names = ["org"] + ([me.get("project") or me["group"]] if me else [])
+    names = ["org"] + ([chname(me)] if me else [])
     ch = dchannels(state); cur = state.setdefault(sid, {}); out = []
     my_tag = f"[{me['name']}]" if me else None
     for n in names:
@@ -209,7 +210,7 @@ def d_send(to, text, sid):
 def d_watch(sid, every=20):
     """Continuous: print one line per new Discord message for this session (own messages skipped)."""
     reg = load(REG, {"sessions": {}}); me = reg["sessions"].get(sid)
-    names = ["org"] + ([me.get("project") or me["group"]] if me else [])
+    names = ["org"] + ([chname(me)] if me else [])
     tag = f"[{me['name']}]" if me else None
     st = load(STATE, {}); ch = dchannels(st); save(STATE, st)
     last = {}
@@ -282,6 +283,12 @@ def d_next(text, sid):
     print("pinned")
 
 
+import re as _re
+def chname(v):
+    """Discord channel name from the Claude app session title (same title on PC & Mac → same channel)."""
+    t = v.get("title") or v.get("project") or v["name"]
+    return _re.sub(r"-+", "-", _re.sub(r"[^\w\-]+", "-", t.strip().lower(), flags=_re.U)).strip("-")[:90]
+
 CATS = {"tasks": "Tasks", "projects": "Projects", "areas": "Areas", "resources": "Resources", "system": "System", "archive": "Archive"}
 SYSTEM_CH = ["org", "status", "status-data", "general", "relay"]
 
@@ -297,10 +304,12 @@ def d_sync():
     text = {c["name"]: c for c in allc if c["type"] == 0}
     want = {}
     for v in reg:
-        slug = v.get("project") or v["name"].lower()
-        want.setdefault(slug, v["group"])
-    for slug, grp in want.items():
+        want.setdefault(chname(v), (v["group"], v.get("project")))
+    for slug, (grp, proj) in want.items():
         parent = cats[grp if grp in CATS else "archive"]
+        if slug not in text and proj and proj in text and proj not in want:
+            dapi("PATCH", f"/channels/{text[proj]['id']}", {"name": slug, "parent_id": parent}); print("rename", proj, "→", slug)
+            text[slug] = text.pop(proj); continue
         if slug in text:
             if text[slug].get("parent_id") != parent:
                 dapi("PATCH", f"/channels/{text[slug]['id']}", {"parent_id": parent}); print("move", slug, "→", grp)
