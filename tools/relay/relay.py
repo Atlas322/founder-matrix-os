@@ -100,7 +100,13 @@ def cmd_inbox():
     print(json.dumps({"hookSpecificOutput": {"hookEventName": event or "UserPromptSubmit", "additionalContext": ctx}}, ensure_ascii=False))
 
 
+def _full_sid(sid):
+    if len(sid) >= 36: return sid
+    hits = sorted((Path.home() / ".claude" / "projects").glob(f"*/{sid}*.jsonl"), key=lambda p: p.stat().st_mtime)
+    return hits[-1].stem if hits else sid
+
 def cmd_register(name, group, sid, project=None):
+    sid = _full_sid(sid)
     group = group.lower().lstrip("@")
     assert group in GROUPS, f"group ∈ {GROUPS}"
     git("pull", "-q", "--rebase", "--autostash")
