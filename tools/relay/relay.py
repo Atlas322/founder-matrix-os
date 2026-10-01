@@ -111,7 +111,8 @@ def cmd_register(name, group, sid, project=None):
     assert group in GROUPS, f"group ∈ {GROUPS}"
     git("pull", "-q", "--rebase", "--autostash")
     reg = load(REG, {"sessions": {}})
-    reg["sessions"][sid] = {"name": name, "group": group, "device": DEVICE,
+    keep = {k: v for k, v in reg["sessions"].get(sid, {}).items() if k in ("project", "title", "private")}
+    reg["sessions"][sid] = {**keep, "name": name, "group": group, "device": DEVICE,
                             "host": socket.gethostname(), "since": datetime.date.today().isoformat()}
     if project: reg["sessions"][sid]["project"] = project
     if "--private" in sys.argv: reg["sessions"][sid]["private"] = True
