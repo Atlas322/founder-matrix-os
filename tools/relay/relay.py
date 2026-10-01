@@ -180,6 +180,7 @@ def dchannels(state):
 
 def d_inbox(hook):
     sid = hook.get("session_id", ""); event = hook.get("hook_event_name", "")
+    if event == "SessionStart": git("pull", "-q", "--rebase", "--autostash")
     state = load(STATE, {}); reg = load(REG, {"sessions": {}})
     me = reg["sessions"].get(sid)
     names = list(dict.fromkeys([BROADCAST] + ([chmap().get(sid, chname(me))] if me else [])))
@@ -209,7 +210,8 @@ def d_inbox(hook):
             hist = [l for l in t.split("## ТҮҮХ")[-1].strip().splitlines() if l.startswith("- ")][-5:]
             NL = chr(10)
             out.insert(0, f"### 🏃 baton · {me['project']}{NL}{now}{NL}{NL}Сүүлийн түүх:{NL}" + NL.join(hist))
-    ctx = (f"[FMOS Discord] Энэ сешн: {who}. Хариу/мэдэгдэл: `python {Path(__file__)} send <org|group> \"текст\" --sid {sid}`.\n"
+    ctx = (f"[FMOS Discord] Энэ сешн: {who}. Хариу: `python {Path(__file__)} send <сувгийн нэр|sys> \"текст\" --sid {sid}`."
+           + (f" Тасралтгүй сонсох: Monitor-оор `python {Path(__file__)} watch --sid {sid}` асаа (30 мин тутам дахин)." if event == "SessionStart" and me else "") + "\n"
            + ("\n\n".join(out) if out else "Шинэ мессеж алга."))
     print(json.dumps({"hookSpecificOutput": {"hookEventName": event or "UserPromptSubmit", "additionalContext": ctx}}, ensure_ascii=False))
 
