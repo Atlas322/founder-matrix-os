@@ -339,12 +339,16 @@ def d_sync():
         else:
             cats[k] = dapi("POST", f"/guilds/{gid}/channels", {"name": name, "type": 4, "position": i})["id"]; print("category +", name)
     text = {c["name"]: c for c in allc if c["type"] == 0}
+    CHF = RELAY / "channels.json"; prev = load(CHF, {})  # project → last channel name (for in-place rename)
     want = {}
     for sid, name in chmap().items():
         v = load(REG, {"sessions": {}})["sessions"][sid]
         want.setdefault(name, (v["group"], v.get("project")))
     for slug, (grp, proj) in want.items():
         parent = cats[grp if grp in CATS else "archive"]
+        if slug not in text and proj and prev.get(proj) in text and prev.get(proj) not in want:
+            o = prev[proj]; dapi("PATCH", f"/channels/{text[o]['id']}", {"name": slug, "parent_id": parent}); print("rename", o, "→", slug)
+            text[slug] = text.pop(o); continue
         old = _re.sub(r"^\d+-", "", slug)
         if slug not in text and old not in text:  # same title, different number/group → move existing channel
             cand = [n for n in text if _re.sub(r"^\d+-", "", n) == old and n not in want]
@@ -366,6 +370,8 @@ def d_sync():
         tgt = cats["system"] if n in SYSTEM_CH else cats["archive"]
         if c.get("parent_id") != tgt:
             dapi("PATCH", f"/channels/{c['id']}", {"parent_id": tgt}); print("move", n, "→", "System" if n in SYSTEM_CH else "Archive")
+    save(CHF, {proj: slug for slug, (grp, proj) in want.items() if proj})
+    git("add", str(CHF)); git("commit", "-qm", "relay: channels.json"); git("push", "-q")
     allc = dapi("GET", f"/guilds/{gid}/channels")
     gidx = {}
     for c in sorted([c for c in allc if c["type"] == 0], key=lambda c: (c.get("parent_id") or "", c["name"])):
