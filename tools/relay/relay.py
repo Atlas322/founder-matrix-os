@@ -147,7 +147,7 @@ def cmd_send(to, title, body, sid):
 
 
 # ── Discord transport (default): channels = Discord, no git per message ──
-import urllib.request
+import urllib.request, urllib.error
 API = "https://discord.com/api/v10"
 DTOKEN_F = Path.home() / ".fmos_discord_token"
 DCFG = RELAY / "discord.json"
@@ -157,8 +157,16 @@ def dapi(method, path, body=None):
         data=json.dumps(body).encode() if body is not None else None,
         headers={"Authorization": "Bot " + DTOKEN_F.read_text().strip(), "Content-Type": "application/json",
                  "User-Agent": "FMOS-relay (https://github.com/rollingbd/founder-matrix-os, 1)"})
-    with urllib.request.urlopen(req, timeout=8) as r:
-        return json.loads(r.read() or b"null")
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(req, timeout=8) as r:
+                return json.loads(r.read() or b"null")
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 502, 503) and attempt < 4:
+                try: wait = float(json.loads(e.read() or b"{}").get("retry_after", 2))
+                except Exception: wait = 2
+                time.sleep(min(wait + 0.5, 30)); continue
+            raise
 
 def dchannels(state):
     ch = state.get("_dch")
@@ -296,16 +304,21 @@ def chname(v):
     return _re.sub(r"-+", "-", _re.sub(r"[^\w\-]+", "-", t.strip().lower(), flags=_re.U)).strip("-")[:90]
 
 def chmap():
-    """session_id → numbered Discord channel name (same numbering as sync)."""
-    out = {}; counter = {}
-    for sid, v in load(REG, {"sessions": {}})["sessions"].items():
-        if v.get("private"): continue
+    """session_id → numbered Discord channel. Same project slug on PC & Mac → ONE channel (named by the first titled session)."""
+    regs = [(sid, v) for sid, v in load(REG, {"sessions": {}})["sessions"].items() if not v.get("private")]
+    key = lambda v: v.get("project") or chname(v)
+    first = {}
+    for sid, v in regs:
+        k = key(v)
+        if k not in first or (v.get("title") and not first[k].get("title")): first[k] = v
+    names = {}; counter = {}
+    for k, v in first.items():
         base = chname(v)
         if not _re.match(r"^\d", base):
             counter[v["group"]] = counter.get(v["group"], 0) + 1
             base = f"{counter[v['group']]:02d}-{base}"
-        out[sid] = base
-    return out
+        names[k] = base
+    return {sid: names[key(v)] for sid, v in regs}
 
 CATS = {"tasks": "01 Tasks", "projects": "02 Projects", "areas": "03 Areas", "resources": "04 Resources", "rnd": "05 R&D", "system": "06 System", "archive": "07 Archive"}
 SYSTEM_CH = ["org", "status", "status-data", "general", "relay"]
@@ -326,13 +339,10 @@ def d_sync():
         else:
             cats[k] = dapi("POST", f"/guilds/{gid}/channels", {"name": name, "type": 4, "position": i})["id"]; print("category +", name)
     text = {c["name"]: c for c in allc if c["type"] == 0}
-    want = {}; counter = {}
-    for v in reg:
-        base = chname(v)
-        if not _re.match(r"^\d", base):
-            counter[v["group"]] = counter.get(v["group"], 0) + 1
-            base = f"{counter[v['group']]:02d}-{base}"
-        want.setdefault(base, (v["group"], v.get("project")))
+    want = {}
+    for sid, name in chmap().items():
+        v = load(REG, {"sessions": {}})["sessions"][sid]
+        want.setdefault(name, (v["group"], v.get("project")))
     for slug, (grp, proj) in want.items():
         parent = cats[grp if grp in CATS else "archive"]
         old = _re.sub(r"^\d+-", "", slug)
