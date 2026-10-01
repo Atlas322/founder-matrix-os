@@ -114,6 +114,8 @@ def cmd_inbox():
         if items:
             out.append(f"### #{key}\n" + "\n\n".join(items))
     save(STATE, state)
+    if me and "Sys Admin" in (me.get("title") or "") and event == "SessionStart":
+        out.insert(0, f"### 🛰 Та 03 Sys Admin — ДИСПЕТЧЕРИЙГ одоо асаа: Monitor(command='python {Path(__file__)} dispatch --sid {sid}', timeout_ms=1800000), дуусах бүрд тэр даруй дахин асаа. Event ирвэл wake жагсаалтын сешнийг send_message-ээр сэрээ.")
     if me and me.get("folder"): out.insert(0, f"### 📁 Төслийн хавтас: `{me['folder']}` — энэ төслийн бүх тэмдэглэл, файл ЗӨВХӨН энд (vault-ийн дүрэм _CLAUDE.md-г дагана). Өөр төслийн хавтсанд бүү бич.")
     who = f"{me['name']} · @{me['group']} · {DEVICE}" if me else f"бүртгэлгүй ({DEVICE}, sid {sid[:8]})"
     if not out and event != "SessionStart":
