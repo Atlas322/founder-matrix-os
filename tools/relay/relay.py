@@ -100,13 +100,14 @@ def cmd_inbox():
     print(json.dumps({"hookSpecificOutput": {"hookEventName": event or "UserPromptSubmit", "additionalContext": ctx}}, ensure_ascii=False))
 
 
-def cmd_register(name, group, sid):
+def cmd_register(name, group, sid, project=None):
     group = group.lower().lstrip("@")
     assert group in GROUPS, f"group ∈ {GROUPS}"
     git("pull", "-q", "--rebase", "--autostash")
     reg = load(REG, {"sessions": {}})
     reg["sessions"][sid] = {"name": name, "group": group, "device": DEVICE,
                             "host": socket.gethostname(), "since": datetime.date.today().isoformat()}
+    if project: reg["sessions"][sid]["project"] = project
     save(REG, reg)
     (RELAY / "s").mkdir(exist_ok=True)
     git("add", str(REG))
@@ -183,6 +184,13 @@ def d_inbox(hook):
     save(STATE, state)
     if not out and event != "SessionStart": return
     who = f"{me['name']} · @{me['group']} · {DEVICE}" if me else f"бүртгэлгүй ({DEVICE}, sid {sid[:8]})"
+    if me and me.get("project") and event == "SessionStart":
+        sf = REPO / "state" / f"{me['project']}.md"
+        if sf.exists():
+            t = sf.read_text(encoding="utf-8"); now = t.split("## ТҮҮХ")[0].strip()
+            hist = [l for l in t.split("## ТҮҮХ")[-1].strip().splitlines() if l.startswith("- ")][-5:]
+            NL = chr(10)
+            out.insert(0, f"### 🏃 baton · {me['project']}{NL}{now}{NL}{NL}Сүүлийн түүх:{NL}" + NL.join(hist))
     ctx = (f"[FMOS Discord] Энэ сешн: {who}. Хариу/мэдэгдэл: `python {Path(__file__)} send <org|group> \"текст\" --sid {sid}`.\n"
            + ("\n\n".join(out) if out else "Шинэ мессеж алга."))
     print(json.dumps({"hookSpecificOutput": {"hookEventName": event or "UserPromptSubmit", "additionalContext": ctx}}, ensure_ascii=False))
@@ -220,6 +228,43 @@ def d_watch(sid, every=20):
                 print(f"#{n} · {who}: " + m["content"].replace("\n", " ⏎ ")[:600], flush=True)
 
 
+def _last_turn(tp):
+    user = asst = ""
+    try:
+        for line in open(tp, encoding="utf-8", errors="ignore"):
+            try: j = json.loads(line)
+            except Exception: continue
+            m = j.get("message") or {}
+            c = m.get("content")
+            txt = c if isinstance(c, str) else "\n".join(x.get("text", "") for x in (c or []) if isinstance(x, dict) and x.get("type") == "text")
+            if not txt.strip(): continue
+            if j.get("type") == "user" and not txt.startswith("<"): user, asst = txt, ""
+            elif j.get("type") == "assistant": asst = txt
+    except Exception: pass
+    return user.strip(), asst.strip()
+
+def d_baton(hook, push_every=300):
+    """Stop hook: write state/<project>.md (ОДОО overwritten, ТҮҮХ appended); commit+push throttled."""
+    sid = hook.get("session_id", ""); me = load(REG, {"sessions": {}})["sessions"].get(sid)
+    if not me or not me.get("project"): return
+    user, asst = _last_turn(hook.get("transcript_path", ""))
+    if not asst: return
+    f = REPO / "state" / f"{me['project']}.md"; f.parent.mkdir(exist_ok=True)
+    old = f.read_text(encoding="utf-8") if f.exists() else ""
+    hist = old.split("## ТҮҮХ", 1)[1].strip() if "## ТҮҮХ" in old else ""
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    first = asst.split("\n")[0][:140]
+    now = (f"# {me['project']}\n\n## ОДОО · {ts} · {me['name']} ({DEVICE})\n"
+           f"**BD-ийн сүүлийн хүсэлт:** {user[:500]}\n\n**Хаана зогссон (сүүлийн хариу):**\n{asst[:2500]}\n")
+    line = f"- {ts} · {DEVICE} · {me['name']} · {first}"
+    f.write_text(now + "\n## ТҮҮХ\n" + (hist + "\n" if hist else "") + line + "\n", encoding="utf-8")
+    st = load(STATE, {}); k = "_baton_push_" + me["project"]
+    if time.time() - st.get(k, 0) > push_every:
+        git("add", str(f)); git("commit", "-qm", f"baton {me['project']} · {me['name']} ({DEVICE})")
+        git("pull", "-q", "--rebase", "--autostash"); git("push", "-q")
+        st[k] = time.time(); save(STATE, st)
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     a = sys.argv[1:]
@@ -233,11 +278,16 @@ def main():
         except Exception as e:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": hook.get("hook_event_name","UserPromptSubmit"), "additionalContext": f"[FMOS Discord] уншиж чадсангүй: {e}"}}, ensure_ascii=False)); return
     if a[0] == "register":
-        return cmd_register(a[1], a[2], sid)
+        pj = a[a.index("--project")+1] if "--project" in a else None
+        return cmd_register(a[1], a[2], sid, pj)
     if a[0] == "send":
         return d_send(a[1], " ".join(a[2:]), sid)
     if a[0] == "gsend":  # old git transport
         return cmd_send(a[1], a[2], a[3] if len(a) > 3 else "", sid)
+    if a[0] == "baton":
+        try: hook = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
+        except Exception: return
+        return d_baton(hook)
     if a[0] == "watch":
         return d_watch(sid)
     if a[0] == "who":
