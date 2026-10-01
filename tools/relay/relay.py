@@ -136,6 +136,67 @@ def cmd_send(to, title, body, sid):
     print("sent" if r.returncode == 0 else "committed (push failed: " + r.stderr.strip() + ")")
 
 
+
+# ── Discord transport (default): channels = Discord, no git per message ──
+import urllib.request
+API = "https://discord.com/api/v10"
+DTOKEN_F = Path.home() / ".fmos_discord_token"
+DCFG = RELAY / "discord.json"
+
+def dapi(method, path, body=None):
+    req = urllib.request.Request(API + path, method=method,
+        data=json.dumps(body).encode() if body is not None else None,
+        headers={"Authorization": "Bot " + DTOKEN_F.read_text().strip(), "Content-Type": "application/json",
+                 "User-Agent": "FMOS-relay (https://github.com/rollingbd/founder-matrix-os, 1)"})
+    with urllib.request.urlopen(req, timeout=8) as r:
+        return json.loads(r.read() or b"null")
+
+def dchannels(state):
+    ch = state.get("_dch")
+    if not ch or time.time() - state.get("_dch_t", 0) > 3600:
+        gid = load(DCFG, {})["guild"]["id"]
+        ch = {c["name"]: c["id"] for c in dapi("GET", f"/guilds/{gid}/channels") if c.get("type") == 0}
+        state["_dch"], state["_dch_t"] = ch, time.time()
+    return ch
+
+def d_inbox(hook):
+    sid = hook.get("session_id", ""); event = hook.get("hook_event_name", "")
+    state = load(STATE, {}); reg = load(REG, {"sessions": {}})
+    me = reg["sessions"].get(sid)
+    names = ["org"] + ([me["group"]] if me else [])
+    ch = dchannels(state); cur = state.setdefault(sid, {}); out = []
+    my_tag = f"[{me['name']}]" if me else None
+    for n in names:
+        cid = ch.get(n)
+        if not cid: continue
+        last = cur.get(n)
+        q = f"?limit=20" + (f"&after={last}" if last else "")
+        msgs = sorted(dapi("GET", f"/channels/{cid}/messages{q}"), key=lambda m: int(m["id"]))
+        if not last and event != "SessionStart": msgs = []
+        elif not last: msgs = msgs[-5:]
+        if msgs: cur[n] = msgs[-1]["id"]
+        elif not last:
+            lm = dapi("GET", f"/channels/{cid}/messages?limit=1"); cur[n] = lm[0]["id"] if lm else "0"
+        lines = [f"- {m['timestamp'][11:16]} **{m['author'].get('global_name') or m['author']['username']}**: {m['content']}"
+                 for m in msgs if not (my_tag and m["content"].startswith(my_tag))]
+        if lines: out.append(f"### #{n}\n" + "\n".join(lines))
+    save(STATE, state)
+    if not out and event != "SessionStart": return
+    who = f"{me['name']} · @{me['group']} · {DEVICE}" if me else f"бүртгэлгүй ({DEVICE}, sid {sid[:8]})"
+    ctx = (f"[FMOS Discord] Энэ сешн: {who}. Хариу/мэдэгдэл: `python {Path(__file__)} send <org|group> \"текст\" --sid {sid}`.\n"
+           + ("\n\n".join(out) if out else "Шинэ мессеж алга."))
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": event or "UserPromptSubmit", "additionalContext": ctx}}, ensure_ascii=False))
+
+def d_send(to, text, sid):
+    reg = load(REG, {"sessions": {}}); me = reg["sessions"].get(sid, {"name": f"{DEVICE}-{sid[:6]}"})
+    state = load(STATE, {}); ch = dchannels(state); save(STATE, state)
+    name = "org" if to in ("all", "@all", "org") else to.lstrip("@").lower()
+    cid = ch[name]; msg = f"[{me['name']}] {text}"
+    for i in range(0, len(msg), 1900):
+        dapi("POST", f"/channels/{cid}/messages", {"content": msg[i:i+1900]})
+    print("sent →", name)
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     a = sys.argv[1:]
@@ -143,10 +204,16 @@ def main():
     if "--sid" in a:
         i = a.index("--sid"); sid = a[i + 1]; del a[i:i + 2]
     if not a or a[0] == "inbox":
-        return cmd_inbox()
+        try: hook = json.load(sys.stdin)
+        except Exception: hook = {}
+        try: return d_inbox(hook)
+        except Exception as e:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": hook.get("hook_event_name","UserPromptSubmit"), "additionalContext": f"[FMOS Discord] уншиж чадсангүй: {e}"}}, ensure_ascii=False)); return
     if a[0] == "register":
         return cmd_register(a[1], a[2], sid)
     if a[0] == "send":
+        return d_send(a[1], " ".join(a[2:]), sid)
+    if a[0] == "gsend":  # old git transport
         return cmd_send(a[1], a[2], a[3] if len(a) > 3 else "", sid)
     if a[0] == "who":
         for k, v in load(REG, {"sessions": {}})["sessions"].items():
