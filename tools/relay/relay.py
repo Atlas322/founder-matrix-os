@@ -354,17 +354,22 @@ def chmap():
     for sid, v in regs:
         k = key(v)
         if k not in first or (v.get("title") and not first[k].get("title")): first[k] = v
-    names = {}; counter = {}
+    names = {}; used = {}
     prev = load(RELAY / "channels.json", {})  # stable numbers: keep a project's existing channel number
     strip = lambda x: _re.sub(r"^([^\w]+-)?\d+-", "", x)
+    num = lambda x: int(_re.match(r"^(?:[^\w]+-)?(\d+)-", x).group(1))
+    todo = []
     for k, v in first.items():
         base = chname(v)
         if k in prev and strip(prev[k]) == strip(base) and _re.match(r"^([^\w]+-)?\d+-", prev[k]) and not _re.match(r"^\d", strip(base)):
-            names[k] = prev[k]; continue
+            names[k] = prev[k]; used.setdefault(v["group"], set()).add(num(prev[k]))
+        else: todo.append((k, v, base))
+    for k, v, base in todo:
         emo, _, core = base.partition("-") if not _re.match(r"^\w", base) else ("", "", base)
         if not _re.match(r"^\d", core):
-            counter[v["group"]] = counter.get(v["group"], 0) + 1
-            core = f"{counter[v['group']]:02d}-{core}"
+            u = used.setdefault(v["group"], set()); n = 1
+            while n in u: n += 1
+            u.add(n); core = f"{n:02d}-{core}"
         names[k] = (emo + "-" if emo else "") + core
     return {sid: names[key(v)] for sid, v in regs}
 
