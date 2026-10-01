@@ -20,7 +20,7 @@ REPO = Path(os.environ.get("FMOS_REPO", Path(__file__).resolve().parents[2]))
 RELAY = REPO / "relay"
 REG = RELAY / "registry.json"
 STATE = Path.home() / ".fmos_relay_state.json"   # per-machine read cursors (not in git)
-GROUPS = ["tasks", "projects", "areas", "resources", "archive"]
+GROUPS = ["tasks", "projects", "areas", "resources", "rnd", "archive"]
 DEVICE = os.environ.get("FMOS_DEVICE") or ("Mac" if sys.platform == "darwin" else "PC")
 PULL_EVERY = 45  # seconds
 
@@ -289,7 +289,7 @@ def chname(v):
     t = v.get("title") or v.get("project") or v["name"]
     return _re.sub(r"-+", "-", _re.sub(r"[^\w\-]+", "-", t.strip().lower(), flags=_re.U)).strip("-")[:90]
 
-CATS = {"tasks": "Tasks", "projects": "Projects", "areas": "Areas", "resources": "Resources", "system": "System", "archive": "Archive"}
+CATS = {"tasks": "Tasks", "projects": "Projects", "areas": "Areas", "resources": "Resources", "rnd": "R&D", "system": "System", "archive": "Archive"}
 SYSTEM_CH = ["org", "status", "status-data", "general", "relay"]
 
 def d_sync():
