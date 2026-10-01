@@ -13,7 +13,7 @@ Commands:
   relay.py send TO "title" [body]    TO = all | @<group> | <session-name>; appends, commits, pushes
   relay.py who                       show registry
 """
-import json, os, sys, subprocess, time, datetime, socket
+import json, os, sys, subprocess, time, datetime, socket, re
 from pathlib import Path
 
 REPO = Path(os.environ.get("FMOS_REPO", Path(__file__).resolve().parents[2]))
@@ -424,6 +424,36 @@ def d_sync():
     st = load(STATE, {}); st.pop("_dch", None); save(STATE, st)
 
 
+def d_dispatch(every=15):
+    """Dispatcher (one per device, run by 03 Sys Admin via Monitor): watch every session channel;
+    print one JSON line per message that should WAKE a local session: human (BD) messages, or other-device
+    messages that address this device ('→ PC' / '@pc'). Own-device bot messages are skipped (no ping-pong)."""
+    reg = load(REG, {"sessions": {}})["sessions"]; cm = chmap()
+    local = {}
+    for sid, ch in cm.items():
+        v = reg[sid]
+        if v.get("device") == DEVICE and not v.get("private"):
+            local.setdefault(ch, []).append(v.get("title") or v["name"])
+    st = load(STATE, {}); st.pop("_dch", None); ch = dchannels(st); save(STATE, st)
+    watch = {n: ch[n] for n in local if n in ch}
+    me_bot = None; last = {}
+    for n, cid in watch.items():
+        lm = dapi("GET", f"/channels/{cid}/messages?limit=1"); last[n] = lm[0]["id"] if lm else "0"
+    print(json.dumps({"ready": len(watch), "channels": list(watch)}, ensure_ascii=False), flush=True)
+    tag = re.compile(r"(→\s*" + DEVICE + r"\b|@" + DEVICE.lower() + r"\b)", re.I)
+    while True:
+        time.sleep(every)
+        for n, cid in watch.items():
+            try: msgs = sorted(dapi("GET", f"/channels/{cid}/messages?after={last[n]}&limit=20"), key=lambda m: int(m["id"]))
+            except Exception as e: continue
+            for m in msgs:
+                last[n] = m["id"]; a = m["author"]; txt = m["content"]
+                if a.get("bot"):
+                    if a["username"].endswith(DEVICE): continue          # own device
+                    if not tag.search(txt): continue                       # other device, not addressed to us
+                print(json.dumps({"wake": local[n], "channel": n, "from": a.get("global_name") or a["username"], "text": txt[:1500]}, ensure_ascii=False), flush=True)
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     a = sys.argv[1:]
@@ -451,6 +481,8 @@ def main():
         try: hook = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
         except Exception: return
         return d_baton(hook)
+    if a[0] == "dispatch":
+        return d_dispatch()
     if a[0] == "watch":
         return d_watch(sid)
     if a[0] == "who":
