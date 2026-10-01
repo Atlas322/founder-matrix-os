@@ -355,8 +355,12 @@ def chmap():
         k = key(v)
         if k not in first or (v.get("title") and not first[k].get("title")): first[k] = v
     names = {}; counter = {}
+    prev = load(RELAY / "channels.json", {})  # stable numbers: keep a project's existing channel number
+    strip = lambda x: _re.sub(r"^([^\w]+-)?\d+-", "", x)
     for k, v in first.items():
         base = chname(v)
+        if k in prev and strip(prev[k]) == strip(base) and _re.match(r"^([^\w]+-)?\d+-", prev[k]) and not _re.match(r"^\d", strip(base)):
+            names[k] = prev[k]; continue
         emo, _, core = base.partition("-") if not _re.match(r"^\w", base) else ("", "", base)
         if not _re.match(r"^\d", core):
             counter[v["group"]] = counter.get(v["group"], 0) + 1
