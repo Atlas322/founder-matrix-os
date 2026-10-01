@@ -178,7 +178,16 @@ def dchannels(state):
         state["_dch"], state["_dch_t"] = ch, time.time()
     return ch
 
+VAULT_HINTS = ("Founder.Matrix", "Second Brain", "founder-matrix-os")
+
+def in_scope(hook):
+    """User-level hooks fire in every project — act only for registered sessions or vault/repo cwd."""
+    if hook.get("session_id", "") in load(REG, {"sessions": {}})["sessions"]: return True
+    cwd = (hook.get("cwd") or os.getcwd()).replace("\\", "/")
+    return any(h in cwd for h in VAULT_HINTS)
+
 def d_inbox(hook):
+    if not in_scope(hook): return
     sid = hook.get("session_id", ""); event = hook.get("hook_event_name", "")
     if event == "SessionStart": git("pull", "-q", "--rebase", "--autostash")
     state = load(STATE, {}); reg = load(REG, {"sessions": {}})

@@ -81,6 +81,7 @@ def main():
         return push(sys.argv[2])
     try: hook = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
     except Exception: return
+    if not relay.in_scope(hook): return
     sid, s, ev = record(hook)
     if not sid: return
     if relay.load(relay.REG, {"sessions": {}})["sessions"].get(sid, {}).get("private"): return
