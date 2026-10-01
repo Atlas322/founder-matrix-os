@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Save to Inbox - Second Brain",
+  "version": "1.2.0",
+  "description": "Veb huudsiig Obsidian vault-iin 00-Inbox ruu shууd hadgalna. Sait-tusgai kontent medee (Pinterest pin, IG/carousel zurag, video) tatna. Local REST API-aar Obsidian neegddeggui.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Save to Inbox"
+  },
+  "options_page": "options.html"
+}

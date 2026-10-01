@@ -1,0 +1,7 @@
+node_modules/
+stash/
+__pycache__/
+*.log
+.env
+*.token
+.DS_Store

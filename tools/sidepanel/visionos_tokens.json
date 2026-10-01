@@ -1,0 +1,316 @@
+{
+ "ts": [
+  {
+   "n": "XLTitle1",
+   "f": "SF Pro Bold",
+   "sz": 48,
+   "lh": "56",
+   "ls": 0
+  },
+  {
+   "n": "XLTitle2",
+   "f": "SF Pro Bold",
+   "sz": 38,
+   "lh": "46",
+   "ls": 0
+  },
+  {
+   "n": "LargeTitle",
+   "f": "SF Pro Bold",
+   "sz": 29,
+   "lh": "38",
+   "ls": 0
+  },
+  {
+   "n": "Title1",
+   "f": "SF Pro Bold",
+   "sz": 24,
+   "lh": "32",
+   "ls": 0
+  },
+  {
+   "n": "Title2",
+   "f": "SF Pro Bold",
+   "sz": 22,
+   "lh": "28",
+   "ls": 0
+  },
+  {
+   "n": "Title3",
+   "f": "SF Pro Bold",
+   "sz": 19,
+   "lh": "24",
+   "ls": 0
+  },
+  {
+   "n": "Headline",
+   "f": "SF Pro Bold",
+   "sz": 17,
+   "lh": "22",
+   "ls": 0
+  },
+  {
+   "n": "Body",
+   "f": "SF Pro Medium",
+   "sz": 17,
+   "lh": "22",
+   "ls": 0
+  },
+  {
+   "n": "Callout",
+   "f": "SF Pro Semibold",
+   "sz": 15,
+   "lh": "20",
+   "ls": 0
+  },
+  {
+   "n": "Subheadline",
+   "f": "SF Pro Regular",
+   "sz": 15,
+   "lh": "20",
+   "ls": 0
+  },
+  {
+   "n": "Footnote",
+   "f": "SF Pro Medium",
+   "sz": 13,
+   "lh": "18",
+   "ls": 0
+  },
+  {
+   "n": "Caption1",
+   "f": "SF Pro Medium",
+   "sz": 12,
+   "lh": "16",
+   "ls": 0
+  },
+  {
+   "n": "Caption2",
+   "f": "SF Pro Medium",
+   "sz": 12,
+   "lh": "16",
+   "ls": 0
+  }
+ ],
+ "ps": [
+  {
+   "n": "Colors/Red",
+   "v": "#ff4245",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Orange",
+   "v": "#ff9230",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Yellow",
+   "v": "#ffd600",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Green",
+   "v": "#30d158",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Mint",
+   "v": "#00dac3",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Teal",
+   "v": "#00d2e0",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Cyan",
+   "v": "#3cd3fe",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Blue",
+   "v": "#0091ff",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Indigo",
+   "v": "#6d7cff",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Purple",
+   "v": "#db34f2",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Pink",
+   "v": "#ff375f",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Brown",
+   "v": "#b78a66",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Gray",
+   "v": "#98989d",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/Black",
+   "v": "#000000",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Colors/White (Labels)",
+   "v": "#ffffff @96%",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Controls/Idle",
+   "v": "#ffffff @7%",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Controls/Hover",
+   "v": "#ffffff @4%",
+   "bm": "LIGHTEN"
+  },
+  {
+   "n": "Controls/Pinch",
+   "v": "#ffffff @16%",
+   "bm": "LIGHTEN"
+  },
+  {
+   "n": "Controls/Selected",
+   "v": "#ffffff",
+   "bm": "COLOR_DODGE"
+  },
+  {
+   "n": "Controls/Disabled",
+   "v": "#ffffff @4%",
+   "bm": "LIGHTEN"
+  },
+  {
+   "n": "Labels/Primary",
+   "v": "#ffffff @96%",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Labels/Secondary",
+   "v": "#ffffff @23%",
+   "bm": "LIGHTEN"
+  },
+  {
+   "n": "Labels/Tertiary",
+   "v": "#ffffff @11%",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Views/Recessed Material View",
+   "v": "#000000 @10%",
+   "bm": "LUMINOSITY"
+  },
+  {
+   "n": "Views/Thin",
+   "v": "#ffffff @7%",
+   "bm": "LIGHTEN"
+  },
+  {
+   "n": "Views/Regular",
+   "v": "#d6d6d6 @45%",
+   "bm": "COLOR_BURN"
+  },
+  {
+   "n": "Views/Thicker",
+   "v": "#dadada @92%",
+   "bm": "COLOR_BURN"
+  },
+  {
+   "n": "Views/(Stroke) Recessed Specular",
+   "v": "#000000 @0%",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Windows/Glass",
+   "v": "#808080 @30%",
+   "bm": "LUMINOSITY"
+  },
+  {
+   "n": "Windows/Glass - Keyboard",
+   "v": "#808080 @30%",
+   "bm": "LUMINOSITY"
+  },
+  {
+   "n": "Windows/(Stroke) Glass Specular",
+   "v": "GRADIENT_LINEAR",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "Separators/Separator",
+   "v": "#ffffff @7%",
+   "bm": "LIGHTEN"
+  },
+  {
+   "n": "_Template/Sheet Fill",
+   "v": "#d6d6d6 @45%",
+   "bm": "COLOR_BURN"
+  },
+  {
+   "n": "_Template/Component Fill",
+   "v": "#808080 @30%",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "_Template/Subcomponent Fill",
+   "v": "#007aff @30%",
+   "bm": "NORMAL"
+  },
+  {
+   "n": "_Template/Submcomponent Stroke",
+   "v": "#007aff",
+   "bm": "NORMAL"
+  }
+ ],
+ "es": [
+  {
+   "n": "Blur",
+   "e": [
+    "BACKGROUND_BLUR r100"
+   ]
+  },
+  {
+   "n": "Blur + Shadow Big",
+   "e": [
+    "BACKGROUND_BLUR r100",
+    "DROP_SHADOW r80 0,40 #000000@30",
+    "DROP_SHADOW r10 0,7 #000000@9"
+   ]
+  },
+  {
+   "n": "Blur + Shadow Small",
+   "e": [
+    "BACKGROUND_BLUR r100",
+    "DROP_SHADOW r4 0,2 #000000@10"
+   ]
+  },
+  {
+   "n": "Recessed",
+   "e": [
+    "INNER_SHADOW r4 0,1.5 #000000@10",
+    "INNER_SHADOW r4 0,1.5 #000000@8",
+    "INNER_SHADOW r1 0,-0.5 #ffffff@25",
+    "INNER_SHADOW r1 0,-0.5 #ffffff@30"
+   ]
+  },
+  {
+   "n": "Recessed - Highlights only",
+   "e": [
+    "INNER_SHADOW r1 0,-0.5 #ffffff@20",
+    "INNER_SHADOW r1 0,-0.5 #5e5e5e@30"
+   ]
+  }
+ ]
+}
