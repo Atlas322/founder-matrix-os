@@ -186,10 +186,31 @@ def in_scope(hook):
     cwd = (hook.get("cwd") or os.getcwd()).replace("\\", "/")
     return any(h in cwd for h in VAULT_HINTS)
 
+def _auto_pair(hook):
+    """BD opens a new session and types only an existing title (e.g. '00 Inbox Admin') →
+    register this session as that title's pair on this device, and tell Claude to rename/regroup itself."""
+    sid = hook.get("session_id", ""); prompt = (hook.get("prompt") or "").strip()
+    reg = load(REG, {"sessions": {}}); S = reg["sessions"]
+    if not prompt or sid in S or hook.get("hook_event_name") != "UserPromptSubmit": return None
+    src = next((v for v in S.values() if (v.get("title") or "").strip().lower() == prompt.lower() and not v.get("private")), None)
+    if not src: return None
+    S[sid] = {k: src[k] for k in ("group", "project", "title") if k in src}
+    S[sid].update(name=f"{src.get('title')} ({DEVICE})", device=DEVICE, host=socket.gethostname(), since=datetime.date.today().isoformat())
+    save(REG, reg); git("add", str(REG)); git("commit", "-qm", f"relay: auto-pair {src.get('title')} ({DEVICE})"); git("push", "-q")
+    grp = {"tasks": "Tasks", "projects": "Projects", "areas": "Areas", "resources": "Resources", "research": "Research", "development": "Development"}.get(src["group"], src["group"])
+    sf = REPO / "state" / f"{src.get('project')}.md"
+    baton = sf.read_text(encoding="utf-8").split("## ТҮҮХ")[0].strip() if src.get("project") and sf.exists() else "(baton алга)"
+    return (f"[FMOS] BD энэ шинэ сешнийг «{src['title']}»-ийн {DEVICE} хос болгон нээв — бүртгэгдлээ (@{src['group']}, project {src.get('project')}). "
+            f"Одоо: 1) ccd_session_mgmt set_session_title self → «{src['title']}». 2) ccd_sidebar list_groups → «{grp}» групп руу move_sessions self. "
+            f"3) Доорх baton-оос хаана зогссоныг уншаад BD-д 2 мөрөөр хэл. 4) Discord сувгаа сонсох: relay.py watch --sid {sid} (Monitor).\n\n### 🏃 baton\n{baton}")
+
+
 def d_inbox(hook):
     if not in_scope(hook): return
     sid = hook.get("session_id", ""); event = hook.get("hook_event_name", "")
     if event == "SessionStart": git("pull", "-q", "--rebase", "--autostash")
+    pair = _auto_pair(hook)
+    if pair: print(json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": pair}}, ensure_ascii=False)); return
     state = load(STATE, {}); reg = load(REG, {"sessions": {}})
     me = reg["sessions"].get(sid)
     names = list(dict.fromkeys([BROADCAST] + ([chmap().get(sid, chname(me))] if me else [])))
