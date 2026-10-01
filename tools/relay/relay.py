@@ -346,6 +346,9 @@ def d_sync():
     for slug, (grp, proj) in want.items():
         parent = cats[grp if grp in CATS else "archive"]
         old = _re.sub(r"^\d+-", "", slug)
+        if slug not in text and old not in text:  # same title, different number/group → move existing channel
+            cand = [n for n in text if _re.sub(r"^\d+-", "", n) == old and n not in want]
+            if cand: old = cand[0]
         if slug not in text and old in text and old not in want:
             dapi("PATCH", f"/channels/{text[old]['id']}", {"name": slug, "parent_id": parent}); print("rename", old, "→", slug)
             text[slug] = text.pop(old); continue
