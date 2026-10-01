@@ -183,6 +183,7 @@ VAULT_HINTS = ("Founder.Matrix", "Second Brain", "founder-matrix-os")
 def in_scope(hook):
     """User-level hooks fire in every project — act only for registered sessions or vault/repo cwd."""
     if hook.get("session_id", "") in load(REG, {"sessions": {}})["sessions"]: return True
+    if "pair:" in (hook.get("prompt") or ""): return True
     cwd = (hook.get("cwd") or os.getcwd()).replace("\\", "/")
     return any(h in cwd for h in VAULT_HINTS)
 
@@ -192,7 +193,9 @@ def _auto_pair(hook):
     sid = hook.get("session_id", ""); prompt = (hook.get("prompt") or "").strip()
     reg = load(REG, {"sessions": {}}); S = reg["sessions"]
     if not prompt or sid in S or hook.get("hook_event_name") != "UserPromptSubmit": return None
-    src = next((v for v in S.values() if (v.get("title") or "").strip().lower() == prompt.lower() and not v.get("private")), None)
+    m = _re.search(r"pair:\s*(.+)", prompt)
+    want = (m.group(1).splitlines()[0] if m else prompt).strip().lower()
+    src = next((v for v in S.values() if (v.get("title") or "").strip().lower() == want and not v.get("private")), None)
     if not src: return None
     S[sid] = {k: src[k] for k in ("group", "project", "title") if k in src}
     S[sid].update(name=f"{src.get('title')} ({DEVICE})", device=DEVICE, host=socket.gethostname(), since=datetime.date.today().isoformat())
@@ -201,8 +204,8 @@ def _auto_pair(hook):
     sf = REPO / "state" / f"{src.get('project')}.md"
     baton = sf.read_text(encoding="utf-8").split("## ТҮҮХ")[0].strip() if src.get("project") and sf.exists() else "(baton алга)"
     return (f"[FMOS] BD энэ шинэ сешнийг «{src['title']}»-ийн {DEVICE} хос болгон нээв — бүртгэгдлээ (@{src['group']}, project {src.get('project')}). "
-            f"Одоо: 1) ccd_session_mgmt set_session_title self → «{src['title']}». 2) ccd_sidebar list_groups → «{grp}» групп руу move_sessions self. "
-            f"3) Доорх baton-оос хаана зогссоныг уншаад BD-д 2 мөрөөр хэл. 4) Discord сувгаа сонсох: relay.py watch --sid {sid} (Monitor).\n\n### 🏃 baton\n{baton}")
+            f"Одоо: 0) cwd vault биш бол mcp__ccd_directory__change_directory → «<OLD-VAULT>». 1) ccd_session_mgmt set_session_title self → «{src['title']}». 2) ccd_sidebar list_groups → «{grp}» групп руу move_sessions self. "
+            f"3) Доорх baton-оос хаана зогссоныг уншаад BD-д 2 мөрөөр хэл. 4) Discord сувгаа сонсох: relay.py watch --sid {sid} (Monitor). 5) Хамгийн сүүлд mcp__ccd_session_mgmt__clear_session self (хуучин яриа Resume-ээр сэргэнэ) — шинэ үүрэгтээ цэвэр эхэлнэ.\n\n### 🏃 baton\n{baton}")
 
 
 def d_inbox(hook):
