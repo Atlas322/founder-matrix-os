@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Vault manifest + diff between PC and Mac (BD: two devices, each a full local backup).
 
-  vault_manifest.py make <vault_dir> <device>   → state/manifest-<device>.tsv  (path, size, sha1)
+  vault_manifest.py make <vault_dir> <device>   → state/<device>-drive-manifest.tsv  (path, size, sha1)
   vault_manifest.py diff                       → only-PC / only-Mac / content differs  (prints, writes state/vault-diff.md)
 
 Skips .obsidian/workspace*.json, .trash, node_modules, desktop.ini, .tmp.drive*.
@@ -32,7 +32,7 @@ def make(vault, device):
             try: rows.append((p.relative_to(vault).as_posix(), p.stat().st_size, sha1(p)))
             except OSError: pass
     rows.sort()
-    out = ST / f"manifest-{device}.tsv"
+    out = ST / f"{device.lower()}-drive-manifest.tsv"
     with open(out, "w", encoding="utf-8") as fh:
         fh.write(f"# {device} {vault} {datetime.datetime.now():%Y-%m-%d %H:%M} files={len(rows)}\n")
         for r in rows: fh.write("\t".join(map(str, r)) + "\n")
@@ -41,7 +41,7 @@ def make(vault, device):
 
 def load(device):
     d = {}
-    for line in open(ST / f"manifest-{device}.tsv", encoding="utf-8"):
+    for line in open(ST / f"{device.lower()}-drive-manifest.tsv", encoding="utf-8"):
         if line.startswith("#"): continue
         p, s, h = line.rstrip("\n").split("\t"); d[p] = (int(s), h)
     return d
