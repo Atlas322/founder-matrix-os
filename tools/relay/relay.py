@@ -29,6 +29,31 @@ def git(*a):
     return subprocess.run(["git", "-C", str(REPO), *a], capture_output=True, text=True, encoding="utf-8")
 
 
+class repo_lock:
+    """Cross-process lock so concurrent Stop hooks (baton) don't run git at the same time."""
+    def __init__(self, timeout=20): self.p = Path.home() / ".fmos_git.lock"; self.t = timeout
+    def __enter__(self):
+        end = time.time() + self.t
+        while True:
+            try: self.fd = os.open(str(self.p), os.O_CREAT | os.O_EXCL | os.O_WRONLY); return self
+            except FileExistsError:
+                if time.time() - self.p.stat().st_mtime > 60: self.p.unlink(missing_ok=True); continue  # stale
+                if time.time() > end: raise TimeoutError("git lock")
+                time.sleep(0.5)
+    def __exit__(self, *a):
+        os.close(self.fd); self.p.unlink(missing_ok=True)
+
+
+def safe_sync(paths, msg):
+    """commit paths → pull --rebase (state/*.md conflicts: keep ours) → push. Never leaves a rebase in progress."""
+    with repo_lock():
+        git("add", *map(str, paths)); git("commit", "-qm", msg)
+        r = git("pull", "-q", "--rebase", "--autostash", "-X", "theirs")
+        if r.returncode != 0:
+            git("rebase", "--abort"); git("pull", "-q", "--no-rebase", "-X", "ours", "--no-edit")
+        git("push", "-q")
+
+
 def load(p, d):
     try:
         return json.loads(Path(p).read_text(encoding="utf-8"))
@@ -315,8 +340,8 @@ def d_baton(hook, push_every=300):
     f.write_text(now + "\n## ТҮҮХ\n" + (hist + "\n" if hist else "") + line + "\n", encoding="utf-8")
     st = load(STATE, {}); k = "_baton_push_" + me["project"]
     if time.time() - st.get(k, 0) > push_every:
-        git("add", str(f)); git("commit", "-qm", f"baton {me['project']} · {me['name']} ({DEVICE})")
-        git("pull", "-q", "--rebase", "--autostash"); git("push", "-q")
+        try: safe_sync([f], f"baton {me['project']} · {me['name']} ({DEVICE})")
+        except TimeoutError: return
         st[k] = time.time(); save(STATE, st)
 
 
@@ -331,7 +356,7 @@ def d_next(text, sid):
     ts = datetime.datetime.now().strftime("%m-%d %H:%M")
     lines.insert(i, f"**Дараагийн алхам ({me['name']}, {ts}):** {text}")
     f.write_text("\n".join(lines).rstrip() + "\n\n## ТҮҮХ" + tail, encoding="utf-8")
-    git("add", str(f)); git("commit", "-qm", f"baton next {me['project']}"); git("pull", "-q", "--rebase", "--autostash"); git("push", "-q")
+    safe_sync([f], f"baton next {me['project']}")
     print("pinned")
 
 
