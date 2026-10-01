@@ -83,6 +83,7 @@ def main():
     except Exception: return
     sid, s, ev = record(hook)
     if not sid: return
+    if relay.load(relay.REG, {"sessions": {}})["sessions"].get(sid, {}).get("private"): return
     if ev in ("PostToolUse",) and time.time() - s.get("pushed", 0) < MIN_GAP: return
     kw = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if os.name == "nt": kw["creationflags"] = 0x00000008 | 0x00000200  # DETACHED | NEW_PROCESS_GROUP

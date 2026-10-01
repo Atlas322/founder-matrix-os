@@ -108,6 +108,7 @@ def cmd_register(name, group, sid, project=None):
     reg["sessions"][sid] = {"name": name, "group": group, "device": DEVICE,
                             "host": socket.gethostname(), "since": datetime.date.today().isoformat()}
     if project: reg["sessions"][sid]["project"] = project
+    if "--private" in sys.argv: reg["sessions"][sid]["private"] = True
     save(REG, reg)
     (RELAY / "s").mkdir(exist_ok=True)
     git("add", str(REG))
