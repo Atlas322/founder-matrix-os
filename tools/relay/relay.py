@@ -166,7 +166,7 @@ def d_inbox(hook):
     sid = hook.get("session_id", ""); event = hook.get("hook_event_name", "")
     state = load(STATE, {}); reg = load(REG, {"sessions": {}})
     me = reg["sessions"].get(sid)
-    names = ["org"] + ([chname(me)] if me else [])
+    names = ["org"] + ([chmap().get(sid, chname(me))] if me else [])
     ch = dchannels(state); cur = state.setdefault(sid, {}); out = []
     my_tag = f"[{me['name']}]" if me else None
     for n in names:
@@ -210,7 +210,7 @@ def d_send(to, text, sid):
 def d_watch(sid, every=20):
     """Continuous: print one line per new Discord message for this session (own messages skipped)."""
     reg = load(REG, {"sessions": {}}); me = reg["sessions"].get(sid)
-    names = ["org"] + ([chname(me)] if me else [])
+    names = ["org"] + ([chmap().get(sid, chname(me))] if me else [])
     tag = f"[{me['name']}]" if me else None
     st = load(STATE, {}); ch = dchannels(st); save(STATE, st)
     last = {}
@@ -289,7 +289,19 @@ def chname(v):
     t = v.get("title") or v.get("project") or v["name"]
     return _re.sub(r"-+", "-", _re.sub(r"[^\w\-]+", "-", t.strip().lower(), flags=_re.U)).strip("-")[:90]
 
-CATS = {"tasks": "Tasks", "projects": "Projects", "areas": "Areas", "resources": "Resources", "rnd": "R&D", "system": "System", "archive": "Archive"}
+def chmap():
+    """session_id → numbered Discord channel name (same numbering as sync)."""
+    out = {}; counter = {}
+    for sid, v in load(REG, {"sessions": {}})["sessions"].items():
+        if v.get("private"): continue
+        base = chname(v)
+        if not _re.match(r"^\d", base):
+            counter[v["group"]] = counter.get(v["group"], 0) + 1
+            base = f"{counter[v['group']]:02d}-{base}"
+        out[sid] = base
+    return out
+
+CATS = {"tasks": "01 Tasks", "projects": "02 Projects", "areas": "03 Areas", "resources": "04 Resources", "rnd": "05 R&D", "system": "06 System", "archive": "07 Archive"}
 SYSTEM_CH = ["org", "status", "status-data", "general", "relay"]
 
 def d_sync():
@@ -297,16 +309,30 @@ def d_sync():
     gid = load(DCFG, {})["guild"]["id"]
     reg = [v for v in load(REG, {"sessions": {}})["sessions"].values() if not v.get("private")]
     allc = dapi("GET", f"/guilds/{gid}/channels")
-    cats = {c["name"].lower(): c["id"] for c in allc if c["type"] == 4}
-    for k, name in CATS.items():
-        if k not in cats:
-            cats[k] = dapi("POST", f"/guilds/{gid}/channels", {"name": name, "type": 4})["id"]; print("category +", name)
+    byname = {_re.sub(r"^\d+\s*", "", c["name"]).lower().replace("r&d", "rnd"): c for c in allc if c["type"] == 4}
+    cats = {}
+    for i, (k, name) in enumerate(CATS.items()):
+        c = byname.get(k)
+        if c:
+            cats[k] = c["id"]
+            if c["name"] != name or c.get("position") != i:
+                dapi("PATCH", f"/channels/{c['id']}", {"name": name, "position": i}); print("category", name)
+        else:
+            cats[k] = dapi("POST", f"/guilds/{gid}/channels", {"name": name, "type": 4, "position": i})["id"]; print("category +", name)
     text = {c["name"]: c for c in allc if c["type"] == 0}
-    want = {}
+    want = {}; counter = {}
     for v in reg:
-        want.setdefault(chname(v), (v["group"], v.get("project")))
+        base = chname(v)
+        if not _re.match(r"^\d", base):
+            counter[v["group"]] = counter.get(v["group"], 0) + 1
+            base = f"{counter[v['group']]:02d}-{base}"
+        want.setdefault(base, (v["group"], v.get("project")))
     for slug, (grp, proj) in want.items():
         parent = cats[grp if grp in CATS else "archive"]
+        old = _re.sub(r"^\d+-", "", slug)
+        if slug not in text and old in text and old not in want:
+            dapi("PATCH", f"/channels/{text[old]['id']}", {"name": slug, "parent_id": parent}); print("rename", old, "→", slug)
+            text[slug] = text.pop(old); continue
         if slug not in text and proj and proj in text and proj not in want:
             dapi("PATCH", f"/channels/{text[proj]['id']}", {"name": slug, "parent_id": parent}); print("rename", proj, "→", slug)
             text[slug] = text.pop(proj); continue
@@ -321,6 +347,11 @@ def d_sync():
         tgt = cats["system"] if n in SYSTEM_CH else cats["archive"]
         if c.get("parent_id") != tgt:
             dapi("PATCH", f"/channels/{c['id']}", {"parent_id": tgt}); print("move", n, "→", "System" if n in SYSTEM_CH else "Archive")
+    allc = dapi("GET", f"/guilds/{gid}/channels")
+    gidx = {}
+    for c in sorted([c for c in allc if c["type"] == 0], key=lambda c: (c.get("parent_id") or "", c["name"])):
+        i = gidx.get(c.get("parent_id"), 0); gidx[c.get("parent_id")] = i + 1
+        if c.get("position") != i: dapi("PATCH", f"/channels/{c['id']}", {"position": i}); time.sleep(0.3)
     st = load(STATE, {}); st.pop("_dch", None); save(STATE, st)
 
 
