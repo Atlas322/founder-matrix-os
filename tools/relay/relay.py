@@ -137,6 +137,7 @@ def cmd_send(to, title, body, sid):
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")
     a = sys.argv[1:]
     sid = os.environ.get("CLAUDE_SESSION_ID", "")
     if "--sid" in a:
