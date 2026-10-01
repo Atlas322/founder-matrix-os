@@ -38,7 +38,7 @@ BD-ийн зорилго (2026-10-02): **BD хаана ч (PC / Mac / утас) 
 |---|---|
 | Resource tools | Claude (Code, skills, agents), Discord, GitHub (энэ repo) |
 | Project tools | Figma bridge, Framer bridge, skills, Remotion, Poster Maker |
-| Хадгалах газар | **Тодорхойгүй (BD шийднэ):** Obsidian vault · Notion · Google Drive. Одоогоор vault PC/Mac тус тусдаа, медиа → Drive |
+| Хадгалах газар | **Тодорхойгүй (BD шийднэ):** Obsidian vault · Notion · Google Drive. **Бодит байдал (2026-10-02):** Obsidian Sync дууссан → vault PC/Mac тусдаа, зөрж эхэлсэн; медиа → Drive. **Түр дүрэм:** vault = тухайн машины локал ажил; хоёр машинд хэрэгтэй бүхэн (код, тохиргоо, төлөв, шийдвэр) → энэ repo. Медиа/зураг repo-д орохгүй. |
 
 ## 6. Нээлттэй асуулт
 
