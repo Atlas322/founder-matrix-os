@@ -472,7 +472,7 @@ def d_dispatch(every=15):
             local.setdefault(ch, []).append(v.get("title") or v["name"])
     st = load(STATE, {}); st.pop("_dch", None); ch = dchannels(st); save(STATE, st)
     watch = {n: ch[n] for n in local if n in ch}
-    me_bot = None; last = {}
+    bot_wakes = {}; last = {}
     for n, cid in watch.items():
         lm = dapi("GET", f"/channels/{cid}/messages?limit=1"); last[n] = lm[0]["id"] if lm else "0"
     print(json.dumps({"ready": len(watch), "channels": list(watch)}, ensure_ascii=False), flush=True)
@@ -486,7 +486,11 @@ def d_dispatch(every=15):
                 last[n] = m["id"]; a = m["author"]; txt = m["content"]
                 if a.get("bot"):
                     if a["username"].endswith(DEVICE): continue          # own device
-                    if not tag.search(txt): continue                       # other device, not addressed to us
+                    if n == BROADCAST and not tag.search(txt): continue    # broadcast channel: must be addressed
+                    # pair channel: other device's twin talks to us → wake, but rate-limit to avoid ping-pong
+                    hist = [t for t in bot_wakes.get(n, []) if time.time() - t < 600]
+                    if len(hist) >= 3: continue
+                    bot_wakes[n] = hist + [time.time()]
                 print(json.dumps({"wake": local[n], "channel": n, "from": a.get("global_name") or a["username"], "text": txt[:1500]}, ensure_ascii=False), flush=True)
 
 
