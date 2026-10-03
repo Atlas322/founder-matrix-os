@@ -177,6 +177,7 @@ def cmd_send(to, title, body, sid):
 
 # ── Discord transport (default): channels = Discord, no git per message ──
 ICON = "🍎" if DEVICE == "Mac" else "🖥️"  # BD 2026-10-03: Mac/PC мессежийг icon-оор ялгах
+BUSY = "🟢"  # d_status prepends this to a channel name while its session works; lookups strip it
 BROADCAST = "03-sys-admin"  # BD 2026-10-02: #org хаагдав; бүх сешнд хамаатай мэдээ = Sys Admin суваг
 import urllib.request, urllib.error
 API = "https://discord.com/api/v10"
@@ -203,7 +204,7 @@ def dchannels(state):
     ch = state.get("_dch")
     if not ch or time.time() - state.get("_dch_t", 0) > 3600:
         gid = load(DCFG, {})["guild"]["id"]
-        ch = {c["name"]: c["id"] for c in dapi("GET", f"/guilds/{gid}/channels") if c.get("type") == 0}
+        ch = {c["name"].removeprefix(BUSY): c["id"] for c in dapi("GET", f"/guilds/{gid}/channels") if c.get("type") == 0}
         state["_dch"], state["_dch_t"] = ch, time.time()
     return ch
 
@@ -354,9 +355,11 @@ def d_status(every=30, busy_s=90):
             except Exception: pass
             st[board_key] = mid; save(STATE, st)
         for n, busy in per_ch.items():
+            # sidebar = channel name (BD wants it in the list): 🟢 prefix while busy. Discord allows 2 renames/10 min.
             if topic_s.get(n) != busy and time.time() - topic_t.get(n, 0) > 300:
                 try:
-                    dapi("PATCH", f"/channels/{ch[n]}", {"topic": f"{'🟢 ' + DEVICE + ' ажиллаж байна' if busy else '⚪ ' + DEVICE + ' сул'} · {datetime.datetime.now():%H:%M}"})
+                    dapi("PATCH", f"/channels/{ch[n]}", {"name": (BUSY + n) if busy else n,
+                         "topic": f"{'🟢 ' + DEVICE + ' ажиллаж байна' if busy else '⚪ ' + DEVICE + ' сул'} · {datetime.datetime.now():%H:%M}"})
                     topic_s[n], topic_t[n] = busy, time.time()
                 except Exception as e: print(f"[status topic] {n}: {e}", flush=True)
         time.sleep(every)
