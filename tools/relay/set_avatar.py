@@ -7,9 +7,14 @@ S = 512
 im = Image.new("RGB", (S, S), (20, 20, 20) if mac else (27, 92, 255))
 d = ImageDraw.Draw(im)
 if mac:
-    d.ellipse([136, 170, 376, 410], fill="white")          # apple body
-    d.ellipse([300, 230, 400, 330], fill=(20, 20, 20))     # bite
-    d.ellipse([236, 100, 300, 170], fill="white")          # leaf
+    # MacBook (BD 2026-10-03: алим хэтэрхий энгийн → Mac компьютерийн icon)
+    d.rounded_rectangle([116, 130, 396, 320], 18, fill=(205, 208, 214))   # lid
+    d.rounded_rectangle([132, 146, 380, 304], 8, fill=(30, 34, 44))      # screen
+    d.rectangle([148, 162, 364, 288], fill=(70, 110, 220))               # wallpaper
+    d.ellipse([220, 190, 292, 262], fill=(150, 190, 255))
+    d.rectangle([248, 136, 264, 142], fill=(30, 34, 44))                 # notch
+    d.polygon([(76, 330), (436, 330), (412, 368), (100, 368)], fill=(205, 208, 214))  # base
+    d.rounded_rectangle([216, 330, 296, 342], 4, fill=(160, 164, 172))   # trackpad lip
 else:
     d.rounded_rectangle([96, 120, 416, 330], 28, fill="white")
     d.rounded_rectangle([120, 144, 392, 306], 14, fill=(27, 92, 255))
