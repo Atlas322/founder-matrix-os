@@ -177,6 +177,7 @@ def cmd_send(to, title, body, sid):
 
 # ── Discord transport (default): channels = Discord, no git per message ──
 ICON = "🍎" if DEVICE == "Mac" else "🖥️"  # BD 2026-10-03: Mac/PC мессежийг icon-оор ялгах
+FOR = __import__("re").compile(r"\bfor\s*(mac|pc)\b", __import__("re").I)
 BUSY = "🟢"  # d_status prepends this to a channel name while its session works; lookups strip it
 BROADCAST = "03-sys-admin"  # BD 2026-10-02: #org хаагдав; бүх сешнд хамаатай мэдээ = Sys Admin суваг
 import urllib.request, urllib.error
@@ -307,6 +308,8 @@ def d_watch(sid, every=20):
             for m in msgs:
                 last[n] = m["id"]
                 if tag and tag in m["content"][:len(tag) + 4]: continue
+                fm = FOR.search(m["content"])
+                if fm and fm.group(1).lower() != DEVICE.lower(): continue
                 who = m["author"].get("global_name") or m["author"]["username"]
                 print(f"#{n} · {who}: " + m["content"].replace("\n", " ⏎ ")[:600], flush=True)
 
@@ -540,6 +543,8 @@ def d_dispatch(every=15):
             except Exception as e: continue
             for m in msgs:
                 last[n] = m["id"]; a = m["author"]; txt = m["content"]
+                fm = FOR.search(txt)  # BD 2026-10-03: «for mac» → зөвхөн Mac, «for pc» → зөвхөн PC хариулна
+                if fm and fm.group(1).lower() != DEVICE.lower(): continue
                 if a.get("bot"):
                     if a["username"].endswith(DEVICE): continue          # own device
                     if n == BROADCAST and not tag.search(txt): continue    # broadcast channel: must be addressed
