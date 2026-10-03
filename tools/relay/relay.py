@@ -310,6 +310,58 @@ def d_watch(sid, every=20):
                 print(f"#{n} · {who}: " + m["content"].replace("\n", " ⏎ ")[:600], flush=True)
 
 
+def d_status(every=30, busy_s=90):
+    """Live status (BD 2026-10-03): this device's sessions → 🟢 ажиллаж байна / ⚪ сул.
+    Working = Claude transcript (.jsonl) written within busy_s. Shows as: ① one board message per device in
+    #03-sys-admin, edited in place; ② each session channel's topic (only on change, ≥5 min apart — Discord limit)."""
+    reg = load(REG, {"sessions": {}})["sessions"]; cm = chmap()
+    st = load(STATE, {}); ch = dchannels(st); save(STATE, st)
+    proj = Path.home() / ".claude" / "projects"
+    # registry cli ids go stale (clear/resume makes a new one) → resolve the CURRENT cli id from the desktop app's
+    # session files by title: title → registry entry (for the channel) + app file (for cliSessionId).
+    app = (Path.home() / "Library/Application Support/Claude/claude-code-sessions") if DEVICE == "Mac" \
+        else Path(os.environ.get("APPDATA", "")) / "Claude" / "claude-code-sessions"
+    by_title = {(v.get("title") or "").strip(): sid for sid, v in reg.items()
+                if v.get("device") == DEVICE and not v.get("private") and cm.get(sid) in ch and v.get("title")}
+    board_key = f"_status_msg_{DEVICE}"; topic_t = {}; topic_s = {}
+    while True:
+        mine = {}
+        for f in app.glob("*/*/local_*.json"):
+            try: j = json.loads(f.read_text(encoding="utf-8"))
+            except Exception: continue
+            t = (j.get("title") or "").strip()
+            if j.get("isArchived") or t not in by_title or not j.get("cliSessionId"): continue
+            mine[j["cliSessionId"]] = reg[by_title[t]] | {"_ch": cm[by_title[t]]}
+        rows = []; per_ch = {}
+        for sid, v in mine.items():
+            hits = list(proj.glob(f"*/{sid}.jsonl"))
+            age = time.time() - max((h.stat().st_mtime for h in hits), default=0)
+            busy = age < busy_s; n = v["_ch"]
+            per_ch[n] = per_ch.get(n, False) or busy
+            rows.append((not busy, v.get("title") or v["name"], f"{'🟢' if busy else '⚪'} **{v.get('title') or v['name']}** · <#{ch[n]}>"
+                         + ("" if busy else f" · {int(age // 60)} мин" if age < 86400 else "")))
+        rows.sort()
+        txt = (f"{ICON} **{DEVICE} — ажилтнуудын төлөв** (шинэчлэгдсэн {datetime.datetime.now():%H:%M:%S})\n"
+               + "\n".join(r[2] for r in rows))[:1990]
+        st = load(STATE, {})
+        try:
+            mid = st.get(board_key)
+            if mid: dapi("PATCH", f"/channels/{ch[BROADCAST]}/messages/{mid}", {"content": txt})
+            else: raise KeyError
+        except Exception:
+            mid = dapi("POST", f"/channels/{ch[BROADCAST]}/messages", {"content": txt})["id"]
+            try: dapi("PUT", f"/channels/{ch[BROADCAST]}/pins/{mid}")
+            except Exception: pass
+            st[board_key] = mid; save(STATE, st)
+        for n, busy in per_ch.items():
+            if topic_s.get(n) != busy and time.time() - topic_t.get(n, 0) > 300:
+                try:
+                    dapi("PATCH", f"/channels/{ch[n]}", {"topic": f"{'🟢 ' + DEVICE + ' ажиллаж байна' if busy else '⚪ ' + DEVICE + ' сул'} · {datetime.datetime.now():%H:%M}"})
+                    topic_s[n], topic_t[n] = busy, time.time()
+                except Exception as e: print(f"[status topic] {n}: {e}", flush=True)
+        time.sleep(every)
+
+
 def _last_turn(tp):
     user = asst = ""
     try:
@@ -524,6 +576,8 @@ def main():
         return d_baton(hook)
     if a[0] == "dispatch":
         return d_dispatch()
+    if a[0] == "status":
+        return d_status()
     if a[0] == "watch":
         return d_watch(sid)
     if a[0] == "who":
