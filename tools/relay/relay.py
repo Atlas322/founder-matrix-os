@@ -176,6 +176,7 @@ def cmd_send(to, title, body, sid):
 
 
 # ── Discord transport (default): channels = Discord, no git per message ──
+ICON = "🍎" if DEVICE == "Mac" else "🖥️"  # BD 2026-10-03: Mac/PC мессежийг icon-оор ялгах
 BROADCAST = "03-sys-admin"  # BD 2026-10-02: #org хаагдав; бүх сешнд хамаатай мэдээ = Sys Admin суваг
 import urllib.request, urllib.error
 API = "https://discord.com/api/v10"
@@ -280,7 +281,7 @@ def d_send(to, text, sid):
     reg = load(REG, {"sessions": {}}); me = reg["sessions"].get(sid, {"name": f"{DEVICE}-{sid[:6]}"})
     state = load(STATE, {}); ch = dchannels(state); save(STATE, state)
     name = BROADCAST if to in ("all", "@all", "org", "sys") else to.lstrip("@").lower()
-    cid = ch[name]; msg = f"[{me['name']}] {text}"
+    cid = ch[name]; msg = f"{ICON} [{me['name']}] {text}"
     for i in range(0, len(msg), 1900):
         dapi("POST", f"/channels/{cid}/messages", {"content": msg[i:i+1900]})
     print("sent →", name)
@@ -304,7 +305,7 @@ def d_watch(sid, every=20):
             except Exception as e: print(f"[watch error] {e}", flush=True); continue
             for m in msgs:
                 last[n] = m["id"]
-                if tag and m["content"].startswith(tag): continue
+                if tag and tag in m["content"][:len(tag) + 4]: continue
                 who = m["author"].get("global_name") or m["author"]["username"]
                 print(f"#{n} · {who}: " + m["content"].replace("\n", " ⏎ ")[:600], flush=True)
 
