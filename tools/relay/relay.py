@@ -314,6 +314,29 @@ def d_watch(sid, every=20):
                 print(f"#{n} · {who}: " + m["content"].replace("\n", " ⏎ ")[:600], flush=True)
 
 
+def d_task(args, sid):
+    """GTD task (itge.e 2026-10-05): PARA has no tasks — a task is created on purpose, owned by a dural (session role),
+    and the owner is notified in its Discord channel. Usage:
+    relay.py task "<гарчиг>" --owner "<сешний title>" [--project "<03-Projects/... note>"] [--status next-action] [--prio 🟡] [--due YYYY-MM-DD] [--body "..."]"""
+    def opt(k, d=""):
+        return args[args.index(k) + 1] if k in args else d
+    title = args[0]; owner = opt("--owner", "itge.e"); status = opt("--status", "next-action")
+    vault = Path("D:/My Drive/Second Brain 2.0") if DEVICE == "PC" else Path.home() / "My Drive/Second Brain 2.0"
+    safe = _re.sub(r'[\\/:*?"<>|]', "-", title)[:80]
+    f = vault / "02-GTD" / "tasks" / f"{safe}.md"
+    today = datetime.date.today().isoformat()
+    proj = opt("--project")
+    f.write_text("---\n" + "\n".join([
+        f"date: {today}", f"updated: {today}", "type: task", f"status: {status}", f"owner: \"{owner}\"",
+        f"priority: {opt('--prio', '🟡')}", f"due: {opt('--due')}", f"project: \"[[{proj}]]\"" if proj else "project:",
+        "tags:", "  - task"]) + "\n---\n\n# " + title + "\n\n" + opt("--body") + "\n", encoding="utf-8")
+    reg = load(REG, {"sessions": {}})["sessions"]; cm = chmap()
+    ch = next((cm[s] for s, v in reg.items() if (v.get("title") or "").strip() == owner.strip() and s in cm), None)
+    msg = f"📌 TASK → **{owner}** · `{status}` · [[02-GTD/tasks/{safe}]]\n{title}" + (f"\n{opt('--body')}" if opt("--body") else "")
+    if ch: d_send(ch, msg, sid)
+    print("task →", f, "| notified:", ch or "(owner сувагтай биш — itge.e)")
+
+
 def d_hub():
     """BD 2026-10-05: ONE place every session (PC+Mac) reads = vault `_system/STATUS.md`.
     Rendered from the git batons state/<project>.md (both devices push there) → one row per project."""
@@ -573,7 +596,7 @@ def d_dispatch(every=15):
                 fm = FOR.search(txt)  # BD 2026-10-03: «for mac» → зөвхөн Mac, «for pc» → зөвхөн PC хариулна
                 if fm and fm.group(1).lower() != DEVICE.lower(): continue
                 if a.get("bot"):
-                    if a["username"].endswith(DEVICE): continue          # own device
+                    if a["username"].endswith(DEVICE) and "📌 TASK" not in txt: continue   # own device (tasks still wake owner)
                     if n == BROADCAST and not tag.search(txt): continue    # broadcast channel: must be addressed
                     # pair channel: other device's twin talks to us → wake, but rate-limit to avoid ping-pong
                     hist = [t for t in bot_wakes.get(n, []) if time.time() - t < 600]
@@ -611,6 +634,8 @@ def main():
         return d_baton(hook)
     if a[0] == "dispatch":
         return d_dispatch()
+    if a[0] == "task":
+        return d_task(a[1:], sid)
     if a[0] == "hub":
         return d_hub()
     if a[0] == "status":
