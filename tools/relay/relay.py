@@ -314,6 +314,33 @@ def d_watch(sid, every=20):
                 print(f"#{n} · {who}: " + m["content"].replace("\n", " ⏎ ")[:600], flush=True)
 
 
+def d_hub():
+    """BD 2026-10-05: ONE place every session (PC+Mac) reads = vault `_system/STATUS.md`.
+    Rendered from the git batons state/<project>.md (both devices push there) → one row per project."""
+    git("pull", "-q", "--rebase", "--autostash")
+    vault = Path(os.environ.get("OBSIDIAN_VAULT_PATH") or (Path.home() / "My Drive/Second Brain 2.0" if DEVICE == "Mac" else Path("D:/My Drive/Second Brain 2.0")))
+    reg = load(REG, {"sessions": {}})["sessions"]
+    title = {}
+    for v in reg.values():
+        if v.get("project") and v.get("title"): title.setdefault(v["project"], v["title"])
+    rows = []
+    for f in sorted((REPO / "state").glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
+        t = f.read_text(encoding="utf-8"); head = t.split("## ТҮҮХ")[0]
+        m = _re.search(r"## ОДОО · ([^\n]+)", head); nxt = _re.search(r"\*\*Дараагийн алхам[^*]*\*\*:?\s*([^\n]+)", head)
+        if not m: continue
+        txt = (nxt.group(1) if nxt else "").replace("|", "/").strip()
+        rows.append(f"| {title.get(f.stem, f.stem)} | {m.group(1).strip()} | {txt[:400] or '—'} |")
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    out = (f"---\ntype: system\nupdated: {now}\n---\n# 🧭 FMOS STATUS — бүх сешний нэг газар\n\n"
+           "> PC + Mac бүх сешн эндээс уншина. Үүсгэгч: `relay.py hub` (git baton `state/*.md`-ээс). Гараар бүү засаарай — "
+           "өөрийн мөрөө `/sync` командаар шинэчил. Дэлгэрэнгүй түүх: `_system/logs/<огноо>.md`.\n\n"
+           f"Шинэчлэгдсэн: {now} ({DEVICE})\n\n| Сешн / төсөл | Сүүлд (хэзээ · хэн) | Хаана зогссон → дараагийн алхам |\n|---|---|---|\n"
+           + "\n".join(rows) + "\n")
+    (vault / "_system").mkdir(parents=True, exist_ok=True)
+    (vault / "_system" / "STATUS.md").write_text(out, encoding="utf-8")
+    print(f"hub → {vault / '_system' / 'STATUS.md'} ({len(rows)} мөр)")
+
+
 def d_status(every=30, busy_s=90):
     """Live status (BD 2026-10-03): this device's sessions → 🟢 ажиллаж байна / ⚪ сул.
     Working = Claude transcript (.jsonl) written within busy_s. Shows as: ① one board message per device in
@@ -584,6 +611,8 @@ def main():
         return d_baton(hook)
     if a[0] == "dispatch":
         return d_dispatch()
+    if a[0] == "hub":
+        return d_hub()
     if a[0] == "status":
         return d_status()
     if a[0] == "watch":
