@@ -596,7 +596,7 @@ def d_dispatch(every=15):
                 fm = FOR.search(txt)  # BD 2026-10-03: «for mac» → зөвхөн Mac, «for pc» → зөвхөн PC хариулна
                 if fm and fm.group(1).lower() != DEVICE.lower(): continue
                 if a.get("bot"):
-                    if a["username"].endswith(DEVICE) and "📌 TASK" not in txt: continue   # own device (tasks still wake owner)
+                    if a["username"].endswith(DEVICE) and "📌 TASK" not in txt and "📌 NOTION" not in txt: continue   # own device (tasks still wake owner)
                     if n == BROADCAST and not tag.search(txt): continue    # broadcast channel: must be addressed
                     # pair channel: other device's twin talks to us → wake, but rate-limit to avoid ping-pong
                     hist = [t for t in bot_wakes.get(n, []) if time.time() - t < 600]
