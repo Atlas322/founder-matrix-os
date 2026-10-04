@@ -128,6 +128,31 @@ def cmd_inbox():
     print(json.dumps({"hookSpecificOutput": {"hookEventName": event or "UserPromptSubmit", "additionalContext": ctx}}, ensure_ascii=False))
 
 
+def _rekey(sid):
+    """itge.e 2026-10-05: a session gets a NEW cli id after clear/resume → registry lookups failed («project алга»).
+    If sid is unknown, find the desktop-app session file holding it (cliSessionId), take its title, and move the
+    registry entry with the same title on this device to the new sid. Returns sid."""
+    if not sid: return sid
+    reg = load(REG, {"sessions": {}}); S = reg["sessions"]
+    if sid in S: return sid
+    app = (Path.home() / "Library/Application Support/Claude/claude-code-sessions") if DEVICE == "Mac" \
+        else Path(os.environ.get("APPDATA", "")) / "Claude" / "claude-code-sessions"
+    title = None
+    for f in app.glob("*/*/local_*.json"):
+        try: j = json.loads(f.read_text(encoding="utf-8"))
+        except Exception: continue
+        if j.get("cliSessionId") == sid: title = (j.get("title") or "").strip(); break
+    if not title: return sid
+    norm = lambda t: (t or "").strip().lstrip("🔥📐⏸✅ ").strip().lower()
+    old = next((k for k, v in S.items() if v.get("device") == DEVICE and norm(v.get("title")) == norm(title)), None)
+    if not old: return sid
+    S[sid] = S.pop(old); S[sid]["prev_sid"] = old
+    save(REG, reg)
+    try: git("add", str(REG)); git("commit", "-qm", f"relay: rekey {title} ({DEVICE})"); git("push", "-q")
+    except Exception: pass
+    return sid
+
+
 def _full_sid(sid):
     if len(sid) >= 36: return sid
     hits = sorted((Path.home() / ".claude" / "projects").glob(f"*/{sid}*.jsonl"), key=lambda p: p.stat().st_mtime)
@@ -614,9 +639,14 @@ def main():
     if not a or a[0] == "inbox":
         try: hook = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
         except Exception: hook = {}
+        try: _rekey(hook.get("session_id", ""))
+        except Exception: pass
         try: return d_inbox(hook)
         except Exception as e:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": hook.get("hook_event_name","UserPromptSubmit"), "additionalContext": f"[FMOS Discord] уншиж чадсангүй: {e}"}}, ensure_ascii=False)); return
+    if a[0] not in ("register", "dispatch", "hub", "status"):
+        try: sid = _rekey(_full_sid(sid))
+        except Exception: pass
     if a[0] == "register":
         pj = a[a.index("--project")+1] if "--project" in a else None
         return cmd_register(a[1], a[2], sid, pj)
@@ -631,6 +661,8 @@ def main():
     if a[0] == "baton":
         try: hook = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
         except Exception: return
+        try: _rekey(hook.get("session_id", ""))
+        except Exception: pass
         return d_baton(hook)
     if a[0] == "dispatch":
         return d_dispatch()
