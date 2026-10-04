@@ -1,0 +1,64 @@
+"""FMOS Harvester (Matrix rule: session chat → atoms automatically).
+Collects what changed in this device's Claude session transcripts since the last harvest:
+BD's messages + each assistant turn's final text (tool noise dropped). Writes one digest file to
+~/.fmos_harvest/<ts>.md (NOT the vault — the vault only gets atoms + log links, written by the harvester agent).
+Usage: python harvest.py [--dry]   → prints the digest path (or "nothing")."""
+import json, os, sys, time, datetime, pathlib, re
+
+HOME = pathlib.Path.home()
+PROJ = HOME / ".claude" / "projects"
+OUT = HOME / ".fmos_harvest"; OUT.mkdir(exist_ok=True)
+STATE = OUT / "_offsets.json"
+VAULT_HINT = re.compile(r"(Second-Brain|Founder-Matrix|founder-matrix)", re.I)
+MIN_CHARS = 400          # skip sessions with almost nothing new
+SKIP = ("<cross-session-message", "<task-notification", "<system-reminder", "[SYSTEM NOTIFICATION")
+
+
+def text_of(content):
+    if isinstance(content, str): return content
+    return "\n".join(c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text")
+
+
+def main(dry=False):
+    off = json.loads(STATE.read_text()) if STATE.exists() else {}
+    parts = []
+    for f in PROJ.glob("*/*.jsonl"):
+        if not VAULT_HINT.search(f.parent.name) or "subagents" in str(f): continue
+        size = f.stat().st_size; start = off.get(str(f), 0)
+        if size <= start: continue
+        with f.open("rb") as fh:
+            fh.seek(start); raw = fh.read()
+        title, turns, last_asst = None, [], None
+        for line in raw.decode("utf-8", "ignore").splitlines():
+            try: j = json.loads(line)
+            except Exception: continue
+            if j.get("type") == "summary" and j.get("summary"): title = j["summary"]
+            msg = j.get("message") or {}
+            if j.get("type") == "user" and not j.get("isMeta"):
+                t = text_of(msg.get("content", "")).strip()
+                if t and not t.startswith(SKIP):
+                    if last_asst: turns.append(("Claude", last_asst)); last_asst = None
+                    turns.append(("BD", t))
+                elif t.startswith("<cross-session-message"):   # relayed BD orders count too
+                    m = re.search(r"\[Discord[^\]]*\]\s*(.+)", t, re.S)
+                    if m: turns.append(("BD (Discord)", m.group(1)[:800]))
+            elif j.get("type") == "assistant":
+                t = text_of(msg.get("content", [])).strip()
+                if t: last_asst = t
+        if last_asst: turns.append(("Claude", last_asst))
+        body = "\n\n".join(f"**{w}:** {t[:1500]}" for w, t in turns)
+        off[str(f)] = size
+        if len(body) < MIN_CHARS: continue
+        parts.append(f"## Session {f.stem[:8]} · {f.parent.name}{' · ' + title if title else ''}\n\n{body}")
+    if not parts:
+        if not dry: STATE.write_text(json.dumps(off))
+        print("nothing"); return
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H%M")
+    p = OUT / f"{ts}.md"
+    p.write_text(f"# Harvest {ts} ({len(parts)} сешн)\n\n" + "\n\n---\n\n".join(parts), encoding="utf-8")
+    if not dry: STATE.write_text(json.dumps(off))
+    print(p)
+
+
+if __name__ == "__main__":
+    main("--dry" in sys.argv)
