@@ -26,13 +26,15 @@ Vault-ийн хавтасны бүтэц ба гол файлууд. Хайлт 
 | `06-Atomic/` | `decisions/` · `knowledge/` | [[03 Resource]] |
 | `07-Goals/` | Зорилго | [[02 Area]] |
 | `99-Archive/` | Архив | [[02 Area]] |
-| `_system/` | BOOT · STATUS · templates · bases · logs · relay | [[02 Area]] |
+| `_system/` | BOOT · STATUS · templates · bases · logs · fm | [[02 Area]] |
 
 ## Гол файлууд
 
 - [[_system/BOOT]] — ажиллах дүрэм
 - [[_system/STATUS]] — дүрүүдийн төлөв
 - [[Home]] — нүүр
+- `_system/fm/registry.json` — сешн ↔ дүрийн бүртгэл (машин уншина)
+- Bases: Tasks · Projects · Companies · People · References · Decisions · Atoms · Agents (`_system/bases/`)
 
 ## Идэвхтэй төслүүд
 

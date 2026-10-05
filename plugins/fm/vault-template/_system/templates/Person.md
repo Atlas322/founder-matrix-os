@@ -5,9 +5,11 @@ type: person
 tags:
   - person
 ai-first: true
+aliases: []
 role:
-company:
 relationship:
+companies: []
+projects: []
 last_interaction: {{date:YYYY-MM-DD}}
 follow_up_date:
 ---
@@ -26,4 +28,7 @@ follow_up_date:
 
 ## Тэмдэглэл
 
-<!-- relationship: team | client | partner | network | personal -->
+<!--
+relationship: team | client | partner | mentor | network | family | friend
+companies / projects: "[[wikilink]]" жагсаалт (байгууллага, төсөл).
+-->

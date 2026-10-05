@@ -119,7 +119,7 @@ Figma-гийн жинхэнэ comment биш (Plugin API comment уншиж ча
 8. Байрлуулахдаа хэмжинэ: богино шошгод `textAutoResize='WIDTH_AND_HEIGHT'`, дараагийн элементэд `y = өмнөхийн y + өндөр + зай` (`autoW`, `below` туслах).
 
 ## Mac-тай синк (2026-09-28)
-Plugin (code.js/ui.html) засах бүрт `_system/relay/pc-to-mac.md`-д «plugin шинэчлэгдсэн» (server.mjs бол «server шинэчлэгдсэн», manifest бол «manifest») гэж нэг мөр бич — Mac-ийн 03 Sys Admin BD-д reopen/restart хийлгэнэ (#20).
+Plugin (code.js/ui.html) засах бүрт нөгөө төхөөрөмж рүү relay-ээр (`relay.py send`, хуучин `_system/relay/` архивласан) «plugin шинэчлэгдсэн» (server.mjs бол «server шинэчлэгдсэн», manifest бол «manifest») гэж нэг мөр бич — Mac-ийн 03 Sys Admin BD-д reopen/restart хийлгэнэ (#20).
 
 ## Board-ын дүрэм: section бүр auto layout (BD, 2026-09-28)
 Section-ийг Figma API auto layout болгож чаддаггүй → section > `Stage · auto` (VERTICAL, hug) > толгой, тайлбар, `мөрүүд (wrap)` (HORIZONTAL WRAP) > `карт` (зураг + caption). Шинэ stage-ийг ийм бүтэцтэй үүсгэ; хуучныг `html2fig/board_autolayout.js`-ээр хөрвүүл. Stage хоорондын сумыг script дахин зурна.

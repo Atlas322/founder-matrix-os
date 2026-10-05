@@ -1,0 +1,21 @@
+Founder Matrix Second Brain (founder-matrix-os)
+
+Copyright (c) 2026 itge.e. All rights reserved.
+
+Licensed for use by the Founder Matrix team and SB+AI Season 2 participants.
+Contributions are licensed to itge.e under the same terms.
+
+You may not redistribute, publish, sublicense or sell this repository or any
+part of it outside the Founder Matrix team and SB+AI Season 2 without prior
+written permission from itge.e.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
+
+Third-party components
+----------------------
+Parts of the "fm" plugin are derived from MIT-licensed projects
+(kepano/obsidian-skills, obsidian-second-brain). Those parts remain under the
+MIT License. Their notices and full license texts are kept in
+plugins/fm/THIRD_PARTY_NOTICES.md and plugins/fm/LICENSES/.

@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "sessions": {},
+  "roles": {
+    "gtd": {
+      "note": "04-Areas/AI Team/ai-workers/00 GTD.md",
+      "channel": "00-gtd",
+      "group": "tasks",
+      "folders": [
+        "00-Inbox/",
+        "02-GTD/"
+      ],
+      "skills": [
+        "fm:inbox",
+        "fm:task",
+        "fm:daily",
+        "fm:update",
+        "fm:save"
+      ],
+      "private": false,
+      "active": true
+    },
+    "project": {
+      "note": "04-Areas/AI Team/ai-workers/01 Project.md",
+      "channel": "01-project",
+      "group": "projects",
+      "folders": [
+        "03-Projects/"
+      ],
+      "skills": [
+        "fm:project",
+        "fm:spawn",
+        "fm:task",
+        "fm:save"
+      ],
+      "private": false,
+      "active": true
+    },
+    "area": {
+      "note": "04-Areas/AI Team/ai-workers/02 Area.md",
+      "channel": "02-area",
+      "group": "areas",
+      "folders": [
+        "04-Areas/",
+        "01-Soul/",
+        "07-Goals/",
+        "99-Archive/",
+        "_system/",
+        "Home.md"
+      ],
+      "skills": [
+        "fm:setup",
+        "fm:role",
+        "fm:vault",
+        "fm:bases",
+        "fm:vault-cli",
+        "fm:save"
+      ],
+      "private": false,
+      "active": true
+    },
+    "resource": {
+      "note": "04-Areas/AI Team/ai-workers/03 Resource.md",
+      "channel": "03-resource",
+      "group": "resources",
+      "folders": [
+        "05-Resources/",
+        "06-Atomic/"
+      ],
+      "skills": [
+        "fm:clip",
+        "fm:save",
+        "fm:track",
+        "fm:canvas"
+      ],
+      "private": false,
+      "active": true
+    },
+    "content-writer": {
+      "note": "04-Areas/AI Team/ai-workers/20 Content Writer.md",
+      "channel": "20-content-writer",
+      "group": "projects",
+      "folders": [],
+      "skills": [
+        "fm:save",
+        "fm:clip",
+        "fm:task"
+      ],
+      "private": false,
+      "active": true
+    },
+    "creative-director": {
+      "note": "04-Areas/AI Team/ai-workers/21 Creative Director.md",
+      "channel": "21-creative-director",
+      "group": "development",
+      "folders": [],
+      "skills": [
+        "fm:canvas",
+        "fm:save",
+        "fm:task"
+      ],
+      "private": false,
+      "active": true
+    },
+    "tool-developer": {
+      "note": "04-Areas/AI Team/ai-workers/22 Tool Developer.md",
+      "channel": "22-tool-developer",
+      "group": "development",
+      "folders": [
+        "04-Areas/AI Team/skills/"
+      ],
+      "skills": [
+        "fm:vault-cli",
+        "fm:bases",
+        "fm:canvas",
+        "fm:task"
+      ],
+      "private": false,
+      "active": true
+    },
+    "finance": {
+      "note": "04-Areas/AI Team/ai-workers/30 Санхүү.md",
+      "channel": "",
+      "group": "areas",
+      "folders": [
+        "04-Areas/Business/finances/"
+      ],
+      "skills": [
+        "fm:finance",
+        "fm:bases",
+        "fm:task"
+      ],
+      "private": true,
+      "active": true
+    }
+  }
+}
