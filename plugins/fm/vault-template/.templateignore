@@ -1,0 +1,11 @@
+# fm_setup.py эдгээрийг member vault руу ХУУЛАХГҮЙ (gitignore-тэй төстэй, glob).
+# Template-д .obsidian/ байх ёсгүй — гишүүн бүр Obsidian-оо өөрөө тохируулна.
+.obsidian/
+.trash/
+.DS_Store
+Thumbs.db
+desktop.ini
+__pycache__/
+*.pyc
+*(1).*
+.templateignore

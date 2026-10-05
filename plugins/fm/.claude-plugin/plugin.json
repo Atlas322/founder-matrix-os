@@ -1,0 +1,54 @@
+{
+  "name": "fm",
+  "version": "0.1.0",
+  "displayName": "Founder Matrix OS",
+  "description": "Соёлын гишүүн бүрийн хувийн Obsidian vault-ийг GTD + PARA + атом тэмдэглэлээр ажиллуулах хөдөлгүүр: дүр (Agent), даалгавар, inbox, хадгалах, хувийн санхүү. / Founder Matrix OS: personal Obsidian vault engine (GTD, PARA, atomic notes, agent roles, private finance) for members of Соёл.",
+  "author": {
+    "name": "itge.e / Соёл"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "keywords": [
+    "obsidian",
+    "gtd",
+    "para",
+    "second-brain",
+    "vault",
+    "mongolian"
+  ],
+  "userConfig": {
+    "vault_path": {
+      "type": "directory",
+      "title": "Vault folder",
+      "description": "Таны хувийн Obsidian vault-ийн үндсэн хавтас (Your personal Obsidian vault root)",
+      "required": true
+    },
+    "member": {
+      "type": "string",
+      "title": "Member name",
+      "description": "Таны нэр эсвэл товч нэр, task owner болон STATUS-д ашиглана (Your name or handle)"
+    },
+    "device": {
+      "type": "string",
+      "title": "Device label",
+      "description": "Энэ төхөөрөмжийн шошго, жишээ нь Mac эсвэл PC (Device label used in session titles)"
+    },
+    "discord_token": {
+      "type": "string",
+      "title": "Discord bot token (v0.2)",
+      "description": "v0.2-т ашиглана. Одоо хоосон үлдээж болно (Optional, used from v0.2)",
+      "sensitive": true
+    },
+    "notion_token": {
+      "type": "string",
+      "title": "Notion token (v0.2)",
+      "description": "v0.2-т ашиглана. Одоо хоосон үлдээж болно (Optional, used from v0.2)",
+      "sensitive": true
+    },
+    "figma_token": {
+      "type": "string",
+      "title": "Figma token (v0.2)",
+      "description": "v0.2-т ашиглана. Одоо хоосон үлдээж болно (Optional, used from v0.2)",
+      "sensitive": true
+    }
+  }
+}

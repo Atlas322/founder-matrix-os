@@ -1,0 +1,62 @@
+filters:
+  and:
+    - file.ext == "md"
+    - type == "session-decision"
+    - '!file.inFolder("_system/templates")'
+properties:
+  decision:
+    displayName: Шийдвэр
+  changetype:
+    displayName: Төрөл
+  status:
+    displayName: Төлөв
+  decidedby:
+    displayName: Хэн
+  date:
+    displayName: Огноо
+  projects:
+    displayName: Төсөл
+  areas:
+    displayName: Area
+views:
+  - type: table
+    name: Хүчинтэй
+    filters:
+      and:
+        - status == "accepted"
+    order:
+      - date
+      - decision
+      - changetype
+      - decidedby
+      - projects
+  - type: table
+    name: Төрлөөр
+    groupBy:
+      property: changetype
+      direction: ASC
+    order:
+      - decision
+      - status
+      - decidedby
+      - date
+  - type: table
+    name: Хүчингүй болсон
+    filters:
+      or:
+        - status == "superseded"
+        - status == "reverted"
+    order:
+      - date
+      - decision
+      - status
+      - supersededby
+  - type: table
+    name: ⚠️ Гэргүй
+    filters:
+      and:
+        - '!projects || projects.length == 0'
+        - '!areas || areas.length == 0'
+    order:
+      - file.basename
+      - date

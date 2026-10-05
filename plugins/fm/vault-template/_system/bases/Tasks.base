@@ -1,0 +1,173 @@
+filters:
+  and:
+    - file.ext == "md"
+    - type == "task"
+    - '!file.inFolder("_system/templates")'
+    - '!file.inFolder("99-Archive")'
+formulas:
+  days_until_due: 'if(due, (date(due) - today()).days, "")'
+  overdue: 'if(due, date(due) < today() && status != "completed" && status != "cancelled", false)'
+  owner_icon: 'if(owner == "me", "👤", if(owner && owner.toString().startsWith("@"), "👥", if(owner, "🤖", "❔")))'
+  status_icon: 'if(status == "inbox", "📥", if(status == "next-action", "⏭️", if(status == "waiting", "⏳", if(status == "someday", "💭", if(status == "completed", "✅", if(status == "cancelled", "🚫", "❔"))))))'
+  priority_icon: 'if(priority == "high", "🔴", if(priority == "medium", "🟡", if(priority == "low", "🟢", "")))'
+properties:
+  formula.days_until_due:
+    displayName: "Хоног үлдсэн"
+  formula.overdue:
+    displayName: "Хэтэрсэн"
+  formula.owner_icon:
+    displayName: " "
+  formula.status_icon:
+    displayName: "  "
+  formula.priority_icon:
+    displayName: "!"
+  status:
+    displayName: Төлөв
+  owner:
+    displayName: Эзэн
+  due:
+    displayName: Хугацаа
+  project:
+    displayName: Төсөл
+  context:
+    displayName: Контекст
+views:
+  - type: table
+    name: Inbox
+    filters:
+      and:
+        - status == "inbox"
+    order:
+      - formula.owner_icon
+      - file.basename
+      - formula.priority_icon
+      - project
+  - type: table
+    name: Next Action
+    filters:
+      and:
+        - status == "next-action"
+    groupBy:
+      property: owner
+      direction: ASC
+    order:
+      - formula.owner_icon
+      - file.basename
+      - formula.priority_icon
+      - due
+      - formula.days_until_due
+      - project
+  - type: table
+    name: Миний
+    filters:
+      and:
+        - owner == "me"
+        - status != "completed"
+        - status != "cancelled"
+    groupBy:
+      property: status
+      direction: ASC
+    order:
+      - formula.status_icon
+      - file.basename
+      - formula.priority_icon
+      - due
+      - project
+  - type: table
+    name: Agent
+    filters:
+      and:
+        - owner != "me"
+        - '!owner.toString().startsWith("@")'
+        - status != "completed"
+        - status != "cancelled"
+    groupBy:
+      property: owner
+      direction: ASC
+    order:
+      - formula.status_icon
+      - file.basename
+      - formula.priority_icon
+      - due
+      - project
+  - type: table
+    name: 🏠 Home
+    filters:
+      and:
+        - context == "home"
+        - status != "completed"
+        - status != "cancelled"
+    groupBy:
+      property: status
+      direction: ASC
+    order:
+      - formula.status_icon
+      - file.basename
+      - formula.priority_icon
+      - due
+  - type: table
+    name: 💼 Work
+    filters:
+      and:
+        - context == "work"
+        - status != "completed"
+        - status != "cancelled"
+    groupBy:
+      property: status
+      direction: ASC
+    order:
+      - formula.status_icon
+      - file.basename
+      - formula.priority_icon
+      - owner
+      - due
+      - project
+  - type: table
+    name: Waiting
+    filters:
+      and:
+        - status == "waiting"
+    order:
+      - formula.owner_icon
+      - file.basename
+      - due
+      - formula.days_until_due
+      - project
+  - type: table
+    name: Someday
+    filters:
+      and:
+        - status == "someday"
+    order:
+      - file.basename
+      - project
+  - type: table
+    name: Дууссан
+    filters:
+      or:
+        - status == "completed"
+        - status == "cancelled"
+    order:
+      - formula.status_icon
+      - file.basename
+      - updated
+      - project
+  - type: table
+    name: ⚠️ Схемийн зөрчил
+    filters:
+      or:
+        - '!status'
+        - '!owner'
+        - '!context'
+        - and:
+            - status != "inbox"
+            - status != "next-action"
+            - status != "waiting"
+            - status != "someday"
+            - status != "completed"
+            - status != "cancelled"
+    order:
+      - file.basename
+      - status
+      - owner
+      - context

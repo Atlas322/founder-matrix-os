@@ -1,0 +1,15 @@
+{
+  "name": "soyol",
+  "owner": {
+    "name": "itge.e / Соёл"
+  },
+  "description": "Соёлын багийн дотоод plugin-ууд (Internal Claude Code plugins for the Соёл team)",
+  "plugins": [
+    {
+      "name": "fm",
+      "source": "./plugins/fm",
+      "description": "Founder Matrix OS: хувийн Obsidian vault-ийн хөдөлгүүр (personal Obsidian vault engine: GTD, PARA, atoms, roles, private finance)",
+      "category": "productivity"
+    }
+  ]
+}
