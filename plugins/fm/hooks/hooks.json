@@ -1,0 +1,31 @@
+{
+  "description": "Founder Matrix OS vault engine: SessionStart context (BOOT.md + role rules) and note lint on writes.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/fm_context.py"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/fm_lint.py"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

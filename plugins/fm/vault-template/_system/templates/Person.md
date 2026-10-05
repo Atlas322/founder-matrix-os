@@ -1,0 +1,29 @@
+---
+date: {{date:YYYY-MM-DD}}
+updated: {{date:YYYY-MM-DD}}
+type: person
+tags:
+  - person
+ai-first: true
+role:
+company:
+relationship:
+last_interaction: {{date:YYYY-MM-DD}}
+follow_up_date:
+---
+
+# {{title}}
+
+## For future agent
+
+Хүний note: хэн бэ, юу хийдэг, ямар холбоотой, юунд анхаардаг. Энэ хүнтэй харилцахаас өмнө эндээс эхэл. Хувийн мэдээллийг зөвхөн тухайн хүн/эзэн хэлсэн бол бичнэ.
+
+## Тухай
+
+## Юунд анхаардаг вэ
+
+## Бие биедээ хэрхэн тус болох вэ
+
+## Тэмдэглэл
+
+<!-- relationship: team | client | partner | network | personal -->
