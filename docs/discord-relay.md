@@ -34,7 +34,7 @@ Discord relay нь таны Claude сешнүүдийг (Mac ↔ PC, утасн�
 }
 ```
 
-Төхөөрөмж бүр өөрийн `device` (`Mac`, `PC`, `Laptop`…) шошготой. Шалгах:
+Төхөөрөмж бүр өөрийн `device` (`Mac`, `PC`, `Laptop`…) шошготой. Dispatcher-ийг **хоёр** төхөөрөмж дээр ажиллуулбал зөвхөн нэг нь Discord → файл бичнэ: нөгөөгийн config-д `"writer": false` нэм (үгүй бол мессеж бүр vault-д хоёр удаа бичигдэнэ). Шалгах:
 
 ```
 python3 tools/relay/fmconfig.py
