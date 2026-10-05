@@ -1,7 +1,6 @@
 {
-  "_comment": "Cut-over-ийн дараах ~/.claude/settings.json-ийн hooks + env хэсэг (Mac). Бүтэн файлыг ҮҮГЭЭР БҮҮ СОЛЬ: extras/cutover-mac.md 3-р алхмын скрипт зөвхөн OSB hook-уудыг хасаж FM_VAULT нэмнэ, бусад тохиргоо (permissions, plugins, theme) хэвээр үлдэнэ. fm_context.py (SessionStart) ба fm_lint.py (PostToolUse) энд БАЙХГҮЙ — тэд fm plugin-ий hooks.json-оос ирнэ. Env утгад $HOME задрахгүй тул FM_VAULT-д бүтэн замаа бич. Энэ '_comment' түлхүүрийг жинхэнэ settings.json руу бүү хуул.",
+  "_comment": "Cut-over-ийн дараах ~/.claude/settings.json-ийн hooks + env хэсэг (Mac). Бүтэн файлыг ҮҮГЭЭР БҮҮ СОЛЬ: extras/cutover-mac.md 3-р алхмын скрипт зөвхөн OSB hook-уудыг хасна (FM_VAULT-ийг энд БҮҮ нэм — relay-ийн горимыг зөвхөн ~/.fmos/config.json сольдог), бусад тохиргоо (permissions, plugins, theme) хэвээр үлдэнэ. fm_context.py (SessionStart) ба fm_lint.py (PostToolUse) энд БАЙХГҮЙ — тэд fm plugin-ий hooks.json-оос ирнэ. Env утгад $HOME задрахгүй тул бүтэн замаа бич. Энэ '_comment' түлхүүрийг жинхэнэ settings.json руу бүү хуул.",
   "env": {
-    "FM_VAULT": "/Users/<your-user>/My Drive/Second Brain 2.0",
     "OBSIDIAN_VAULT_PATH": "/Users/<your-user>/My Drive/Second Brain 2.0"
   },
   "hooks": {

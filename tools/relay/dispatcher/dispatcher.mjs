@@ -24,7 +24,8 @@ const WRITER = (process.env.FMOS_WRITER ?? (VAULT_MODE ? (FMCFG.writer === false
 const TOKEN = readFileSync(join(homedir(), '.fmos_discord_token'), 'utf8').trim();
 const CFG = JSON.parse(readFileSync(join(RELAY, 'discord.json'), 'utf8'));
 const MEMBER = process.env.FM_MEMBER || FMCFG.member || CFG.member || 'BD'; // label for human Discord messages
-const STATE_F = join(homedir(), '.fmos_dispatch_state.json');
+// separate read offsets per mode: legacy repo files and vault files share names (org.md, s/<x>.md) but not sizes
+const STATE_F = join(homedir(), VAULT_MODE ? '.fmos_dispatch_state.vault.json' : '.fmos_dispatch_state.json');
 const GROUPS = ['tasks', 'projects', 'areas', 'resources', 'archive'];
 const POLL = 20_000;
 

@@ -79,11 +79,11 @@ claude plugin uninstall fm@founder-matrix
 claude plugin marketplace remove founder-matrix
 ```
 
-## 3. `settings.json`: OSB hook-уудыг хасаж `FM_VAULT` нэмэх
+## 3. `settings.json`: OSB hook-уудыг хасах
 
 ```powershell
-python3 "$Repo\extras\cutover_settings.py" --vault "$Vault"            # dry-run — гаралтыг УНШ
-python3 "$Repo\extras\cutover_settings.py" --vault "$Vault" --apply
+python3 "$Repo\extras\cutover_settings.py"            # dry-run — гаралтыг УНШ
+python3 "$Repo\extras\cutover_settings.py" --apply
 python3 "$Repo\extras\cutover_settings.py" --check                     # exit 0
 python3 -m json.tool "$Claude\settings.json" > $null; if ($?) { "JSON OK" }
 ```
@@ -91,6 +91,8 @@ python3 -m json.tool "$Claude\settings.json" > $null; if ($?) { "JSON OK" }
 - Скрипт `obsidian-second-brain\hooks\*` (load_vault_context, validate-ai-first, obsidian-bg-agent) ба `check-write-date.sh`-ийг хасна; `relay.py`, `status.py`, `claude_status.py` үлдэнэ; CRLF ба догол хадгалагдана.
 - Dry-run-д хуучин vault замтай (`Founder.Matrix`) hook харагдвал **энэ скрипт хөндөхгүй** — `claude_status.py`-г repo хуулбар руу (`$Repo\tools\figma\bridge\claude_status.py`) заах эсэхийг Tool Developer-ээс асуу, гараар зас.
 - `OBSIDIAN_VAULT_PATH` хуучин замтай байвал `$Vault` болгож гараар зас (`relay.py` уншдаг).
+
+> ⚠️ `--vault` **бүү** өг (`FM_VAULT`-ийг settings.json-д бүү нэм): settings-ийн env бүх hook-д очдог тул relay 7-р алхмаас **өмнө** vault горимд шилжиж, `_system/fm/` хоосон байхад registry/discord.json-гүй болно; 7-р алхмын «Буцаах» ч ажиллахгүй болно. Горимын цорын ганц шилжүүлэгч = `~/.fmos/config.json` (7-р алхам). Plugin vault-аа `vault_path`/`config.json`-оос олно.
 
 **Буцаах:** `Copy-Item "$BK\claude\settings.json" "$Claude\settings.json" -Force`
 
