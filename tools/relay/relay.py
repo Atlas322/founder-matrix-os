@@ -440,7 +440,7 @@ def d_status(every=30, busy_s=90):
     # session files by title: title → registry entry (for the channel) + app file (for cliSessionId).
     app = fmconfig.claude_app_sessions_dir()
     by_title = {(v.get("title") or "").strip(): sid for sid, v in reg.items()
-                if v.get("device") == DEVICE and not v.get("private") and cm.get(sid) in ch and v.get("title")}
+                if v.get("device") == DEVICE and not is_private(v) and cm.get(sid) in ch and v.get("title")}
     board_key = f"_status_msg_{DEVICE}"; topic_t = {}; topic_s = {}
     while True:
         mine = {}
@@ -530,6 +530,7 @@ def d_next(text, sid):
     """Pin 'Дараагийн алхам' in state/<project>.md (kept across auto baton writes)."""
     me = load(REG, {"sessions": {}})["sessions"].get(sid)
     if not me or not me.get("project"): print("project алга"); return
+    if is_private(me): print("private — baton бичихгүй"); return  # same rule as d_baton: never written/pushed
     f = STATE_DIR / f"{me['project']}.md"; f.parent.mkdir(parents=True, exist_ok=True); old = f.read_text(encoding="utf-8") if f.exists() else f"# {me['project']}\n\n## ТҮҮХ\n"
     head, _, tail = old.partition("## ТҮҮХ")
     lines = [l for l in head.splitlines() if not l.startswith("**Дараагийн алхам")]
@@ -554,7 +555,7 @@ def chname(v):
 
 def chmap():
     """session_id → numbered Discord channel. Same project slug on PC & Mac → ONE channel (named by the first titled session)."""
-    regs = [(sid, v) for sid, v in load(REG, {"sessions": {}})["sessions"].items() if not v.get("private")]
+    regs = [(sid, v) for sid, v in load(REG, {"sessions": {}})["sessions"].items() if not is_private(v)]  # finance/tax/gold too: no Discord channel
     key = lambda v: v.get("project") or chname(v)
     first = {}
     for sid, v in regs:
@@ -585,7 +586,7 @@ SYSTEM_CH = ["status", "status-data", "general", "relay"]  # #org хаагдса
 def d_sync():
     """Discord = sidebar: category per PARA group, one channel per project slug. Never deletes — old channels → Archive."""
     gid = load(DCFG, {})["guild"]["id"]
-    reg = [v for v in load(REG, {"sessions": {}})["sessions"].values() if not v.get("private")]
+    reg = [v for v in load(REG, {"sessions": {}})["sessions"].values() if not is_private(v)]
     allc = dapi("GET", f"/guilds/{gid}/channels")
     byname = {_re.sub(r"^\d+\s*", "", c["name"]).lower().replace("r&d", "research"): c for c in allc if c["type"] == 4}
     cats = {}
@@ -647,7 +648,7 @@ def d_dispatch(every=15):
     local = {}
     for sid, ch in cm.items():
         v = reg[sid]
-        if v.get("device") == DEVICE and not v.get("private"):
+        if v.get("device") == DEVICE and not is_private(v):
             local.setdefault(ch, []).append(v.get("title") or v["name"])
     st = load(STATE, {}); st.pop("_dch", None); ch = dchannels(st); save(STATE, st)
     watch = {n: ch[n] for n in local if n in ch}

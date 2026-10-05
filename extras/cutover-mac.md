@@ -4,7 +4,7 @@ itge.e-ийн Mac-ийг хуучин `obsidian-second-brain` (OSB) тохирг
 
 - **Хугацаа:** ~30 минут. Дараа нь Mac дээр 1 өдөр тогтвортой ажиллуулаад PC-г шилжүүлнэ (`cutover-pc.md`).
 - **Хүрэхгүй:** `.obsidian/`, `tools/relay/` код, `fmos-harvester-mac` scheduled task, Discord суваг.
-- **Зөвхөн Mac бичнэ.** PC дээр Obsidian ба Claude сешнүүдийг хаа (Drive `(1)` давхардлаас сэргийлнэ).
+- **Зөвхөн Mac бичнэ.** PC дээр Obsidian ба Claude сешнүүдийг хаа (Drive `(1)` давхардлаас сэргийлнэ) — **PC cut-over хүртэл хаалттай байлга**: legacy PC-ийн baton/бүртгэл git `state/`, `relay/` руу очиж vault-ийн `_system/fm/`-д хэзээ ч орохгүй, STATUS хоёр эх сурвалжаас ээлжлэн дарагдана.
 
 ## 0. Хувьсагч ба урьдчилсан шалгалт
 
@@ -81,17 +81,19 @@ claude plugin uninstall fm@founder-matrix
 claude plugin marketplace remove founder-matrix
 ```
 
-## 3. `settings.json`: OSB hook-уудыг хасаж `FM_VAULT` нэмэх
+## 3. `settings.json`: OSB hook-уудыг хасах
 
 Хасагдах 4 hook: SessionStart `load_vault_context.py`, PostCompact `obsidian-bg-agent.sh`, PostToolUse `validate-ai-first.sh` ба `check-write-date.sh` (`fm_lint.py`-д шингэсэн). **Үлдэх:** `relay.py inbox/baton`, `status.py`, `claude_status.py` (13 hook). Зорилтот төлөв: `extras/settings.mac.json.example`.
 
 ```bash
-python3 "$REPO/extras/cutover_settings.py" --vault "$VAULT"            # dry-run: 4 мөр хасахыг харуулна
-python3 "$REPO/extras/cutover_settings.py" --vault "$VAULT" --apply
+python3 "$REPO/extras/cutover_settings.py"            # dry-run: 4 мөр хасахыг харуулна
+python3 "$REPO/extras/cutover_settings.py" --apply
 python3 "$REPO/extras/cutover_settings.py" --check                     # "OK: ... алга", exit 0
 python3 -m json.tool ~/.claude/settings.json > /dev/null && echo "JSON OK"
 grep -c "relay.py\|status.py\|claude_status.py" ~/.claude/settings.json   # 13
 ```
+
+> ⚠️ `--vault` **бүү** өг (`FM_VAULT`-ийг settings.json-д бүү нэм): settings-ийн env бүх hook-д очдог тул relay 6-р алхмаас **өмнө** vault горимд шилжиж, `_system/fm/` хоосон байхад registry/discord.json-гүй болно; 6-р алхмын «Буцаах» ч ажиллахгүй болно. Горимын цорын ганц шилжүүлэгч = `~/.fmos/config.json` (6–7-р алхам). Plugin vault-аа `vault_path`/`config.json`-оос олно.
 
 `OBSIDIAN_VAULT_PATH` хэвээр үлдэнэ (`relay.py` уншдаг). `AI_FIRST_SKIP_CHARSET` хоргүй — 30 хоногийн цэвэрлэгээнд хасна.
 
@@ -187,6 +189,18 @@ else:
                             ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print("бичлээ:", p)
 EOF2
+```
+
+**Mac бол Discord бичигч биш** (PC бичнэ). Vault горимд dispatcher default-аар бичигч болдог тул Mac-ийн config-д `"writer": false` нэм — үгүй бол Discord мессеж бүр vault-ийн нэг файлд хоёр удаа бичигдэнэ:
+
+```bash
+python3 - <<'EOF3'
+import json
+from pathlib import Path
+p = Path.home() / ".fmos" / "config.json"
+c = json.loads(p.read_text(encoding="utf-8")); c["writer"] = False
+p.write_text(json.dumps(c, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"); print(c)
+EOF3
 ```
 
 **Буцаах:** 6-р алхмын «Буцаах»-д багтсан.
