@@ -1,0 +1,209 @@
+{
+  "name": "FMOS · Notion comment → Discord",
+  "nodes": [
+    {
+      "name": "Every 2 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "node-1"
+    },
+    {
+      "name": "Links",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// relay/notion_links.json-ийн хуулбар: Discord суваг ↔ Notion project page\nconst LINKS = [\n  { channel: \"🔥-04-byd-website\", channelId: \"DISCORD_ID\", page: \"NOTION_PAGE_ID\", title: \"BYD website\" },\n];\nreturn LINKS.map(l => ({ json: l }));"
+      },
+      "id": "node-2"
+    },
+    {
+      "name": "Notion page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "url": "=https://api.notion.com/v1/pages/{{ $json.page }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "onError": "continueRegularOutput",
+      "id": "node-3"
+    },
+    {
+      "name": "Targets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// project page + түүний Tasks relation-ууд → comment шалгах хуудсууд\nconst links = $('Links').all();\nconst out = [];\n$input.all().forEach((it, i) => {\n  const l = links[i].json;\n  out.push({ json: { pid: l.page, kind: l.title, channelId: l.channelId } });\n  for (const r of (it.json.properties?.Tasks?.relation || []))\n    out.push({ json: { pid: r.id, kind: \"task\", channelId: l.channelId } });\n});\nreturn out;"
+      },
+      "id": "node-4"
+    },
+    {
+      "name": "Comments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "url": "=https://api.notion.com/v1/comments?block_id={{ $json.pid }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "onError": "continueRegularOutput",
+      "id": "node-5"
+    },
+    {
+      "name": "New only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Шинэ comment-ийг л үлдээнэ. Анхны ажиллагаа = baseline (хуучныг илгээхгүй).\n// staticData зөвхөн workflow Active үед хадгалагдана.\nconst sd = $getWorkflowStaticData('global');\nconst first = !sd.seen;\nsd.seen = sd.seen || {};\nconst targets = $('Targets').all();\nconst out = [];\n$input.all().forEach((it, i) => {\n  const t = targets[i].json;\n  for (const c of (it.json.results || [])) {\n    if (sd.seen[c.id]) continue;\n    sd.seen[c.id] = c.created_time;\n    if (first) continue;\n    const text = (c.rich_text || []).map(r => r.plain_text || \"\").join(\"\");\n    const url = \"https://app.notion.com/p/\" + t.pid.replace(/-/g, \"\");\n    out.push({ json: { channelId: t.channelId,\n      content: `📌 NOTION comment · ${t.kind}\\n${text}\\n${url}\\n(агент: гүйцэтгээд Notion comment-д «✓ хийгдлээ» гэж хариул)`.slice(0, 1900) } });\n  }\n});\nreturn out;"
+      },
+      "id": "node-6"
+    },
+    {
+      "name": "Discord post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://discord.com/api/v10/channels/{{ $json.channelId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.content }) }}",
+        "options": {}
+      },
+      "id": "node-7"
+    }
+  ],
+  "connections": {
+    "Every 2 min": {
+      "main": [
+        [
+          {
+            "node": "Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Links": {
+      "main": [
+        [
+          {
+            "node": "Notion page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion page": {
+      "main": [
+        [
+          {
+            "node": "Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Targets": {
+      "main": [
+        [
+          {
+            "node": "Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comments": {
+      "main": [
+        [
+          {
+            "node": "New only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New only": {
+      "main": [
+        [
+          {
+            "node": "Discord post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "id": "fmosNotionDiscord1"
+}
