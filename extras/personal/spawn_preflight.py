@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""fm:spawn pre-flight - run BEFORE creating, closing or re-mapping any session.
+"""spawn-preflight (itge.e personal skill, NOT shipped in the fm plugin) - run BEFORE creating,
+closing or re-mapping any session.
 
 Reads the disk, not memory:
   1. project status (frontmatter is truth, not the board) + open tasks + scope contract
@@ -7,7 +8,8 @@ Reads the disk, not memory:
   3. role coverage: which roles have no bound session on this device
   4. git working tree / worktrees - only if the vault is a git repo
 
-Usage: preflight.py <vault>
+Usage: spawn_preflight.py <vault> [--plugin <path to plugins/fm>]
+(default plugin path: <repo>/plugins/fm, i.e. two folders up from this file)
 Read-only. Python 3.9+, stdlib only, macOS / Windows / Linux.
 """
 import datetime
@@ -18,8 +20,13 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True  # never write __pycache__ into the plugin folder
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent.parent / "project" / "scripts"))
-sys.path.insert(0, str(HERE.parent.parent / "role" / "scripts"))
+PLUGIN = HERE.parents[1] / "plugins" / "fm"
+if "--plugin" in sys.argv:
+    _i = sys.argv.index("--plugin")
+    PLUGIN = Path(sys.argv[_i + 1]).expanduser()
+    del sys.argv[_i:_i + 2]
+sys.path.insert(0, str(PLUGIN / "skills" / "project" / "scripts"))
+sys.path.insert(0, str(PLUGIN / "skills" / "role" / "scripts"))
 
 try:
     import fm_project  # noqa: E402
