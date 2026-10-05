@@ -1,6 +1,6 @@
 # bases — Obsidian Bases харагдац
 
-`.base` файлууд (Obsidian core Bases). Засахдаа `/fm:bases` skill-ийг дууд.
+`.base` файлууд (Obsidian core Bases). Засахдаа албан ёсны `obsidian:obsidian-bases` skill-ийг дууд (`05-Resources/references/Official skills.md`).
 
 | Base | Юу |
 |---|---|

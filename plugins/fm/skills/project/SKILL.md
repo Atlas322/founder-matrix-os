@@ -3,7 +3,6 @@ name: project
 description: Төсөл үүсгэх, шинэчлэх, төлөв солих (Active / Planning / On-hold / Archive), төсөл хаах шалгах жагсаалт, kanban самбарын цэгцлэл (hygiene). «төсөл», «шинэ төсөл», «төсөл үүсгэ», «төслийн төлөв», «төслийг зогсоо», «төсөл хаа», «архивла», «on-hold болго», «төслүүдийг харуул», «самбар цэгцэл», «board hygiene», «хуучирсан картууд» гэвэл энэ skill-ийг ашигла.
 argument-hint: "[нэр] [new|status|close|hygiene]"
 ---
-<!-- Ideas adapted from third-party MIT work by Eugeniu Ghelbur (project and board-hygiene commands). Rewritten. See THIRD_PARTY_NOTICES.md -->
 
 # /fm:project — төсөл ба самбар
 

@@ -112,7 +112,7 @@ ls "$BK/moved-skills"     # 7 зүйл
 cd ~
 ```
 
-kepano-гийн 5 skill одоо `/fm:canvas`, `/fm:bases`, `/fm:vault-cli`, `/fm:vault`, `/fm:clip` дотор байна. claude.ai «My Uploads» дахь `obsidian` plugin-ийг **itge.e өөрөө** вэбээс хасна.
+fm v0.3-аас kepano-гийн skill-үүдийг fm-д хуулахаа больсон. Эдгээр 5 skill-ийг **албан ёсны** `obsidian@obsidian-skills` plugin өгнө — энэ алхмаас **өмнө** Claude Code-д суулга: `/plugin marketplace add kepano/obsidian-skills` → `/plugin install obsidian@obsidian-skills` (`/fm:setup`-ийн «албан ёсны plugin» алхам ч мөн санал болгоно). claude.ai «My Uploads» дахь хуучин `obsidian` хуулбарыг **itge.e өөрөө** вэбээс хасна.
 
 **Буцаах:** `mv "$BK/moved-skills/"* ~/.claude/skills/`
 
