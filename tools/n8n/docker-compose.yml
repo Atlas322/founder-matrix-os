@@ -32,6 +32,8 @@ services:
       TZ: ${TZ:-Asia/Ulaanbaatar}
       WEBHOOK_URL: ${WEBHOOK_URL:-http://localhost:5678/}
       N8N_SECURE_COOKIE: "false"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      FMOS_TELEGRAM_TOKEN: ${FMOS_TELEGRAM_TOKEN:-}
     volumes:
       - n8n:/home/node/.n8n
       - ./workflows:/workflows
