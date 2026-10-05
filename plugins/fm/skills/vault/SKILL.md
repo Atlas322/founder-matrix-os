@@ -2,7 +2,6 @@
 name: vault
 description: "Founder Matrix vault-д (Obsidian, PARA + GTD, монгол кирилл) ажиллах цөм дүрэм - vault-аа олох, _system/BOOT.md унших, тэмдэглэлийн төрөл ба хавтас, frontmatter, атом, дүр (Agent), хувийн санхүүгийн нууцлал. Vault-д аливаа тэмдэглэл унших, бичих, засах, зөөх үед өөрөө ачаална. Trigger - «vault», «тэмдэглэл бич», «нот үүсгэ», «хаана хадгалах вэ», «frontmatter», «атом», «task үүсгэ», «дүрийн тэмдэглэл», «санхүүгийн бичлэг», «wikilink», «callout», «Obsidian синтакс», «.md файл засах». Use for any read or write inside a Founder Matrix Obsidian vault."
 ---
-<!-- Not itself derived. references/obsidian-syntax.md is derived from kepano/obsidian-skills/obsidian-markdown (MIT). See THIRD_PARTY_NOTICES.md -->
 
 # vault — Founder Matrix vault-д ажиллах цөм дүрэм
 
@@ -83,7 +82,7 @@ ai-first: true
 9. **Vault-ийн нот эсэхийг frontmatter шийднэ:** `type:` **ба** `ai-first:` хоёулаа байвал нот. Үгүй бол гадны схемийн файл (дизайн spec, plugin өгөгдөл, Excalidraw) — «засаж» бүү оролд, тусад нь мэдээл.
 10. **Чөлөөлөгдөх гадаргуу:** kanban самбар, `Home.md`, `index.md`, `_system/logs/*` — оршил ба баялаг frontmatter шаардахгүй.
 
-Obsidian-ий синтакс (wikilink, embed, callout, properties, tag, comment, math, mermaid, footnote) → [references/obsidian-syntax.md](references/obsidian-syntax.md).
+Obsidian-ий синтакс (wikilink, embed, callout, properties, tag, comment, math, mermaid, footnote) → албан ёсны `obsidian:obsidian-markdown` skill (kepano/obsidian-skills, `/fm:setup` суулгана). Суугаагүй бол [Obsidian Help](https://help.obsidian.md)-ээс шалга.
 
 ## 4. Task (GTD)
 
@@ -164,10 +163,10 @@ Kanban карт чирэх нь task файлын `status`-ыг өөрчлөхг
 
 ## 10. Холбогдох skill-үүд
 
-- `.canvas` файл → `fm:canvas`
-- `.base` файл (Bases харагдац) → `fm:bases`
-- Obsidian CLI (ажиллаж буй Obsidian-аар хайх, plugin reload) → `fm:vault-cli`
-- Вэб линкийг reference + атом болгох → `fm:clip` (Defuddle CLI-г алхам болгон ашигладаг)
-- Яриаг vault-д хадгалах → `fm:save`; inbox цэгцлэх → `fm:inbox`; дүр ачаалах → `fm:role`; өдрийн sync, төлөв, дүгнэлт → `fm:update`
+- Яриаг vault-д хадгалах, ярианы дундах checkpoint (`--checkpoint`), вэб линкийг reference + атом болгох → `fm:save`
+- Inbox цэгцлэх → `fm:inbox`; task → `fm:task`; төсөл → `fm:project`; хүн → `fm:people`; дүр ачаалах → `fm:role`
+- Сешний төлөв, өдрийн тэмдэглэл, долоо хоногийн тойм → `fm:update`
 
-Эдгээр нь `fm` plugin-ий skill. Суугаагүй байвал энэ skill-ийн дүрмээр гараар хий.
+**Албан ёсны skill (fm-д хуулаагүй, `/fm:setup` суулгана):** `.canvas` → `obsidian:json-canvas`; `.base` (Bases харагдац) → `obsidian:obsidian-bases`; Obsidian CLI → `obsidian:obsidian-cli`; вэб хуудсыг цэвэр markdown болгох → `obsidian:defuddle`. Жагсаалт: `05-Resources/references/Official skills.md`.
+
+Суугаагүй skill байвал энэ skill-ийн дүрмээр гараар хий.

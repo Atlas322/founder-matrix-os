@@ -129,6 +129,8 @@ foreach ($s in 'obsidian-second-brain','defuddle','json-canvas','obsidian-bases'
 Get-ChildItem "$BK\moved-skills" -Name
 ```
 
+Эдгээр kepano skill-ийг fm v0.3 хуулдаггүй: зөөхөөс **өмнө** албан ёсны plugin-ийг суулга — `/plugin marketplace add kepano/obsidian-skills` → `/plugin install obsidian@obsidian-skills`.
+
 OSB хавтас дотор ажиллаж буй MCP процесс файл түгжвэл: бүх Claude цонхыг хаагаад дахин ажиллуул.
 
 **Буцаах:** `Move-Item "$BK\moved-skills\*" "$Claude\skills\"`
