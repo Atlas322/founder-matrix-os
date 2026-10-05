@@ -1,0 +1,142 @@
+{
+  "id": "fmosTelegramInbox1",
+  "name": "FMOS · Telegram → Discord inbox",
+  "nodes": [
+    {
+      "id": "t1",
+      "name": "Every 1 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "t2",
+      "name": "Offset",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Telegram getUpdates offset (staticData — зөвхөн Published үед хадгалагдана)\nconst sd = $getWorkflowStaticData('global');\nreturn [{ json: { offset: sd.offset || 0 } }];"
+      }
+    },
+    {
+      "id": "t3",
+      "name": "getUpdates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "url": "=https://api.telegram.org/bot{{ $env.FMOS_TELEGRAM_TOKEN }}/getUpdates?offset={{ $json.offset }}&timeout=0",
+        "options": {}
+      }
+    },
+    {
+      "id": "t4",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Шинэ мессежийг Discord #00-inbox-admin руу. offset-ийг ахиулна.\nconst sd = $getWorkflowStaticData('global');\nconst out = [];\nfor (const u of ($input.first().json.result || [])) {\n  sd.offset = u.update_id + 1;\n  const m = u.message || u.channel_post || u.edited_message;\n  if (!m) continue;\n  const who = [m.from?.first_name, m.from?.last_name].filter(Boolean).join(\" \") || m.chat?.title || \"?\";\n  let kind = \"\", text = m.text || m.caption || \"\";\n  if (m.photo) kind = \"📷 зураг\";\n  else if (m.voice) kind = `🎙 дуу (${m.voice.duration}с)`;\n  else if (m.video) kind = \"🎬 видео\";\n  else if (m.document) kind = `📎 ${m.document.file_name || \"файл\"}`;\n  if (m.forward_origin || m.forward_from) kind = (\"↪ forward \" + kind).trim();\n  out.push({ json: { channelId: \"DISCORD_ID\",\n    content: `📥 TELEGRAM · ${who}${kind ? \" · \" + kind : \"\"}\\n${text}`.slice(0, 1900) } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "t5",
+      "name": "Discord post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://discord.com/api/v10/channels/{{ $json.channelId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.content }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "A58eILyXYwMV3Kx8",
+          "name": "Header Auth account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 1 min": {
+      "main": [
+        [
+          {
+            "node": "Offset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Offset": {
+      "main": [
+        [
+          {
+            "node": "getUpdates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "getUpdates": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "Discord post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
