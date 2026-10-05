@@ -320,18 +320,25 @@ def d_watch(sid, every=20):
     names = list(dict.fromkeys([BROADCAST] + ([chmap().get(sid, chname(me))] if me else [])))
     tag = f"[{me['name']}]" if me else None
     st = load(STATE, {}); ch = dchannels(st); save(STATE, st)
-    last = {}
+    # resume from the last seen id (persisted) so restarts after network drops never lose messages
+    wk = "_watch_" + sid; last = dict(load(STATE, {}).get(wk, {}))
     for n in names:
-        lm = dapi("GET", f"/channels/{ch[n]}/messages?limit=1") if n in ch else []
-        last[n] = lm[0]["id"] if lm else "0"
+        if n in last or n not in ch: continue
+        for attempt in range(10):
+            try:
+                lm = dapi("GET", f"/channels/{ch[n]}/messages?limit=1"); last[n] = lm[0]["id"] if lm else "0"; break
+            except Exception as e:
+                print(f"[watch error] {e}", flush=True); time.sleep(15)
+        else: last[n] = "0"
     while True:
         time.sleep(every)
         for n in names:
-            if n not in ch: continue
+            if n not in ch or n not in last: continue
             try: msgs = sorted(dapi("GET", f"/channels/{ch[n]}/messages?after={last[n]}&limit=20"), key=lambda m: int(m["id"]))
             except Exception as e: print(f"[watch error] {e}", flush=True); continue
+            if msgs:
+                last[n] = msgs[-1]["id"]; st = load(STATE, {}); st[wk] = last; save(STATE, st)
             for m in msgs:
-                last[n] = m["id"]
                 if tag and tag in m["content"][:len(tag) + 4]: continue
                 fm = FOR.search(m["content"])
                 if fm and fm.group(1).lower() != DEVICE.lower(): continue
