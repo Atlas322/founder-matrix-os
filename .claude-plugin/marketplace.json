@@ -1,9 +1,9 @@
 {
-  "name": "soyol",
+  "name": "founder-matrix",
   "owner": {
-    "name": "itge.e / Соёл"
+    "name": "itge.e / Founder Matrix"
   },
-  "description": "Соёлын багийн дотоод plugin-ууд (Internal Claude Code plugins for the Соёл team)",
+  "description": "Founder Matrix Second Brain: багийн болон Second Brain Season 2-ын Claude Code plugin (Founder Matrix team + Season 2 students)",
   "plugins": [
     {
       "name": "fm",

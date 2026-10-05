@@ -1,10 +1,10 @@
 {
   "name": "fm",
   "version": "0.1.0",
-  "displayName": "Founder Matrix OS",
-  "description": "Соёлын гишүүн бүрийн хувийн Obsidian vault-ийг GTD + PARA + атом тэмдэглэлээр ажиллуулах хөдөлгүүр: дүр (Agent), даалгавар, inbox, хадгалах, хувийн санхүү. / Founder Matrix OS: personal Obsidian vault engine (GTD, PARA, atomic notes, agent roles, private finance) for members of Соёл.",
+  "displayName": "Founder Matrix Second Brain",
+  "description": "Хэрэглэгч бүрийн хувийн Obsidian vault-ийг GTD + PARA + атом тэмдэглэлээр ажиллуулах хөдөлгүүр: дүр (Agent), даалгавар, inbox, хадгалах, хувийн санхүү. / Founder Matrix OS: personal Obsidian vault engine (GTD, PARA, atomic notes, agent roles, private finance) for members of Соёл.",
   "author": {
-    "name": "itge.e / Соёл"
+    "name": "itge.e / Founder Matrix"
   },
   "license": "SEE LICENSE IN LICENSE",
   "keywords": [

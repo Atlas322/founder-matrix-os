@@ -13,8 +13,8 @@ Vault-ийн агуулга (тэмдэглэл) энд **орохгүй**.
 Эх сурвалж: `<OLD-VAULT>` (PC). 2026-10-02 Obsidian Sync дууссан тул relay энд шилжив.
 Дараагийн алхам: Mac clone → relay ажиллуулах → vault синкийн шийдлийг BD + 2 Claude хамт гаргах.
 
-## fm plugin, Соёл marketplace (2026-10-05, TEST v0)
+## Founder Matrix Second Brain: `fm` plugin (2026-10-05, TEST v0)
 
-Энэ repo нь мөн **Claude Code marketplace `soyol`** болно: `.claude-plugin/marketplace.json` → `plugins/fm/` (Founder Matrix OS). Гишүүн бүр `/plugin marketplace add rollingbd/founder-matrix-os` → `/plugin install fm@soyol` → `/fm:setup` гэж өөрийн хувийн vault-аа үүсгэнэ. Дэлгэрэнгүй: [`plugins/fm/README.md`](plugins/fm/README.md). Тест: `python3 tests/test_hooks.py`, `claude plugin validate --strict plugins/fm`.
+Энэ repo нь мөн **Claude Code marketplace `founder-matrix`** болно: `.claude-plugin/marketplace.json` → `plugins/fm/` (Founder Matrix OS). Хэрэглэгч бүр `/plugin marketplace add rollingbd/founder-matrix-os` → `/plugin install fm@founder-matrix` → `/fm:setup` гэж өөрийн хувийн vault-аа үүсгэнэ. Дэлгэрэнгүй: [`plugins/fm/README.md`](plugins/fm/README.md). Тест: `python3 tests/test_hooks.py`, `claude plugin validate --strict plugins/fm`.
 
-> ⚠️ Соёлын гишүүдэд унших эрх өгөхөөс өмнө: энэ repo-ийн git түүхэнд `state/`, `relay/registry.json` зэрэг хувийн мэдээлэл бий — түүхийг цэвэрлэх (filter-repo + force-push) алхмыг itge.e батална.
+> ⚠️ Баг (Төвшин, Соёл) болон Season 2-ын сурагчдад эрх өгөхөөс өмнө: энэ repo-ийн git түүхэнд `state/`, `relay/registry.json` зэрэг хувийн мэдээлэл бий — түүхийг цэвэрлэх (filter-repo + force-push) алхмыг itge.e батална.
