@@ -1,6 +1,6 @@
 {
   "name": "fm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "displayName": "Founder Matrix Second Brain",
   "description": "Хэрэглэгч бүрийн хувийн Obsidian vault-ийг GTD + PARA + атом тэмдэглэлээр ажиллуулах хөдөлгүүр: дүр (Agent), даалгавар, inbox, хадгалах, хувийн санхүү. / Founder Matrix OS: personal Obsidian vault engine (GTD, PARA, atomic notes, agent roles, private finance) for the Founder Matrix team and Second Brain Season 2.",
   "author": {

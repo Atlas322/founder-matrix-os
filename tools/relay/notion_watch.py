@@ -2,13 +2,14 @@
 Polls comments on linked Notion pages (project page + its related Tasks) through the official CLI `ntn api`
 (already logged in — no token), and posts every NEW comment to the project's Discord channel as
 "📌 NOTION …" so the dispatcher wakes that project's agent. Run every ~2 min (Windows Task Scheduler / launchd).
-Config: relay/notion_links.json  {"<discord channel>": {"page": "<notion page id>", "title": "..."}}
+Config: <data>/notion_links.json (vault mode: <vault>/_system/fm, legacy: <repo>/relay)  {"<discord channel>": {"page": "<notion page id>", "title": "..."}}
 Usage: python notion_watch.py [--once] [--dry]"""
 import json, subprocess, shutil, sys, pathlib, urllib.request
 sys.stdout.reconfigure(encoding="utf-8")
 HERE = pathlib.Path(__file__).resolve().parent
-REPO = HERE.parent.parent
-LINKS = REPO / "relay" / "notion_links.json"
+sys.path.insert(0, str(HERE))
+import fmconfig  # noqa: E402
+LINKS = fmconfig.NOTION_LINKS
 STATE = pathlib.Path.home() / ".fmos_notion_watch.json"
 DRY = "--dry" in sys.argv
 
@@ -25,7 +26,7 @@ def plain(rt): return "".join(t.get("plain_text", "") for t in rt or [])
 
 def discord_post(channel, text):
     tok = (pathlib.Path.home() / ".fmos_discord_token").read_text().strip()
-    gid = json.loads((REPO / "relay" / "discord.json").read_text(encoding="utf-8"))["guild"]["id"]
+    gid = json.loads(fmconfig.DISCORD_CFG.read_text(encoding="utf-8"))["guild"]["id"]
     H = {"Authorization": "Bot " + tok, "Content-Type": "application/json", "User-Agent": "FMOS-notion-watch (1)"}
     req = urllib.request.Request(f"https://discord.com/api/v10/guilds/{gid}/channels", headers=H)
     chans = json.loads(urllib.request.urlopen(req, timeout=10).read())

@@ -34,15 +34,16 @@ ai-first: true
 | `meeting` | `02-GTD/meetings/` | Meeting |
 | `project` · `project-brain` | `03-Projects/<1-Active·2-Planning·3-On-hold>/<Нэр>/` | Project · Project Brain |
 | `person` | `04-Areas/people/` | Person |
-| `company` · `tool` | `04-Areas/Business/companies/` · `tools/` | — |
-| `agent-role` | `04-Areas/AI Team/ai-workers/` | — |
+| `company` · `tool` | `04-Areas/Business/companies/` · `tools/` | Company · Tool |
+| `area` | `04-Areas/Life/<Нэр>/<Нэр>.md` | Area |
+| `agent-role` | `04-Areas/AI Team/ai-workers/` | Agent Role |
 | `sop` | холбогдох `04-Areas/…` | SOP |
 | `finance-record` + `scope: team` | `04-Areas/Business/finances/` | Finance Record |
-| `bill` · хувийн `finance-record` | 🔒 `04-Areas/Business/finances/private/` | Bill · Finance Record |
-| `reference` · `glossary` · `source` | `05-Resources/references/` · `glossary/` · `sources/` | — |
+| `bill` · `income` · хувийн `finance-record` | 🔒 `04-Areas/Business/finances/private/` | Bill · Income · Finance Record |
+| `reference` · `glossary` · `source` | `05-Resources/references/` · `glossary/` · `sources/` | Reference |
 | `session-decision` | `06-Atomic/decisions/` | Session Decision |
 | `atomic` | `06-Atomic/knowledge/` | Atomic |
-| `goal` | `07-Goals/` | — |
+| `goal` | `07-Goals/<он> Goals.md` | Goal |
 
 Загварууд `_system/templates/`-д. Дууссан/хүчингүй зүйл → `99-Archive/` (устгах биш).
 

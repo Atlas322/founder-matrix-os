@@ -3,7 +3,7 @@
 
 Reads the disk, not memory:
   1. project status (frontmatter is truth, not the board) + open tasks + scope contract
-  2. sessions registered in <vault>/_system/relay/registry.json (role · device · title)
+  2. sessions registered in <vault>/_system/fm/registry.json (role · device · title)
   3. role coverage: which roles have no bound session on this device
   4. git working tree / worktrees - only if the vault is a git repo
 
@@ -59,7 +59,7 @@ def main(argv):
     fm_project.cmd_list(vault, [])
     _out("")
 
-    _out("── 2. БҮРТГЭЛТЭЙ СЕШНҮҮД ── (_system/relay/registry.json)")
+    _out("── 2. БҮРТГЭЛТЭЙ СЕШНҮҮД ── (_system/fm/registry.json)")
     reg = fm_role.load_registry(vault)
     sessions = reg.get("sessions", {})
     if not sessions:

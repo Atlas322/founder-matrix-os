@@ -299,7 +299,7 @@ def cmd_move(vault: Path, args: List[str]) -> None:
             text = read_text(p)
             if text and pattern.search(text):
                 touched.append((p, len(pattern.findall(text))))
-        reg = vault / "_system" / "relay" / "registry.json"
+        reg = vault / "_system" / "fm" / "registry.json"
         if reg.exists() and pattern.search(read_text(reg)):
             touched.append((reg, len(pattern.findall(read_text(reg)))))
     _out("%s → %s (status: %s)" % (old_rel, new_rel, status))

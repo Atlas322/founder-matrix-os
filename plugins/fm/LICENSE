@@ -1,4 +1,21 @@
-Copyright (c) 2026 itge.e. All rights reserved. Licensed for use by the Founder Matrix team and Second Brain Season 2 participants (license terms for student contributions: TBD).
+Founder Matrix Second Brain - "fm" plugin (Founder Matrix OS)
 
-This plugin includes third-party components licensed under the MIT License.
-See THIRD_PARTY_NOTICES.md and the LICENSES/ directory for their notices.
+Copyright (c) 2026 itge.e. All rights reserved.
+
+Licensed for use by the Founder Matrix team and SB+AI Season 2 participants.
+Contributions are licensed to itge.e under the same terms.
+
+You may not redistribute, publish, sublicense or sell this plugin or any part
+of it outside the Founder Matrix team and SB+AI Season 2 without prior written
+permission from itge.e.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
+
+Third-party components
+----------------------
+This plugin includes components derived from projects licensed under the MIT
+License. Those components remain under the MIT License. See
+THIRD_PARTY_NOTICES.md and the LICENSES/ directory for their notices and full
+license texts.

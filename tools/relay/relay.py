@@ -8,24 +8,35 @@ Channels (files under <repo>/relay/):
 
 Commands:
   relay.py inbox                     hook (SessionStart / UserPromptSubmit): reads hook JSON on stdin,
-                                     git pull (throttled), prints new entries as additionalContext
+                                     git pull (throttled; vault mode: no git), prints new entries as additionalContext
   relay.py register NAME GROUP       bind the current session (CLAUDE_SESSION_ID or --sid) to NAME + GROUP
   relay.py send TO "title" [body]    TO = all | @<group> | <session-name>; appends, commits, pushes
   relay.py who                       show registry
+
+Data location (see fmconfig.py): ~/.fmos/config.json {"vault": ...} or env FM_VAULT → vault mode, all data in
+<vault>/_system/fm/ (registry.json, channels.json, discord.json, state/<project>.md) and NO git. Without a config the
+legacy layout <repo>/relay + <repo>/state with git commit/push is used unchanged.
 """
 import json, os, sys, subprocess, time, datetime, socket, re
 from pathlib import Path
 
-REPO = Path(os.environ.get("FMOS_REPO", Path(__file__).resolve().parents[2]))
-RELAY = REPO / "relay"
-REG = RELAY / "registry.json"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import fmconfig  # noqa: E402  (vault vs legacy paths, device, member, configurable specifics)
+
+REPO = fmconfig.REPO
+RELAY = fmconfig.RELAY_DIR          # vault mode: <vault>/_system/fm · legacy: <repo>/relay
+REG = fmconfig.REG
+STATE_DIR = fmconfig.STATE_DIR      # batons state/<project>.md
+VAULT_MODE = fmconfig.VAULT_MODE    # True → no git at all (Drive syncs the vault)
 STATE = Path.home() / ".fmos_relay_state.json"   # per-machine read cursors (not in git)
 GROUPS = ["tasks", "projects", "areas", "resources", "research", "development", "archive"]
-DEVICE = os.environ.get("FMOS_DEVICE") or ("Mac" if sys.platform == "darwin" else "PC")
+DEVICE = fmconfig.DEVICE
 PULL_EVERY = 45  # seconds
 
 
 def git(*a):
+    if VAULT_MODE:  # vault-backed data: never commit/push/pull
+        return subprocess.CompletedProcess(["git", *a], 0, "", "")
     return subprocess.run(["git", "-C", str(REPO), *a], capture_output=True, text=True, encoding="utf-8")
 
 
@@ -46,6 +57,7 @@ class repo_lock:
 
 def safe_sync(paths, msg):
     """commit paths → pull --rebase (state/*.md conflicts: keep ours) → push. Never leaves a rebase in progress."""
+    if VAULT_MODE: return  # files already written in the vault; Drive syncs them
     with repo_lock():
         git("add", *map(str, paths)); git("commit", "-qm", msg)
         r = git("pull", "-q", "--rebase", "--autostash", "-X", "theirs")
@@ -56,12 +68,29 @@ def safe_sync(paths, msg):
 
 def load(p, d):
     try:
-        return json.loads(Path(p).read_text(encoding="utf-8"))
+        v = json.loads(Path(p).read_text(encoding="utf-8"))
     except Exception:
         return d
+    if isinstance(v, dict) and Path(p) == Path(REG): _norm_reg(v)
+    return v
+
+
+def _norm_reg(reg):
+    """The fm plugin (fm_role) registers sessions as {role, device, title, since} - no name/group.
+    Fill those in so relay code can index v["name"] / v["group"]; the role's group comes from roles{}."""
+    roles = reg.get("roles") if isinstance(reg.get("roles"), dict) else {}
+    S = reg.get("sessions")
+    if not isinstance(S, dict): reg["sessions"] = {}; return
+    for sid in [k for k, v in S.items() if not isinstance(v, dict)]: S.pop(sid)
+    for sid, v in S.items():
+        r = roles.get(v.get("role")) if v.get("role") else None
+        g = (r.get("group") if isinstance(r, dict) else None) or "tasks"
+        v.setdefault("group", g if g in GROUPS else "tasks")
+        v.setdefault("name", v.get("title") or f"{v.get('device', DEVICE)}-{sid[:6]}")
 
 
 def save(p, v):
+    Path(p).parent.mkdir(parents=True, exist_ok=True)
     Path(p).write_text(json.dumps(v, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
@@ -114,8 +143,8 @@ def cmd_inbox():
         if items:
             out.append(f"### #{key}\n" + "\n\n".join(items))
     save(STATE, state)
-    if me and "Sys Admin" in (me.get("title") or "") and event == "SessionStart":
-        out.insert(0, f"### 🛰 Та 03 Sys Admin — ДИСПЕТЧЕРИЙГ одоо асаа: Monitor(command='python {Path(__file__)} dispatch --sid {sid}', timeout_ms=1800000), дуусах бүрд тэр даруй дахин асаа. Event ирвэл wake жагсаалтын сешнийг send_message-ээр сэрээ.")
+    if me and fmconfig.DISPATCHER_TITLE in (me.get("title") or "") and event == "SessionStart":
+        out.insert(0, f"### 🛰 Та {me.get('title')} — ДИСПЕТЧЕРИЙГ одоо асаа: Monitor(command='python {Path(__file__)} dispatch --sid {sid}', timeout_ms=1800000), дуусах бүрд тэр даруй дахин асаа. Event ирвэл wake жагсаалтын сешнийг send_message-ээр сэрээ.")
     if me and me.get("folder"): out.insert(0, f"### 📁 Төслийн хавтас: `{me['folder']}` — энэ төслийн бүх тэмдэглэл, файл ЗӨВХӨН энд (vault-ийн дүрэм _CLAUDE.md-г дагана). Өөр төслийн хавтсанд бүү бич.")
     who = f"{me['name']} · @{me['group']} · {DEVICE}" if me else f"бүртгэлгүй ({DEVICE}, sid {sid[:8]})"
     if not out and event != "SessionStart":
@@ -123,7 +152,7 @@ def cmd_inbox():
     ctx = f"[FMOS relay] Энэ сешн: {who}.\n"
     if not me and event == "SessionStart":
         ctx += ("Бүртгүүлэх: `python " + str(Path(__file__)) + f" register <нэр> <{'|'.join(GROUPS)}> --sid {sid}` "
-                "(BD-ийн sidebar групптэй ижил). Илгээх: `relay.py send <all|@group|нэр> \"гарчиг\" \"агуулга\"`.\n")
+                f"({fmconfig.MEMBER_LABEL}-ийн sidebar групптэй ижил). Илгээх: `relay.py send <all|@group|нэр> \"гарчиг\" \"агуулга\"`.\n")
     ctx += "\n\n".join(out) if out else "Шинэ relay бичлэг алга."
     print(json.dumps({"hookSpecificOutput": {"hookEventName": event or "UserPromptSubmit", "additionalContext": ctx}}, ensure_ascii=False))
 
@@ -135,8 +164,7 @@ def _rekey(sid):
     if not sid: return sid
     reg = load(REG, {"sessions": {}}); S = reg["sessions"]
     if sid in S: return sid
-    app = (Path.home() / "Library/Application Support/Claude/claude-code-sessions") if DEVICE == "Mac" \
-        else Path(os.environ.get("APPDATA", "")) / "Claude" / "claude-code-sessions"
+    app = fmconfig.claude_app_sessions_dir()
     title = None
     for f in app.glob("*/*/local_*.json"):
         try: j = json.loads(f.read_text(encoding="utf-8"))
@@ -164,14 +192,14 @@ def cmd_register(name, group, sid, project=None):
     assert group in GROUPS, f"group ∈ {GROUPS}"
     git("pull", "-q", "--rebase", "--autostash")
     reg = load(REG, {"sessions": {}})
-    keep = {k: v for k, v in reg["sessions"].get(sid, {}).items() if k in ("project", "title", "private")}
+    keep = {k: v for k, v in reg["sessions"].get(sid, {}).items() if k in ("project", "title", "private", "role")}
     reg["sessions"][sid] = {**keep, "name": name, "group": group, "device": DEVICE,
                             "host": socket.gethostname(), "since": datetime.date.today().isoformat()}
     if project: reg["sessions"][sid]["project"] = project
     if "--private" in sys.argv: reg["sessions"][sid]["private"] = True
     if "--title" in sys.argv: reg["sessions"][sid]["title"] = sys.argv[sys.argv.index("--title") + 1]
     save(REG, reg)
-    (RELAY / "s").mkdir(exist_ok=True)
+    (RELAY / "s").mkdir(parents=True, exist_ok=True)
     git("add", str(REG))
     git("commit", "-qm", f"relay: register {name} @{group} ({DEVICE})")
     git("push", "-q")
@@ -201,20 +229,20 @@ def cmd_send(to, title, body, sid):
 
 
 # ── Discord transport (default): channels = Discord, no git per message ──
-ICON = "🍎" if DEVICE == "Mac" else "🖥️"  # BD 2026-10-03: Mac/PC мессежийг icon-оор ялгах
+ICON = "🍎" if fmconfig.IS_MAC else "🖥️"  # BD 2026-10-03: Mac/PC мессежийг icon-оор ялгах
 FOR = __import__("re").compile(r"\bfor\s*(mac|pc)\b", __import__("re").I)
 BUSY = "🟢"  # d_status prepends this to a channel name while its session works; lookups strip it
-BROADCAST = "03-sys-admin"  # BD 2026-10-02: #org хаагдав; бүх сешнд хамаатай мэдээ = Sys Admin суваг
+BROADCAST = fmconfig.BROADCAST  # discord.json "broadcast" (default 03-sys-admin): бүх сешнд хамаатай мэдээний суваг
 import urllib.request, urllib.error
 API = "https://discord.com/api/v10"
 DTOKEN_F = Path.home() / ".fmos_discord_token"
-DCFG = RELAY / "discord.json"
+DCFG = fmconfig.DISCORD_CFG
 
 def dapi(method, path, body=None):
     req = urllib.request.Request(API + path, method=method,
         data=json.dumps(body).encode() if body is not None else None,
         headers={"Authorization": "Bot " + DTOKEN_F.read_text().strip(), "Content-Type": "application/json",
-                 "User-Agent": "FMOS-relay (https://github.com/rollingbd/founder-matrix-os, 1)"})
+                 "User-Agent": f"FMOS-relay ({fmconfig.USER_AGENT_URL}, 1)"})
     for attempt in range(5):
         try:
             with urllib.request.urlopen(req, timeout=8) as r:
@@ -234,7 +262,7 @@ def dchannels(state):
         state["_dch"], state["_dch_t"] = ch, time.time()
     return ch
 
-VAULT_HINTS = ("Founder.Matrix", "Second Brain", "founder-matrix-os")
+VAULT_HINTS = fmconfig.vault_hints()  # defaults + discord.json "vault_hints" + configured vault
 
 def in_scope(hook):
     """User-level hooks fire in every project — act only for registered sessions or vault/repo cwd."""
@@ -244,7 +272,7 @@ def in_scope(hook):
     return any(h in cwd for h in VAULT_HINTS)
 
 def _auto_pair(hook):
-    """BD opens a new session and types only an existing title (e.g. '00 Inbox Admin') →
+    """The member opens a new session and types only an existing title (e.g. the inbox role, discord.json "inbox_role") →
     register this session as that title's pair on this device, and tell Claude to rename/regroup itself."""
     sid = hook.get("session_id", ""); prompt = (hook.get("prompt") or "").strip()
     reg = load(REG, {"sessions": {}}); S = reg["sessions"]
@@ -253,15 +281,15 @@ def _auto_pair(hook):
     want = (m.group(1).splitlines()[0] if m else prompt).strip().lower()
     src = next((v for v in S.values() if (v.get("title") or "").strip().lower() == want and not v.get("private")), None)
     if not src: return None
-    S[sid] = {k: src[k] for k in ("group", "project", "title") if k in src}
+    S[sid] = {k: src[k] for k in ("group", "project", "title", "role", "private") if k in src}
     S[sid].update(name=f"{src.get('title')} ({DEVICE})", device=DEVICE, host=socket.gethostname(), since=datetime.date.today().isoformat())
     save(REG, reg); git("add", str(REG)); git("commit", "-qm", f"relay: auto-pair {src.get('title')} ({DEVICE})"); git("push", "-q")
     grp = {"tasks": "Tasks", "projects": "Projects", "areas": "Areas", "resources": "Resources", "research": "Research", "development": "Development"}.get(src["group"], src["group"])
-    sf = REPO / "state" / f"{src.get('project')}.md"
+    sf = STATE_DIR / f"{src.get('project')}.md"
     baton = sf.read_text(encoding="utf-8").split("## ТҮҮХ")[0].strip() if src.get("project") and sf.exists() else "(baton алга)"
-    return (f"[FMOS] BD энэ шинэ сешнийг «{src['title']}»-ийн {DEVICE} хос болгон нээв — бүртгэгдлээ (@{src['group']}, project {src.get('project')}). "
-            f"Одоо: 0) cwd vault биш бол mcp__ccd_directory__change_directory → «<OLD-VAULT>». 1) ccd_session_mgmt set_session_title self → «{src['title']}». 2) ccd_sidebar list_groups → «{grp}» групп руу move_sessions self. "
-            f"3) Доорх baton-оос хаана зогссоныг уншаад BD-д 2 мөрөөр хэл. 4) Discord сувгаа сонсох: relay.py watch --sid {sid} (Monitor). 5) Хамгийн сүүлд mcp__ccd_session_mgmt__clear_session self (хуучин яриа Resume-ээр сэргэнэ) — шинэ үүрэгтээ цэвэр эхэлнэ.\n\n### 🏃 baton\n{baton}")
+    return (f"[FMOS] {fmconfig.MEMBER_LABEL} энэ шинэ сешнийг «{src['title']}»-ийн {DEVICE} хос болгон нээв — бүртгэгдлээ (@{src['group']}, project {src.get('project')}). "
+            f"Одоо: 0) cwd vault биш бол mcp__ccd_directory__change_directory → «{fmconfig.vault_dir()}». 1) ccd_session_mgmt set_session_title self → «{src['title']}». 2) ccd_sidebar list_groups → «{grp}» групп руу move_sessions self. "
+            f"3) Доорх baton-оос хаана зогссоныг уншаад {fmconfig.MEMBER_LABEL}-д 2 мөрөөр хэл. 4) Discord сувгаа сонсох: relay.py watch --sid {sid} (Monitor). 5) Хамгийн сүүлд mcp__ccd_session_mgmt__clear_session self (хуучин яриа Resume-ээр сэргэнэ) — шинэ үүрэгтээ цэвэр эхэлнэ.\n\n### 🏃 baton\n{baton}")
 
 
 def d_inbox(hook):
@@ -293,7 +321,7 @@ def d_inbox(hook):
     if not out and event != "SessionStart": return
     who = f"{me['name']} · @{me['group']} · {DEVICE}" if me else f"бүртгэлгүй ({DEVICE}, sid {sid[:8]})"
     if me and me.get("project") and event == "SessionStart":
-        sf = REPO / "state" / f"{me['project']}.md"
+        sf = STATE_DIR / f"{me['project']}.md"
         if sf.exists():
             t = sf.read_text(encoding="utf-8"); now = t.split("## ТҮҮХ")[0].strip()
             hist = [l for l in t.split("## ТҮҮХ")[-1].strip().splitlines() if l.startswith("- ")][-5:]
@@ -341,7 +369,7 @@ def d_watch(sid, every=20):
             for m in msgs:
                 if tag and tag in m["content"][:len(tag) + 4]: continue
                 fm = FOR.search(m["content"])
-                if fm and fm.group(1).lower() != DEVICE.lower(): continue
+                if fm and fm.group(1).lower() != fmconfig.KIND: continue
                 who = m["author"].get("global_name") or m["author"]["username"]
                 print(f"#{n} · {who}: " + m["content"].replace("\n", " ⏎ ")[:600], flush=True)
 
@@ -352,10 +380,10 @@ def d_task(args, sid):
     relay.py task "<гарчиг>" --owner "<сешний title>" [--project "<03-Projects/... note>"] [--status next-action] [--prio 🟡] [--due YYYY-MM-DD] [--body "..."]"""
     def opt(k, d=""):
         return args[args.index(k) + 1] if k in args else d
-    title = args[0]; owner = opt("--owner", "itge.e"); status = opt("--status", "next-action")
-    vault = Path("D:/My Drive/Second Brain 2.0") if DEVICE == "PC" else Path.home() / "My Drive/Second Brain 2.0"
+    title = args[0]; owner = opt("--owner", fmconfig.DEFAULT_OWNER); status = opt("--status", "next-action")
+    vault = fmconfig.vault_dir()
     safe = _re.sub(r'[\\/:*?"<>|]', "-", title)[:80]
-    f = vault / "02-GTD" / "tasks" / f"{safe}.md"
+    f = vault / "02-GTD" / "tasks" / f"{safe}.md"; f.parent.mkdir(parents=True, exist_ok=True)
     today = datetime.date.today().isoformat()
     proj = opt("--project")
     f.write_text("---\n" + "\n".join([
@@ -365,21 +393,26 @@ def d_task(args, sid):
     reg = load(REG, {"sessions": {}})["sessions"]; cm = chmap()
     ch = next((cm[s] for s, v in reg.items() if (v.get("title") or "").strip() == owner.strip() and s in cm), None)
     msg = f"📌 TASK → **{owner}** · `{status}` · [[02-GTD/tasks/{safe}]]\n{title}" + (f"\n{opt('--body')}" if opt("--body") else "")
+    if not ch and VAULT_MODE:  # unowned (no channel) → the inbox role catches it (discord.json "inbox_role")
+        ch = next((cm[s] for s, v in reg.items() if (v.get("title") or "").strip() == fmconfig.INBOX_ROLE and s in cm), None)
     if ch: d_send(ch, msg, sid)
-    print("task →", f, "| notified:", ch or "(owner сувагтай биш — itge.e)")
+    print("task →", f, "| notified:", ch or f"(owner сувагтай биш — {fmconfig.MEMBER_LABEL})")
 
 
 def d_hub():
     """BD 2026-10-05: ONE place every session (PC+Mac) reads = vault `_system/STATUS.md`.
-    Rendered from the git batons state/<project>.md (both devices push there) → one row per project."""
+    Rendered from the batons STATE_DIR/<project>.md (legacy: git state/, vault mode: <vault>/_system/fm/state) → one row
+    per project. Private projects (finance/tax/gold, "private": true) are never listed."""
     git("pull", "-q", "--rebase", "--autostash")
-    vault = Path(os.environ.get("OBSIDIAN_VAULT_PATH") or (Path.home() / "My Drive/Second Brain 2.0" if DEVICE == "Mac" else Path("D:/My Drive/Second Brain 2.0")))
+    vault = fmconfig.vault_dir()
     reg = load(REG, {"sessions": {}})["sessions"]
     title = {}
     for v in reg.values():
         if v.get("project") and v.get("title"): title.setdefault(v["project"], v["title"])
+    private = set(PRIVATE_PROJECTS) | {v["project"] for v in reg.values() if v.get("project") and is_private(v)}
     rows = []
-    for f in sorted((REPO / "state").glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
+    for f in sorted(STATE_DIR.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
+        if f.stem in private: continue  # privacy: finance/tax/gold + private sessions never reach STATUS
         t = f.read_text(encoding="utf-8"); head = t.split("## ТҮҮХ")[0]
         m = _re.search(r"## ОДОО · ([^\n]+)", head); nxt = _re.search(r"\*\*Дараагийн алхам[^*]*\*\*:?\s*([^\n]+)", head)
         if not m: continue
@@ -387,7 +420,7 @@ def d_hub():
         rows.append(f"| {title.get(f.stem, f.stem)} | {m.group(1).strip()} | {txt[:400] or '—'} |")
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     out = (f"---\ntype: system\nupdated: {now}\n---\n# 🧭 FMOS STATUS — бүх сешний нэг газар\n\n"
-           "> PC + Mac бүх сешн эндээс уншина. Үүсгэгч: `relay.py hub` (git baton `state/*.md`-ээс). Гараар бүү засаарай — "
+           "> PC + Mac бүх сешн эндээс уншина. Үүсгэгч: `relay.py hub` (baton `state/*.md`-ээс). Гараар бүү засаарай — "
            "өөрийн мөрөө `/sync` командаар шинэчил. Дэлгэрэнгүй түүх: `_system/logs/<огноо>.md`.\n\n"
            f"Шинэчлэгдсэн: {now} ({DEVICE})\n\n| Сешн / төсөл | Сүүлд (хэзээ · хэн) | Хаана зогссон → дараагийн алхам |\n|---|---|---|\n"
            + "\n".join(rows) + "\n")
@@ -405,8 +438,7 @@ def d_status(every=30, busy_s=90):
     proj = Path.home() / ".claude" / "projects"
     # registry cli ids go stale (clear/resume makes a new one) → resolve the CURRENT cli id from the desktop app's
     # session files by title: title → registry entry (for the channel) + app file (for cliSessionId).
-    app = (Path.home() / "Library/Application Support/Claude/claude-code-sessions") if DEVICE == "Mac" \
-        else Path(os.environ.get("APPDATA", "")) / "Claude" / "claude-code-sessions"
+    app = fmconfig.claude_app_sessions_dir()
     by_title = {(v.get("title") or "").strip(): sid for sid, v in reg.items()
                 if v.get("device") == DEVICE and not v.get("private") and cm.get(sid) in ch and v.get("title")}
     board_key = f"_status_msg_{DEVICE}"; topic_t = {}; topic_s = {}
@@ -465,11 +497,8 @@ def _last_turn(tp):
     except Exception: pass
     return user.strip(), asst.strip()
 
-PRIVATE_PROJECTS = {"finance", "tax", "gold"}
-
-def is_private(entry):
-    """Registry entry is private: explicit flag, or a money project (finance/tax/gold)."""
-    return bool(entry) and (entry.get("private") or entry.get("project") in PRIVATE_PROJECTS)
+PRIVATE_PROJECTS = fmconfig.PRIVATE_PROJECTS
+is_private = fmconfig.is_private  # explicit "private": true, or a money project (finance/tax/gold)
 
 
 def d_baton(hook, push_every=300):
@@ -479,16 +508,17 @@ def d_baton(hook, push_every=300):
     if is_private(me): return  # privacy (itge.e 2026-10-05): finance/private chat never leaves the machine
     user, asst = _last_turn(hook.get("transcript_path", ""))
     if not asst: return
-    f = REPO / "state" / f"{me['project']}.md"; f.parent.mkdir(exist_ok=True)
+    f = STATE_DIR / f"{me['project']}.md"; f.parent.mkdir(parents=True, exist_ok=True)
     old = f.read_text(encoding="utf-8") if f.exists() else ""
     hist = old.split("## ТҮҮХ", 1)[1].strip() if "## ТҮҮХ" in old else ""
     nxt = [l for l in old.split("## ТҮҮХ")[0].splitlines() if l.startswith("**Дараагийн алхам")]
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     first = asst.split("\n")[0][:140]
     now = (f"# {me['project']}\n\n## ОДОО · {ts} · {me['name']} ({DEVICE})\n"
-           + (nxt[0] + "\n" if nxt else "") + f"**BD-ийн сүүлийн хүсэлт:** {user[:500]}\n\n**Хаана зогссон (сүүлийн хариу):**\n{asst[:2500]}\n")
+           + (nxt[0] + "\n" if nxt else "") + f"**{fmconfig.MEMBER_LABEL}-ийн сүүлийн хүсэлт:** {user[:500]}\n\n**Хаана зогссон (сүүлийн хариу):**\n{asst[:2500]}\n")
     line = f"- {ts} · {DEVICE} · {me['name']} · {first}"
     f.write_text(now + "\n## ТҮҮХ\n" + (hist + "\n" if hist else "") + line + "\n", encoding="utf-8")
+    if VAULT_MODE: return  # vault file written; Drive syncs it — no git
     st = load(STATE, {}); k = "_baton_push_" + me["project"]
     if time.time() - st.get(k, 0) > push_every:
         try: safe_sync([f], f"baton {me['project']} · {me['name']} ({DEVICE})")
@@ -500,7 +530,7 @@ def d_next(text, sid):
     """Pin 'Дараагийн алхам' in state/<project>.md (kept across auto baton writes)."""
     me = load(REG, {"sessions": {}})["sessions"].get(sid)
     if not me or not me.get("project"): print("project алга"); return
-    f = REPO / "state" / f"{me['project']}.md"; old = f.read_text(encoding="utf-8") if f.exists() else f"# {me['project']}\n\n## ТҮҮХ\n"
+    f = STATE_DIR / f"{me['project']}.md"; f.parent.mkdir(parents=True, exist_ok=True); old = f.read_text(encoding="utf-8") if f.exists() else f"# {me['project']}\n\n## ТҮҮХ\n"
     head, _, tail = old.partition("## ТҮҮХ")
     lines = [l for l in head.splitlines() if not l.startswith("**Дараагийн алхам")]
     i = next((k + 1 for k, l in enumerate(lines) if l.startswith("## ОДОО")), len(lines))
@@ -531,7 +561,7 @@ def chmap():
         k = key(v)
         if k not in first or (v.get("title") and not first[k].get("title")): first[k] = v
     names = {}; used = {}
-    prev = load(RELAY / "channels.json", {})  # stable numbers: keep a project's existing channel number
+    prev = load(fmconfig.CHANNELS, {})  # stable numbers: keep a project's existing channel number
     strip = lambda x: _re.sub(r"^([^\w]+-)?\d+-", "", x)
     num = lambda x: int(_re.match(r"^(?:[^\w]+-)?(\d+)-", x).group(1))
     todo = []
@@ -568,7 +598,7 @@ def d_sync():
         else:
             cats[k] = dapi("POST", f"/guilds/{gid}/channels", {"name": name, "type": 4, "position": i})["id"]; print("category +", name)
     text = {c["name"]: c for c in allc if c["type"] == 0}
-    CHF = RELAY / "channels.json"; prev = load(CHF, {})  # project → last channel name (for in-place rename)
+    CHF = fmconfig.CHANNELS; prev = load(CHF, {})  # project → last channel name (for in-place rename)
     want = {}
     for sid, name in chmap().items():
         v = load(REG, {"sessions": {}})["sessions"][sid]
@@ -634,7 +664,7 @@ def d_dispatch(every=15):
             for m in msgs:
                 last[n] = m["id"]; a = m["author"]; txt = m["content"]
                 fm = FOR.search(txt)  # BD 2026-10-03: «for mac» → зөвхөн Mac, «for pc» → зөвхөн PC хариулна
-                if fm and fm.group(1).lower() != DEVICE.lower(): continue
+                if fm and fm.group(1).lower() != fmconfig.KIND: continue
                 if a.get("bot"):
                     if a["username"].endswith(DEVICE) and "📌 TASK" not in txt and "📌 NOTION" not in txt: continue   # own device (tasks still wake owner)
                     if n == BROADCAST and not tag.search(txt): continue    # broadcast channel: must be addressed

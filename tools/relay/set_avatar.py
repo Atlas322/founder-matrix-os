@@ -1,8 +1,11 @@
 # Set this device's Discord bot avatar (🖥️ PC = blue monitor, 🍎 Mac = black apple-ish). Run once per device.
-import base64, io, pathlib, sys, requests
+import base64, io, pathlib, sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import fmconfig  # noqa: E402  (DEVICE: env FMOS_DEVICE > ~/.fmos/config.json "device" > platform)
+import requests
 from PIL import Image, ImageDraw
 
-mac = sys.platform == "darwin"
+mac = (fmconfig.DEVICE == "Mac") if fmconfig.DEVICE in ("Mac", "PC") else fmconfig.IS_MAC
 S = 512
 im = Image.new("RGB", (S, S), (20, 20, 20) if mac else (27, 92, 255))
 d = ImageDraw.Draw(im)

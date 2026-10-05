@@ -42,12 +42,12 @@ Vault цэвэр, тогтвортой бүтэцтэй байх; дүрэм н�
 
 - `04-Areas/` (`Business/finances/private/` ба `AI Team/skills/`-ээс бусад)
 - `01-Soul/`, `07-Goals/`, `99-Archive/`
-- `_system/` (BOOT, templates, bases, logs, relay, index, STATUS), `Home.md`
+- `_system/` (BOOT, templates, bases, logs, fm, index, STATUS), `Home.md`
 
 ## Дүрэм
 
 1. **`_system/BOOT.md` бол дүрмийн цорын ганц эх.** Шинэ дүрэм хэмжилт, давтагдсан тохиолдол дээр л нэмнэ; ≤8 KB-аас хэтрүүлэхгүй, түүх бичихгүй (түүх → атом).
-2. **Ростер:** дүр нэмэх/өөрчлөх = `ai-workers/` дахь note + `_system/relay/registry.json`-ийн `roles` хоёуланг. Сешн ↔ дүрийн зураглал зөвхөн registry-д.
+2. **Ростер:** дүр нэмэх/өөрчлөх = `ai-workers/` дахь note + `_system/fm/registry.json`-ийн `roles` хоёуланг. Сешн ↔ дүрийн зураглал зөвхөн registry-д.
 3. **Templates, bases** засахдаа `/fm:bases`. Template-ийн өөрчлөлт хуучин note-ийг өөрчлөхгүй.
 4. **Архивлах, устгах** нь эзний зөвшөөрлөөр. Default = архив.
 5. **`.obsidian/`-г хөндөхгүй.**

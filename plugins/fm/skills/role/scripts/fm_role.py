@@ -2,7 +2,7 @@
 """fm:role helper - bind a Claude Code session to a vault role.
 
 Role notes live in <vault>/04-Areas/AI Team/ai-workers/*.md (one note = one role).
-The session -> role map lives in <vault>/_system/relay/registry.json:
+The session -> role map lives in <vault>/_system/fm/registry.json:
 
     {"sessions": {"<sid>": {"role": "gtd", "device": "Mac", "title": "GTD · Mac", "since": "YYYY-MM-DD"}},
      "roles":    {"gtd": {"note": "04-Areas/AI Team/ai-workers/00 GTD.md"}}}
@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 ROLES_DIR = Path("04-Areas") / "AI Team" / "ai-workers"
-REGISTRY = Path("_system") / "relay" / "registry.json"
+REGISTRY = Path("_system") / "fm" / "registry.json"
 ROLE_TYPES = {"agent-role", "ai-worker"}
 
 

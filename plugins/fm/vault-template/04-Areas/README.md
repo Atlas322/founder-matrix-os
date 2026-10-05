@@ -11,6 +11,6 @@
 | `people/` | Хүмүүс (`type: person`) |
 | `AI Team/ai-workers/` | Agent-уудын дүрийн note (`type: agent-role`) |
 | `AI Team/skills/` | Skill-ийн каталог |
-| `Life/health/` | Эрүүл мэнд |
+| `Life/<Нэр>/` | Хувийн хүрээ (`type: area`): эрүүл мэнд, гэр бүл, суралцах, гэр |
 
 - **Эзэн дүр:** [[02 Area]] (private/-ийг эс тооцвол).

@@ -8,7 +8,7 @@ import json, os, sys, time, subprocess, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-import relay  # noqa: E402  (load, save, dapi, dchannels, REG, STATE, DEVICE)
+import relay  # noqa: E402  (load, save, dapi, dchannels, REG, STATE, DEVICE, is_private — paths via fmconfig)
 
 DIR = Path.home() / ".fmos_status"; DIR.mkdir(exist_ok=True)
 MIN_GAP = 4
@@ -84,7 +84,7 @@ def main():
     if not relay.in_scope(hook): return
     sid, s, ev = record(hook)
     if not sid: return
-    if relay.load(relay.REG, {"sessions": {}})["sessions"].get(sid, {}).get("private"): return
+    if relay.is_private(relay.load(relay.REG, {"sessions": {}})["sessions"].get(sid, {})): return  # finance/tax/gold too
     if ev in ("PostToolUse",) and time.time() - s.get("pushed", 0) < MIN_GAP: return
     kw = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if os.name == "nt": kw["creationflags"] = 0x00000008 | 0x00000200  # DETACHED | NEW_PROCESS_GROUP
