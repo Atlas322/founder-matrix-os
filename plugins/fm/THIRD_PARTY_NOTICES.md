@@ -1,6 +1,6 @@
 # Third-party notices / Гуравдагч талын мэдэгдэл
 
-The "fm" plugin (Founder Matrix OS) is proprietary to itge.e / Соёл (see LICENSE).
+The "fm" plugin (Founder Matrix OS) is proprietary to itge.e / Founder Matrix (see LICENSE).
 Some parts are derived from or adapted from the MIT-licensed projects below.
 Their copyright notices and full license texts are kept in LICENSES/ as the
 MIT License requires. Paths below are relative to plugins/fm/.
@@ -66,7 +66,7 @@ Copyright (c) 2026 Eugeniu Ghelbur, MIT License.
 Renamed and modified. Not affiliated with or endorsed by Eugeniu Ghelbur or Obsidian.
 Full license text: LICENSES/obsidian-second-brain.MIT.txt
 
-fm replaces that plugin for Соёл members; none of its scripts, hooks or MCP
+fm replaces that plugin for Founder Matrix users; none of its scripts, hooks or MCP
 server are vendored. Skills marked with a "See THIRD_PARTY_NOTICES.md" comment:
 
 - fm:save - the overall flow (scan the conversation for vault-worthy items, group them by kind, search before creating, propagate to the daily note, report what was saved) is adapted from the "obsidian-save" command of obsidian-second-brain by Eugeniu Ghelbur (https://github.com/eugeniughelbur/obsidian-second-brain), (c) 2026 Eugeniu Ghelbur, MIT License. Rewritten in Mongolian for a PARA + atomic-notes vault; no text copied.

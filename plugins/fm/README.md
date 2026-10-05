@@ -1,6 +1,6 @@
-# fm: Founder Matrix OS plugin (marketplace `soyol`)
+# Founder Matrix Second Brain: `fm` plugin (marketplace `founder-matrix`)
 
-`founder-matrix-os` repo нь Соёлын багийн дотоод **marketplace `soyol`** болно (`.claude-plugin/marketplace.json`). Одоогоор нэг plugin агуулна:
+`founder-matrix-os` repo нь **marketplace `founder-matrix`** болно (`.claude-plugin/marketplace.json`). Одоогоор нэг plugin агуулна:
 
 **`fm`, Founder Matrix OS.** Гишүүн бүрийн **хувийн Obsidian vault**-ийг GTD + PARA + атом тэмдэглэлээр ажиллуулах хөдөлгүүр. Багийн төслүүд ч мөн тэр хувийн vault дотор хөтлөгдөнө. Бүх сешн нь **Agent**, зөвхөн **дүрээрээ** (GTD, Project, Area, Resource, Content Writer, Creative Director, Tool Developer, Санхүү) ялгарна. Дүрийн тэмдэглэлүүд plugin-д биш, таны vault-ийн `04-Areas/AI Team/ai-workers/` дотор амьдарна.
 
@@ -29,7 +29,7 @@
 2. **Claude Code дотор marketplace нэмэх:**
    ```
    /plugin marketplace add rollingbd/founder-matrix-os
-   /plugin install fm@soyol
+   /plugin install fm@founder-matrix
    /reload-plugins
    ```
    Суулгах үед `vault_path` (заавал: таны vault-ийн хавтас), `member` (нэр), `device` (жишээ нь `Mac`, `PC`) асууна. Дараа нь `/config`-оос өөрчилж болно.
@@ -44,7 +44,7 @@
    /fm:role gtd        # эсвэл project, area, resource, finance ...
    ```
 
-Шинэчлэл: `plugin.json`-ийн `version` (одоо `0.1.0`) нэмэгдэх үед гишүүдэд шинэ хувилбар очно. Custom marketplace-ийн auto-update анхдагчаар унтраалттай: `/plugin` → Marketplaces → soyol → Enable auto-update, эсвэл `/plugin marketplace update soyol`.
+Шинэчлэл: `plugin.json`-ийн `version` (одоо `0.1.0`) нэмэгдэх үед гишүүдэд шинэ хувилбар очно. Custom marketplace-ийн auto-update анхдагчаар унтраалттай: `/plugin` → Marketplaces → founder-matrix → Enable auto-update, эсвэл `/plugin marketplace update founder-matrix`.
 
 ## Windows тэмдэглэл
 
@@ -72,7 +72,7 @@
 ## Repo бүтэц
 
 ```
-.claude-plugin/marketplace.json   marketplace "soyol"
+.claude-plugin/marketplace.json   marketplace "founder-matrix"
 plugins/fm/                        plugin "fm"
   .claude-plugin/plugin.json
   skills/  agents/  hooks/  scripts/  vault-template/
@@ -84,17 +84,17 @@ tests/test_hooks.py                python3 tests/test_hooks.py (repo root-оос
 
 ## Лиценз
 
-Copyright (c) 2026 itge.e. All rights reserved. Licensed for use by members of Соёл. kepano/obsidian-skills болон obsidian-second-brain-аас гаралтай хэсгүүд MIT лицензтэй: `plugins/fm/THIRD_PARTY_NOTICES.md`.
+Copyright (c) 2026 itge.e. All rights reserved. Licensed for use by the Founder Matrix team and Second Brain Season 2 participants. kepano/obsidian-skills болон obsidian-second-brain-аас гаралтай хэсгүүд MIT лицензтэй: `plugins/fm/THIRD_PARTY_NOTICES.md`.
 
 ---
 
 ## English (short)
 
-The **founder-matrix-os** repo doubles as **soyol**, the private Claude Code marketplace of the Соёл team. Its one plugin, **`fm` (Founder Matrix OS)**, turns each member's personal Obsidian vault (Mongolian content) into a GTD + PARA + atomic-notes system run by role-based Agents. Role notes live in the vault, not in the plugin.
+The **founder-matrix-os** repo doubles as **founder-matrix**, the Claude Code marketplace of Founder Matrix Second Brain (team + Second Brain Season 2 students). Its one plugin, **`fm` (Founder Matrix OS)**, turns each member's personal Obsidian vault (Mongolian content) into a GTD + PARA + atomic-notes system run by role-based Agents. Role notes live in the vault, not in the plugin.
 
 - **v0 (this):** vault engine core: 16 skills, 4 agents, SessionStart context hook, note lint hook (warns on frontmatter/date issues, blocks secrets and misplaced private finance), vault template and `/fm:setup`.
 - **v0.2:** Discord relay, Figma, Notion, video watch, research, health checks, calendar.
-- **Install:** `gh auth login && gh auth setup-git`, then `/plugin marketplace add rollingbd/founder-matrix-os`, `/plugin install fm@soyol`, `/fm:setup`.
+- **Install:** `gh auth login && gh auth setup-git`, then `/plugin marketplace add rollingbd/founder-matrix-os`, `/plugin install fm@founder-matrix`, `/fm:setup`.
 - **Windows:** hooks call `python3` in exec form (no shell); run `uv python install --default`, or install Store Python, or copy `python.exe` to `python3.exe`.
 - **Privacy:** personal finance is a private module inside every vault. It never leaves the vault (no git, Discord, STATUS, logs or atoms). Tokens are stored in the OS keychain.
-- **License:** proprietary to itge.e / Соёл; MIT notices in `plugins/fm/THIRD_PARTY_NOTICES.md`.
+- **License:** proprietary to itge.e / Founder Matrix; MIT notices in `plugins/fm/THIRD_PARTY_NOTICES.md`.
