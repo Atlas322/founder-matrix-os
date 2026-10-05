@@ -11,7 +11,17 @@ OUT = HOME / ".fmos_harvest"; OUT.mkdir(exist_ok=True)
 STATE = OUT / "_offsets.json"
 VAULT_HINT = re.compile(r"(Second-Brain|Founder-Matrix|founder-matrix)", re.I)
 MIN_CHARS = 400          # skip sessions with almost nothing new
-SKIP = ("<cross-session-message", "<task-notification", "<system-reminder", "[SYSTEM NOTIFICATION")
+SKIP = ("<cross-session-message", "<task-notification", "<system-reminder", "[SYSTEM NOTIFICATION", "<scheduled-task")
+REG = pathlib.Path(__file__).resolve().parents[2] / "relay" / "registry.json"
+PRIVATE_PROJECTS = {"finance", "tax", "gold"}
+PRIVATE_HINT = re.compile(r"(finances-private|санхүү|Санхүү)", re.I)
+
+
+def private_sids():
+    """Sessions that must never be harvested: registry private flag or money projects (itge.e 2026-10-05)."""
+    try: S = json.loads(REG.read_text(encoding="utf-8"))["sessions"]
+    except Exception: return set()
+    return {sid for sid, v in S.items() if v.get("private") or v.get("project") in PRIVATE_PROJECTS}
 
 
 def text_of(content):
@@ -21,13 +31,17 @@ def text_of(content):
 
 def main(dry=False):
     off = json.loads(STATE.read_text()) if STATE.exists() else {}
-    parts = []
+    parts = []; priv = private_sids()
     for f in PROJ.glob("*/*.jsonl"):
         if not VAULT_HINT.search(f.parent.name) or "subagents" in str(f): continue
+        if f.stem in priv or PRIVATE_HINT.search(f.parent.name):
+            off[str(f)] = f.stat().st_size; continue   # private: mark read, never digest
         size = f.stat().st_size; start = off.get(str(f), 0)
         if size <= start: continue
         with f.open("rb") as fh:
             fh.seek(start); raw = fh.read()
+        if b'<scheduled-task name="fmos-harvester' in raw[:20000]:
+            off[str(f)] = size; continue                   # harvester's own run: never digest itself
         title, turns, last_asst = None, [], None
         for line in raw.decode("utf-8", "ignore").splitlines():
             try: j = json.loads(line)

@@ -458,10 +458,18 @@ def _last_turn(tp):
     except Exception: pass
     return user.strip(), asst.strip()
 
+PRIVATE_PROJECTS = {"finance", "tax", "gold"}
+
+def is_private(entry):
+    """Registry entry is private: explicit flag, or a money project (finance/tax/gold)."""
+    return bool(entry) and (entry.get("private") or entry.get("project") in PRIVATE_PROJECTS)
+
+
 def d_baton(hook, push_every=300):
     """Stop hook: write state/<project>.md (ОДОО overwritten, ТҮҮХ appended); commit+push throttled."""
     sid = hook.get("session_id", ""); me = load(REG, {"sessions": {}})["sessions"].get(sid)
     if not me or not me.get("project"): return
+    if is_private(me): return  # privacy (itge.e 2026-10-05): finance/private chat never leaves the machine
     user, asst = _last_turn(hook.get("transcript_path", ""))
     if not asst: return
     f = REPO / "state" / f"{me['project']}.md"; f.parent.mkdir(exist_ok=True)
