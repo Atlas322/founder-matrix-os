@@ -39,7 +39,7 @@ relay.d_sync()
 print(json.dumps({"cats": [p["name"] for p in POSTS if p.get("type") == 4], "chans": [p["name"] for p in POSTS if p.get("type") == 0]}))
 """
 
-REG = {"sessions": {"s1": {"group": "projects", "project": "byd", "title": "📁 BYD"},
+REG = {"sessions": {"s1": {"group": "projects", "project": "acme", "title": "📁 Acme"},
                     "s2": {"group": "areas", "project": "area", "title": "📥 GTD"}}}
 
 
@@ -59,16 +59,16 @@ def main():
         (repo / "relay" / n).write_text(json.dumps(v), encoding="utf-8")
     env = {k: v for k, v in os.environ.items() if k not in ("FM_VAULT", "FMOS_CONFIG", "FMOS_REPO", "OBSIDIAN_VAULT_PATH")}
     env.update(HOME=str(home), USERPROFILE=str(home), FMOS_REPO=str(repo), PYTHONIOENCODING="utf-8")
-    cm = {"s1": "📁-01-byd", "s2": "gtd"}
+    cm = {"s1": "📁-01-acme", "s2": "gtd"}
 
     d = run(env, [], cm)
     check(sorted(d["cats"]) == sorted(["02 Projects", "03 Areas"]), "empty server: only categories that get channels", str(d))
-    check(sorted(d["chans"]) == sorted(["📁-01-byd", "gtd"]), "empty server: both session channels created", str(d))
+    check(sorted(d["chans"]) == sorted(["📁-01-acme", "gtd"]), "empty server: both session channels created", str(d))
 
     existing = [{"id": "c1", "name": "02 Projects", "type": 4, "position": 0},
                 {"id": "c2", "name": "03 Areas", "type": 4, "position": 1},
                 {"id": "c9", "name": "05 Research", "type": 4, "position": 2},
-                {"id": "t1", "name": "📁-01-byd", "type": 0, "parent_id": "c1"},
+                {"id": "t1", "name": "📁-01-acme", "type": 0, "parent_id": "c1"},
                 {"id": "t2", "name": "gtd", "type": 0, "parent_id": "c2"}]
     d = run(env, existing, cm)
     check(d["cats"] == [] and d["chans"] == [], "second run: nothing new (no empty categories, no channels)", str(d))
