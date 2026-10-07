@@ -453,7 +453,8 @@ class Onboard(object):
 
     def find_project(self, name):
         # type: (str) -> Optional[str]
-        for root in PROJECT_ROOTS:
+        # "03-Projects" last: older vaults keep projects directly under it, no state folders
+        for root in PROJECT_ROOTS + ["03-Projects"]:
             p = self.vault / root / name / (name + ".md")
             if p.is_file():
                 return "%s/%s/%s" % (root, name, name)
@@ -527,7 +528,8 @@ class Onboard(object):
             self.projects[name] = existing or "%s/%s/%s" % (STATES[state][0], name, name)
             self.project_state[name] = state
             self.project_goal[name] = text(p.get("goal"))
-            if existing and not existing.startswith(STATES[state][0]):
+            flat = existing and existing.count("/") == 2   # 03-Projects/<name>/<name>
+            if existing and not flat and not existing.startswith(STATES[state][0]):
                 self.warnings.append("«%s» төсөл аль хэдийн %s-д байна — төлөвийг өөрчлөхгүй"
                                      % (name, existing.split("/")[1]))
         for pe in self._items("people"):

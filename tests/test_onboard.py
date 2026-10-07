@@ -465,6 +465,28 @@ def test_existing_project_is_reused(c):
     assert per["projects"] == ["[[03-Projects/3-On-hold/Подкаст 2026/Подкаст 2026|Подкаст 2026]]"], per
 
 
+def test_flat_project_layout_is_found(c):
+    # Older vaults keep projects directly under 03-Projects/<name>/ (no state folders)
+    c.setup()
+    flat = c.vault / "03-Projects/Хуучин сайт"
+    flat.mkdir(parents=True)
+    (flat / "Хуучин сайт.md").write_text("---\ntype: project\nstatus: active\n---\n# Хуучин сайт\n",
+                                         encoding="utf-8")
+    answers = {"member": "Тест", "mode": "quick",
+               "projects": [{"name": "Хуучин сайт", "state": "active"}],
+               "roles": {"activate": ["project"],
+                         "work": [{"project": "Хуучин сайт", "slug": "old-site"}]}}
+    code, out, err = c.onboard(answers, "--json")
+    assert code == 0, (out, err)
+    rep = json.loads(out)
+    assert not any("олдсонгүй" in w for w in rep["warnings"]), rep["warnings"]
+    assert not any("аль хэдийн" in w for w in rep["warnings"]), rep["warnings"]
+    assert not (c.vault / "03-Projects/1-Active/Хуучин сайт").exists()
+    role = json.loads(c.read("_system/fm/registry.json"))["roles"]["old-site"]
+    assert role["folders"] == ["03-Projects/Хуучин сайт/"], role
+    assert role["project"] == "03-Projects/Хуучин сайт/Хуучин сайт", role
+
+
 def test_dry_run_writes_nothing(c):
     c.setup()
     before = c.snapshot()
