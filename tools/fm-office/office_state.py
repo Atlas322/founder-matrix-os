@@ -1,14 +1,14 @@
 """FM Office — vault-аас /api/state-ийн JSON-ийг бүрдүүлнэ (зөвхөн уншина).
 
 Эх сурвалж:
-  03-Projects/{1-Active,2-Planning,3-On-hold}/<Name>/<Name>.md  → status, stage
+  02-Projects/{1-Active,2-Planning,3-On-hold}/<Name>/<Name>.md  → status, stage
   99-Archive/Projects/*                                         → харанхуй архивын өрөө
   _system/fm/registry.json                                      → агент (сешн)
   _system/fm/state/<project>.md  "## ОДОО · <ts> · <name> (<dev>)" → last_seen
   _system/fm/channels.json                                      → Discord суваг
   _system/logs/<өнөөдөр>.md  "- **HH:MM** · A → B: text"          → яриа
 
-Нууцлал: 04-Areas/Business/finances/private-ийг огт уншихгүй; private: true төсөл/сешн,
+Нууцлал: 03-Areas/Business/finances/private-ийг огт уншихгүй; private: true төсөл/сешн,
 Finance/санхүүгийн сешн, Personal/Home сешнийг алгасна.
 """
 import json, re
@@ -73,7 +73,9 @@ def _norm(s):
 def read_projects(vault):
     rooms = []
     for d, status in STATUS_DIRS.items():
-        base = vault / "03-Projects" / d
+        base = vault / "02-Projects" / d
+        if not (vault / "02-Projects").is_dir():  # одоогийн layout (fallback)
+            base = vault / "03-Projects" / d
         if not base.is_dir():
             continue
         for p in sorted(base.iterdir()):

@@ -2,7 +2,7 @@
 
 Эх сурвалж (бүгд runtime-д уншина, repo-д хүн/харилцагчийн нэр бичихгүй):
   plugins/fm/sidebar.json                         → role → одоогийн гарчиг («🏛️ Architect», «📥 GTD» …)
-  <vault>/_system/fm/agents/*.md, 04-Areas/AI Team/ai-workers/*.md  → `role:` + `aliases:` (хуучин нэрс)
+  <vault>/_system/fm/agents/*.md, 03-Areas/AI Team/ai-workers/*.md  → `role:` + `aliases:` (хуучин нэрс)
   <vault>/_system/fm/fm-office.json  "names"      → нэмэлт хуучин→шинэ хүснэгт, "role_map" → note role → sidebar role
 """
 import json, re
@@ -10,7 +10,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SIDEBAR_CANDIDATES = [HERE.parents[1] / "plugins" / "fm" / "sidebar.json", HERE.parents[1] / "sidebar.json"]
-ROLE_NOTE_DIRS = ["_system/fm/agents", "04-Areas/AI Team/ai-workers"]  # шинэ байршил эхэнд, хуучин нь fallback
+ROLE_NOTE_DIRS = ["_system/fm/agents", "03-Areas/AI Team/ai-workers", "04-Areas/AI Team/ai-workers"]  # шинэ байршил эхэнд, хуучин нь fallback
 DEV_SUFFIX = re.compile(r"\s*[\(\[]?\s*(?:·\s*)?\b(PC|Mac)\b\s*[\)\]]?\s*$", re.I)
 EMOJI_LEAD = re.compile(r"^[^\w\[\(]+", re.U)
 
