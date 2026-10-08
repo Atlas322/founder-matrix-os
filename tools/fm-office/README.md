@@ -3,6 +3,27 @@
 Цаглабар (Inai Operation App)-ын «Оффис» модуль. Vault = барилга, давхар = PARA, төсөл бүр = өрөө
 (дотор нь одоогийн stage / Key Activity), агент сешн = ширээнд суугаа хүн. Three.js r160 (CDN, importmap), build алхамгүй.
 
+## 📅 Цаглабар (`/calendar`)
+
+- Өдөр / 7 хоног (үндсэн) / Сар; ‹ Өнөөдөр ›; өнөөдрийн улаан шугам; утсанд 14 хоногийн агенда.
+- Өгөгдөл (`GET /api/calendar?from=&to=`, `calendar_data.py`): task `due`/`scheduled` → блок, event/meeting
+  `scheduled`/`date` (+цаг) → цагийн блок, төслийн `milestones` → ромбо, daily note → өдрийн цэг. Өнгө = төслийн шат.
+  Блок дээр эзэн агентын chip (owner → агент; «bd/itge.e» = itge.e, «claude» = төслийн өрөөний агент) ба төлөв:
+  товлосон (тасархай) → 🟢 ажиллаж (агент ажиллаж + next-action) → ✅ дууссан (бүдэг).
+- «Огноогүй тавиур»: due-гүй next-action task-ууд төслөөр.
+- Чирж товлох: тавиур/блокийг өдөр рүү чирэх → «<task> → 10/14 товлох уу?» → `POST /api/schedule {task_path, due, confirm:true}`.
+  Сервер зөвхөн frontmatter-ийн `due:` мөрийг солино (бусад byte, `updated:`, CRLF хэвээр; мөр алга бол нэмнэ),
+  зөвхөн `01-GTD/Tasks` (эсвэл хуучин `00-GTD/Tasks`, `02-GTD/tasks`) доторх `type: task`, private биш, localhost.
+  «Буцаах» = өмнөх утгыг сэргээнэ.
+- Блок дээр дарах → карт (Obsidian-д нээх, Оффис дахь өрөө). Оффисын өрөөнөөс «📅 Цаглабарт харах».
+
+## Vault-ийн бүтэц (хавтас hardcode хийхгүй)
+
+`vault_index.py` vault-ийг алхаж frontmatter `type:` (project/task/event/meeting/daily)-аар ангилна; type-гүй бол
+замын hint (…Projects/<Name>/<Name>.md, …/Tasks/, …/Events/, …/Daily/YYYY-MM-DD.md). Төсөл = `<…Projects>/<Name>/<Name>.md`
+(статус хавтас байсан ч, байхгүй ч), статус = frontmatter. `99-Archive` → архив. 60 с cache (~0.3 с/4500 note).
+`finances/private`, `_trash`, `.obsidian`, `private: true` огт уншихгүй.
+
 ## Хувилбарууд
 
 - `/` — **2.5D** (үндсэн): батлагдсан C-style зурагнууд (`assets/img/*.webp`, ≤1600px).

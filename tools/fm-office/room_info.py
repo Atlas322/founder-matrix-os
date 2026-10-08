@@ -5,6 +5,7 @@ Baton: _system/fm/state/<slug>.md-ийн «## ОДОО» хэсэг.
 Нууцлал: төслийн frontmatter-оос зөвхөн цагаан жагсаалтын талбар (finance гэх мэт хэзээ ч биш).
 """
 import re, urllib.parse
+import vault_index
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -56,42 +57,31 @@ def link_target(v):
 
 
 def tasks_for(vault, project, now=None):
-    """Төслийн нээлттэй task-ууд (статусаар бүлэглэсэн) + энэ долоо хоногт дууссан тоо."""
+    """Төслийн нээлттэй task-ууд (статусаар бүлэглэсэн) + энэ долоо хоногт дууссан тоо.
+    Task-уудыг frontmatter `type: task`-аар (vault_index) олно — хавтас hardcode хийхгүй."""
     now = now or datetime.now()
     week0 = (now - timedelta(days=now.weekday())).date()
     groups = {s: [] for s in OPEN}
-    done_week, seen = 0, set()
-    for d in TASK_DIRS:
-        base = Path(vault) / d
-        if not base.is_dir():
+    done_week = 0
+    for n in vault_index.by_type(vault, "task"):
+        if n["path"].startswith("_"):
             continue
-        for f in base.rglob("*.md"):
-            if f.name in seen:
-                continue
+        fm = n["fm"]
+        if Path(link_target(fm.get("project"))).name != project:
+            continue
+        st = fm.get("status", "inbox")
+        if st in DONE:
             try:
-                text = f.read_text(encoding="utf-8", errors="ignore")
-            except OSError:
-                continue
-            fm = flat_fm(text)
-            if fm.get("type") != "task" or str(fm.get("private", "")).lower() == "true":
-                continue
-            if Path(link_target(fm.get("project"))).name != project:
-                continue
-            seen.add(f.name)
-            st = fm.get("status", "inbox")
-            if st in DONE:
-                try:
-                    if datetime.strptime((fm.get("completed") or fm.get("updated") or "")[:10], "%Y-%m-%d").date() >= week0:
-                        done_week += 1
-                except ValueError:
-                    pass
-                continue
-            if st not in groups:
-                continue
-            h = re.search(r"^#\s+(.+)$", text, re.M)
-            groups[st].append({"title": (h.group(1) if h else f.stem)[:140], "status": st,
-                               "priority": fm.get("priority", ""), "due": fm.get("due", ""),
-                               "owner": re.sub(r"\[\[|\]\]", "", fm.get("owner", ""))[:60]})
+                if datetime.strptime((fm.get("completed") or fm.get("updated") or "")[:10], "%Y-%m-%d").date() >= week0:
+                    done_week += 1
+            except ValueError:
+                pass
+            continue
+        if st not in groups:
+            continue
+        groups[st].append({"title": n["title"][:140], "status": st, "path": n["path"],
+                           "priority": fm.get("priority", ""), "due": fm.get("due", ""),
+                           "owner": re.sub(r"\[\[|\]\]", "", fm.get("owner", ""))[:60]})
     for g in groups.values():
         g.sort(key=lambda t: (t["due"] or "9999", t["title"]))
     return {"groups": groups, "open": sum(len(g) for g in groups.values()), "done_week": done_week}
@@ -121,12 +111,7 @@ def baton(vault, slug):
 
 
 def project_note(vault, name):
-    for root in ("02-Projects", "03-Projects"):  # шинэ, одоогийн layout
-        for d in ("", "1-Active", "2-Planning", "3-On-hold"):  # flat (2026-10-09), хуучин статус хавтас
-            p = Path(vault) / root / d / name / f"{name}.md"
-            if p.is_file():
-                return p
-    return None
+    return vault_index.find_project(vault, name)
 
 
 def project_info(vault, room, agents, all_agents, slugs):

@@ -14,6 +14,7 @@ Finance/санхүүгийн сешн, Personal/Home сешнийг алгасн
 """
 import json, re
 import discord_feed
+import vault_index
 from names import Names, norm as _nnorm, clean as _clean
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -91,29 +92,38 @@ def project_dirs(vault):
 
 
 def read_projects(vault):
-    rooms = []
-    for p, status in project_dirs(vault):
-        note = p / f"{p.name}.md"
-        fm = {}
-        if note.is_file():
-            fm = frontmatter(note.read_text(encoding="utf-8", errors="ignore"))
-        if is_private(fm.get("private")):
+    """Төслүүдийг хавтсаар биш frontmatter `type: project`-оор олно (vault_index). Хуучин layout-д ч ажиллана."""
+    rooms, seen = [], set()
+    arch = []
+    for n, archived, folder in vault_index.project_rooms(vault):
+        fm = n["fm"]
+        if n["name"] in seen:
             continue
-        stg, stt = stage_of(fm.get("stage")), (fm.get("status") or status)
-        rooms.append({"id": "p:" + p.name, "floor": "projects", "kind": "project",
-                      "project": p.name, "stage": stg, "status": stt,
+        seen.add(n["name"])
+        if archived:
+            arch.append(n["name"])
+            continue
+        stg, stt = stage_of(fm.get("stage")), (fm.get("status") or folder or "active")
+        if stt in ("completed", "done", "cancelled", "archived"):
+            arch.append(n["name"])
+            continue
+        rooms.append({"id": "p:" + n["name"], "floor": "projects", "kind": "project",
+                      "project": n["name"], "stage": stg, "status": stt,
                       "parked": (not stg) or stt in PARKED_STATUS})
     order = {a: i for i, a in enumerate(ACTIVITIES)}
     rooms.sort(key=lambda r: (r["parked"], order.get(r["stage"], 99), r["project"].lower()))
-    arch = vault / "99-Archive" / "Projects"
-    if arch.is_dir():
-        for p in sorted(arch.iterdir()):
-            if p.is_dir() and not p.name.startswith((".", "_")):
+    # архивын хавтас (note-гүй ч байж болно)
+    ad = vault / "99-Archive" / "Projects"
+    if ad.is_dir():
+        for p in sorted(ad.iterdir()):
+            if p.is_dir() and not p.name.startswith((".", "_")) and p.name not in arch and p.name not in seen:
                 note = p / f"{p.name}.md"
                 if note.is_file() and is_private(frontmatter(note.read_text(encoding="utf-8", errors="ignore")).get("private")):
                     continue
-                rooms.append({"id": "a:" + p.name, "floor": "archive", "kind": "archive",
-                              "project": p.name, "stage": None, "status": "archived"})
+                arch.append(p.name)
+    for name in sorted(set(arch)):
+        rooms.append({"id": "a:" + name, "floor": "archive", "kind": "archive",
+                      "project": name, "stage": None, "status": "archived"})
     return rooms
 
 

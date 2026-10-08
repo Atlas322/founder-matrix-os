@@ -136,7 +136,8 @@ function renderRoom() {
     html += sec("Task-ууд", taskGroups(I.tasks), "", `${I.tasks.open} нээлттэй · 7 хоногт ✓ ${I.tasks.done_week}`);
     html += sec("Сешнүүд", sessionsHtml(I));
     html += sec("Сүүлийн яриа", convHtml);
-    html += sec("Холбоос", I.links.length ? `<ul class="links">${I.links.map(l => `<li><a class="ghost" href="${esc(l.url)}" target="_blank" rel="noopener"><span>${esc(l.label)}</span><i>↗</i></a></li>`).join("")}</ul>` : '<p class="mute">Холбоос алга.</p>');
+    const calLink = `<li><a class="ghost" href="/calendar#project=${encodeURIComponent(r.project)}"><span>📅 Цаглабарт харах</span><i>↗</i></a></li>`;
+    html += sec("Холбоос", `<ul class="links">${calLink}${I.links.map(l => `<li><a class="ghost" href="${esc(l.url)}" target="_blank" rel="noopener"><span>${esc(l.label)}</span><i>↗</i></a></li>`).join("")}</ul>`);
   } else if (r.kind === "workshop") {
     html += sec(`Энэ шатанд буй төслүүд`, I.projects.length ? `<ul class="wp">${I.projects.map(p => `<li><a href="#" data-go="${esc(p.id)}">${esc(p.project)}</a> <span class="mute">${esc(STATUS[p.status] || p.status)}</span>
       <div class="tsum">${["next-action", "waiting", "inbox", "someday"].map(g => `<span>${GROUP_LBL[g]}: <b>${p.tasks.groups[g].length}</b></span>`).join("")}<span>7 хоногт ✔ <b>${p.tasks.done_week}</b></span></div></li>`).join("")}</ul>` : '<p class="mute">Энэ шатанд төсөл алга.</p>', "wide");
