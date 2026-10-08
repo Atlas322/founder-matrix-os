@@ -37,7 +37,7 @@ class OfficeStateTest(unittest.TestCase):
         w(v / "_system/fm/state/proj-a.md", "# proj-a\n\n## ОДОО · 2026-10-09 10:00 · Mac-A (Mac)\nтекст\n")
         w(v / "_system/logs/2026-10-09.md",
           "- **09:55** · Mac-A → Mac-Gold: судалгаа хэрэгтэй\n- **09:58** · finance → area: нууц\n")
-        self.state = build_state(v, now=datetime(2026, 10, 9, 10, 5))
+        self.state = build_state(v, now=datetime(2026, 10, 9, 10, 5), discord=False)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -62,7 +62,7 @@ class OfficeStateTest(unittest.TestCase):
         self.assertEqual(ws["Контент"], 0)
 
     def test_agents_private_filtered_and_working(self):
-        ag = {a["name"]: a for a in self.state["agents"]}
+        ag = {a["name"]: a for a in self.state["agents"] if not a.get("human")}
         self.assertEqual(set(ag), {"Mac-A", "A (PC)", "Mac-Gold"})
         self.assertEqual(ag["Mac-A"]["state"], "working")
         self.assertEqual(ag["Mac-A"]["device"], "🍎")

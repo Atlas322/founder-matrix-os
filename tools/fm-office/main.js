@@ -209,7 +209,7 @@ function deskSlot(a) {
     p.position.set(0.75, 0, 0.45); p.rotation.y = -0.6; // зогсож буй
     p.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.color.multiplyScalar(0.7); } });
   }
-  const lb = label(`${esc(a.device)} ${esc(a.name)}`, "alb");
+  const lb = label(a.human ? `🙂 <b>${esc(a.name)}</b>` : `${esc(a.device)} ${esc(a.name)}`, "alb" + (a.human ? " human" : ""));
   lb.position.set(p.position.x, 1.55, p.position.z);
   g.add(lb);
   g.userData = { pick: { type: "agent", id: a.id }, person: p, label: lb };
@@ -264,7 +264,7 @@ function placeRoom(fg, r, cx, cz, rw, rd, agentsByRoom, glassMat) {
   else if (r.kind === "project") chip = `<span class="chip" style="background:#8a8378">stage алга</span>`;
   const lb = label(`${esc(r.kind === "workshop" ? "⚙️ " + r.project : r.project)}${chip}`, "lbl" + (r.kind === "archive" || r.parked ? " dim" : ""));
   lb.position.set(0, gh + 0.2, 0); rg.add(lb);
-  labelItems.push({ obj: lb, kind: "room", id: r.id });
+  labelItems.push({ obj: lb, kind: "room", id: r.id, staged: r.kind === "project" && !!r.stage && !r.parked });
   if (r.kind === "archive") rg.add(box(rw - 0.1, FH - 0.4, 0.05, 0x1d1a16, 0, 0, rd / 2 - 0.05, { transparent: true, opacity: 0.35 }));
 }
 
@@ -304,6 +304,7 @@ function build(state) {
       parkedGroup.add(box(pW, 0.05, pD, 0x8f887c, px + pW / 2, 0, z0 + pD / 2));
       B.rooms.forEach((r, i) => placeRoom(parkedGroup, r, px + rw * (i % B.cols) + rw / 2, z0 + rd * Math.floor(i / B.cols) + rd / 2, rw, rd, agentsByRoom, glassMat));
       const pl = label("Шатгүй / Зогссон", "lbl floor dim"); pl.position.set(px + pW / 2, FH * PS + 0.4, z0); parkedGroup.add(pl);
+      labelItems.push({ obj: pl, kind: "title", id: "parked" });
     }
   });
   const ground = box(maxW + 8, 0.2, maxD + 8, 0xd7c6a5, 0, -0.2, 0); ground.receiveShadow = true; building.add(ground);
@@ -322,7 +323,10 @@ function fitTo(obj) {
   scene.updateMatrixWorld(true); // шинэ group-уудын matrixWorld хараахан шинэчлэгдээгүй
   const b = new THREE.Box3();
   obj.traverse(m => { if (m.isMesh && isShown(m)) b.expandByObject(m, false); });
-  if (b.isEmpty()) return;
+  if (!b.isEmpty()) fitBox(b);
+}
+
+function fitBox(b) {
   const center = b.getCenter(new THREE.Vector3());
   resetView(center);
   camera.updateMatrixWorld();
@@ -362,8 +366,9 @@ function labelPass(now) {
     if (!it.obj.visible) continue;
     const isSel = selected && selected.type === it.kind && selected.id === it.id;
     const isHov = hovered && hovered.type === it.kind && hovered.id === it.id;
-    const zoomOk = it.kind === "room" ? ppu > 14 : ppu > 26;
-    if (isSel || isHov || zoomOk) want.push({ el, pr: isSel || isHov ? 3 : it.kind === "agent" && it.working ? 2 : it.kind === "room" ? 1 : 0 });
+    // stage-тэй төслийн өрөө үргэлж; бусад нь zoom-оор; «Шатгүй / Зогссон» гарчиг хамгийн бага эрэмбэтэй
+    const zoomOk = it.staged || it.kind === "title" || (it.kind === "room" ? ppu > 14 : ppu > 26);
+    if (isSel || isHov || zoomOk) want.push({ el, pr: it.staged || isSel || isHov ? 3 : it.kind === "agent" && it.working ? 2 : it.kind === "room" ? 1 : 0 });
     else el.style.visibility = "hidden";
   }
   want.sort((x, y) => y.pr - x.pr);
@@ -389,12 +394,14 @@ function renderFloorButtons(floors) {
   pk.title = "Stage-гүй болон зогссон төслүүдийг харуулах/нуух";
   pk.onclick = () => { showParked = !showParked; pk.classList.toggle("on", showParked); updateVisibility(); };
   wrap.appendChild(pk);
+  $("feedBtn").onclick = () => $("feed").classList.toggle("open");
+  if (innerWidth <= 600) $("feed").classList.remove("open"); // утсанд товчоор нээнэ
 }
 function counts() {
-  const ag = STATE?.agents || [];
+  const ag = (STATE?.agents || []).filter(a => !a.human);
   $("nWork").textContent = ag.filter(a => a.state === "working").length;
   $("nIdle").textContent = ag.filter(a => a.state !== "working").length;
-  $("nTalk").textContent = talkCount;
+  $("nTalk").textContent = (STATE?.conversations || []).length; // сүүлийн 24 цагийн яриа
 }
 function openCard(html) { $("cardBody").innerHTML = html; $("card").classList.add("show"); }
 function closeCard() { $("card").classList.remove("show"); selected = null; }
@@ -467,7 +474,8 @@ function headPos(id) {
   const v = new THREE.Vector3(); n.userData.person.userData.head.getWorldPosition(v); return v;
 }
 function playConv(c) {
-  const a = headPos(c.from), b = c.to ? headPos(c.to) : null;
+  let a = headPos(c.from), b = c.to ? headPos(c.to) : null;
+  if (!a) { a = b; b = null; } // илгээгч өөр давхарт → bubble-ийг хүлээн авагч дээр
   if (!a) return false;
   const ok = c.type === "✅";
   const col = ok ? C.green : C.blue;
@@ -483,11 +491,11 @@ function playConv(c) {
       effects.push({ obj: ring, until: performance.now() + 3200, pulse: true, t0: performance.now() });
     }
   }
-  const icon = c.type === "send_message" ? "💬" : c.type === "Discord" ? "🎧" : c.type;
-  const bub = label(`${icon} <b>${esc(c.from_label || "")}${c.to_label ? " → " + esc(c.to_label) : ""}</b><br>${esc(c.text)}`, "bubble" + (ok ? " ok" : ""));
+  const icon = TYPE_ICON[c.type] || "💬";
+  const fl = agentName(c.from) || c.from_label || "", tl = agentName(c.to) || c.to_label || "";
+  const bub = label(`${icon} <b>${esc(fl)}${tl ? " → " + esc(tl) : ""}</b><br>${esc(c.text)}`, "bubble" + (ok ? " ok" : ""));
   bub.position.copy(a).setY(a.y + 0.9); scene.add(bub);
   effects.push({ obj: bub, until: performance.now() + 3000 });
-  talkCount++; counts();
   return true;
 }
 function pump(now) {
@@ -495,10 +503,40 @@ function pump(now) {
   const c = queue.shift();
   if (playConv(c)) busyUntil = now + 3300;
 }
+const convKey = c => c.id || (c.ts + c.text);
+const agentName = id => STATE?.agents.find(a => a.id === id)?.name;
 function enqueueReal(list) {
-  const fresh = list.filter(c => !seenConv.has(c.time + c.text));
-  fresh.forEach(c => seenConv.add(c.time + c.text));
-  queue.push(...(seenConv.size === fresh.length ? fresh.slice(-3) : fresh)); // анх ачаалахад сүүлийн 3
+  const firstLoad = seenConv.size === 0;
+  const fresh = list.filter(c => !seenConv.has(convKey(c)));
+  fresh.forEach(c => seenConv.add(convKey(c)));
+  queue.push(...(firstLoad ? fresh.slice(-3) : fresh)); // анх ачаалахад сүүлийн 3
+  renderFeed(list);
+}
+const TYPE_ICON = { "✅": "✅", "🙋": "🙋", "itge.e": "🙂", "Discord": "💬", "send_message": "📨" };
+function renderFeed(list) {
+  const ul = $("feedList");
+  const items = [...list].reverse().slice(0, 40);
+  $("feedEmpty").style.display = items.length ? "none" : "block";
+  ul.innerHTML = items.map((c, i) => {
+    const f = agentName(c.from) || c.from_label || "?", to = agentName(c.to) || c.to_label || "";
+    return `<li data-i="${i}" class="${c.type === "✅" ? "ok" : ""}"><span class="t">${esc((c.ts || "").slice(11, 16))}${c.channel ? " · #" + esc(c.channel) : ""}</span>
+      <b>${TYPE_ICON[c.type] || "💬"} ${esc(f)}${to ? " → " + esc(to) : ""}</b><span class="x2">${esc(c.text)}</span></li>`;
+  }).join("");
+  ul.querySelectorAll("li").forEach(li => li.onclick = () => focusConv(items[+li.dataset.i]));
+}
+function focusConv(c) {
+  const ids = [c.from, c.to].filter(id => id && agentNodes.has(id));
+  if (!ids.length) return;
+  const floors = new Set(ids.map(id => { for (const [f, g] of floorGroups) { let p = agentNodes.get(id); while (p && p !== g) p = p.parent; if (p) return f; } }));
+  if (floors.size === 1) applyFloor([...floors][0], false); else applyFloor("all", false);
+  const b = new THREE.Box3();
+  scene.updateMatrixWorld(true);
+  ids.forEach(id => b.expandByObject(agentNodes.get(id)));
+  b.expandByScalar(2.5);
+  fitBox(b);
+  selected = { type: "agent", id: ids[0] };
+  queue.unshift(c); busyUntil = 0;
+  if (innerWidth <= 600) $("feed").classList.remove("open");
 }
 const DEMO = [
   ["send_message", "Brief бэлэн, дизайн руу шилжүүлье"], ["🙋", "Figma-ийн эрх хэрэгтэй байна"], ["✅", "Task дууссан — шалгаад баталъя"],

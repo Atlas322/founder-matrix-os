@@ -41,8 +41,20 @@ button.on{background:var(--ink);color:var(--paper)}
 #card a{color:var(--blue);font-weight:600}
 #card ul{margin:4px 0 0;padding-left:18px}
 #tip{position:fixed;z-index:15;pointer-events:none;background:var(--ink);color:var(--paper);font-size:12px;padding:3px 7px;border-radius:5px;display:none}
+#feed{position:fixed;z-index:9;left:16px;bottom:16px;width:300px;max-height:42%;overflow:auto;background:rgba(246,238,221,.95);border:3px solid var(--ink);border-radius:10px;box-shadow:4px 4px 0 var(--ink);padding:8px 10px;display:none}
+#feed.open{display:block}
+#feed h3{margin:0 0 4px;font-size:13px}
+#feed p{margin:4px 0;font-size:12px;color:var(--mute)}
+#feed ul{list-style:none;margin:0;padding:0}
+#feed li{font-size:12px;padding:5px 4px;border-top:1px solid var(--line);cursor:pointer;display:grid;gap:1px}
+#feed li:hover{background:#efe3c9}
+#feed li.ok b{color:var(--green)}
+#feed .t{color:var(--mute);font-size:11px}
+#feed .x2{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alb.human{background:var(--ochre)}
 #err{position:fixed;bottom:12px;left:16px;z-index:12;font-size:12px;color:#a33}
 @media (max-width:600px){
+  #feed{left:0;right:0;bottom:0;width:auto;max-height:40%;border-radius:14px 14px 0 0;border-width:3px 0 0;box-shadow:none}
   header{padding:8px 16px;gap:6px}
   h1{font-size:15px}
   .sp{display:none}
@@ -66,12 +78,14 @@ button.on{background:var(--ink);color:var(--paper)}
   <span class="stat">ажиллаж <b id="nWork">0</b> · сул <b id="nIdle">0</b> · яриа <b id="nTalk">0</b></span>
   <span class="sp"></span>
   <div class="floors" id="floors"></div>
+  <button id="feedBtn" title="Яриаг харуулах/нуух">Яриа</button>
   <button id="demo" title="Жишээ яриа тоглуулах">Demo</button>
   <button id="reset">Харагдац</button>
 </header>
 <div id="stage"></div>
 <div id="tip"></div>
 <aside id="card" role="dialog"><button class="x" id="close" aria-label="Хаах">×</button><div id="cardBody"></div></aside>
+<aside id="feed" class="open"><h3>Яриа</h3><p id="feedEmpty">Сүүлийн 24 цагт яриа алга — «Demo»-г асаа.</p><ul id="feedList"></ul></aside>
 <div id="err"></div>
 <script type="module" src="/main.js"></script>
 </body>
