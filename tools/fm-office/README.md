@@ -47,7 +47,7 @@
 ## Ажиллуулах
 
 ```
-python server.py --vault "D:/My Drive/Second Brain 2.0" --port 5191
+python server.py --vault "<vault>" --port 5191
 ```
 → http://localhost:5191 . Vault-ийн `.claude/launch.json`-д `fm-office` гэж бүртгэлтэй.
 Тест: `python -m unittest discover -s tests`
