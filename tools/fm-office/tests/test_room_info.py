@@ -62,6 +62,12 @@ class TaskBatonTest(unittest.TestCase):
         self.assertIn("🧠 _BRAIN", labels)
         self.assertNotIn("999999", str(info))
 
+    def test_project_note_flat_and_legacy(self):
+        w(self.v / "02-Projects/Flat One/Flat One.md", "---\nstatus: planning\n---\n")
+        self.assertEqual(room_info.project_note(self.v, "Flat One"), self.v / "02-Projects/Flat One/Flat One.md")
+        self.assertEqual(room_info.project_note(self.v, "Project A"),
+                         self.v / "02-Projects/1-Active/Project A/Project A.md")
+
 
 class SendValidationTest(unittest.TestCase):
     ALLOWED = {"project-a", "gtd"}

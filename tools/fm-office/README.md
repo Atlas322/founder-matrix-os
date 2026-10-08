@@ -35,7 +35,7 @@ python server.py --vault "D:/My Drive/Second Brain 2.0" --port 5191
 
 | Юу | Хаанаас |
 |---|---|
-| Төслийн өрөө, status, stage | `02-Projects/{1-Active,2-Planning,3-On-hold}/<Name>/<Name>.md` frontmatter `status`, `stage: "[[…/activities/<Activity>]]"` |
+| Төслийн өрөө, status, stage | `02-Projects/<Name>/<Name>.md` (хуучин `{1-Active,2-Planning,3-On-hold}/` дэд хавтас ч уншина) frontmatter `status`, `stage: "[[…/activities/<Activity>]]"` |
 | Архивын харанхуй өрөө | `99-Archive/Projects/*` |
 | Key Activity цехийн ачаалал | тухайн stage-тэй төслийн тоо |
 | Агент | `_system/fm/registry.json` → `sessions` |

@@ -122,7 +122,7 @@ def baton(vault, slug):
 
 def project_note(vault, name):
     for root in ("02-Projects", "03-Projects"):  # шинэ, одоогийн layout
-        for d in ("1-Active", "2-Planning", "3-On-hold"):
+        for d in ("", "1-Active", "2-Planning", "3-On-hold"):  # flat (2026-10-09), хуучин статус хавтас
             p = Path(vault) / root / d / name / f"{name}.md"
             if p.is_file():
                 return p

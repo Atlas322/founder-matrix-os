@@ -1,7 +1,8 @@
 """FM Office — vault-аас /api/state-ийн JSON-ийг бүрдүүлнэ (зөвхөн уншина).
 
 Эх сурвалж:
-  02-Projects/{1-Active,2-Planning,3-On-hold}/<Name>/<Name>.md  → status, stage
+  02-Projects/<Name>/<Name>.md (status = frontmatter)          → status, stage
+    (хуучин 02-Projects/{1-Active,2-Planning,3-On-hold}/<Name>/ ч уншина)
   99-Archive/Projects/*                                         → харанхуй архивын өрөө
   _system/fm/registry.json                                      → агент (сешн)
   _system/fm/state/<project>.md  "## ОДОО · <ts> · <name> (<dev>)" → last_seen
@@ -70,27 +71,38 @@ def _norm(s):
     return re.sub(r"[^\w]+", "", s.lower())
 
 
+def project_dirs(vault):
+    """[(project dir, fallback status)] — flat 02-Projects/<Name>/ first (layout 2026-10-09,
+    status = frontmatter), then legacy status subfolders 02-Projects/{1-Active,...}/<Name>/."""
+    root = vault / "02-Projects"
+    if not root.is_dir():  # одоогийн layout (fallback)
+        root = vault / "03-Projects"
+    if not root.is_dir():
+        return []
+    out = []
+    for p in sorted(root.iterdir()):
+        if not p.is_dir() or p.name.startswith((".", "_")):
+            continue
+        if p.name in STATUS_DIRS:
+            out += [(q, STATUS_DIRS[p.name]) for q in sorted(p.iterdir()) if q.is_dir()]
+        elif (p / f"{p.name}.md").is_file():
+            out.append((p, ""))
+    return out
+
+
 def read_projects(vault):
     rooms = []
-    for d, status in STATUS_DIRS.items():
-        base = vault / "02-Projects" / d
-        if not (vault / "02-Projects").is_dir():  # одоогийн layout (fallback)
-            base = vault / "03-Projects" / d
-        if not base.is_dir():
+    for p, status in project_dirs(vault):
+        note = p / f"{p.name}.md"
+        fm = {}
+        if note.is_file():
+            fm = frontmatter(note.read_text(encoding="utf-8", errors="ignore"))
+        if is_private(fm.get("private")):
             continue
-        for p in sorted(base.iterdir()):
-            if not p.is_dir():
-                continue
-            note = p / f"{p.name}.md"
-            fm = {}
-            if note.is_file():
-                fm = frontmatter(note.read_text(encoding="utf-8", errors="ignore"))
-            if is_private(fm.get("private")):
-                continue
-            stg, stt = stage_of(fm.get("stage")), (fm.get("status") or status)
-            rooms.append({"id": "p:" + p.name, "floor": "projects", "kind": "project",
-                          "project": p.name, "stage": stg, "status": stt,
-                          "parked": (not stg) or stt in PARKED_STATUS})
+        stg, stt = stage_of(fm.get("stage")), (fm.get("status") or status)
+        rooms.append({"id": "p:" + p.name, "floor": "projects", "kind": "project",
+                      "project": p.name, "stage": stg, "status": stt,
+                      "parked": (not stg) or stt in PARKED_STATUS})
     order = {a: i for i, a in enumerate(ACTIVITIES)}
     rooms.sort(key=lambda r: (r["parked"], order.get(r["stage"], 99), r["project"].lower()))
     arch = vault / "99-Archive" / "Projects"
