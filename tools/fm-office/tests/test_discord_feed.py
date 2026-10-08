@@ -2,7 +2,8 @@ import sys, unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from discord_feed import parse_message, HUMAN_ID  # noqa: E402
+from datetime import datetime, timezone  # noqa: E402
+from discord_feed import parse_message, local_time, HUMAN_ID  # noqa: E402
 
 A = lambda i, name, title, role, project, dev, state="idle": {
     "id": i, "name": name, "title": title, "role": role, "project": project, "device_name": dev, "state": state}
@@ -63,7 +64,21 @@ class ParseTest(unittest.TestCase):
         self.assertIsNone(parse_message(msg("нууц\n-# 🖥️ PC · Finance · Санхүү", BOT_PC), "project-a", OWN_A, AGENTS))
         ev = parse_message(msg("я" * 300, HUMAN), "project-a", OWN_A, AGENTS)
         self.assertLessEqual(len(ev["text"]), 80)
-        self.assertEqual(set(ev), {"id", "ts", "from", "to", "type", "text", "channel"})
+        self.assertEqual(set(ev), {"id", "ts", "hhmm", "iso", "from", "to", "type", "text", "channel"})
+
+
+    def test_utc_to_local_time(self):
+        ev = parse_message(msg("сайн уу", HUMAN, ts="2026-10-08T16:28:00.123000+00:00"), "project-a", OWN_A, AGENTS)
+        exp = datetime(2026, 10, 8, 16, 28, tzinfo=timezone.utc).astimezone()  # машины tz (UB дээр 10-09 00:28)
+        self.assertEqual(ev["hhmm"], exp.strftime("%H:%M"))
+        self.assertEqual(ev["ts"], exp.strftime("%Y-%m-%d %H:%M:%S"))
+        self.assertEqual(datetime.fromisoformat(ev["iso"]).utcoffset(), exp.utcoffset())
+        self.assertEqual(local_time("2026-10-08T16:28:00Z").astimezone(timezone.utc).hour, 16)
+
+    def test_old_name_footer_resolves_via_keys(self):
+        ag = [dict(AGENTS[0], name="🏛️ Architect", title="🏛️ Architect", keys={"tooldeveloper", "tooldeveloperpc"})]
+        ev = parse_message(msg("ok\n-# 🖥️ PC · Tool Developer (PC)", BOT_PC), "architect", ag, ag)
+        self.assertEqual(ev["from"], "arch-pc")
 
 
 if __name__ == "__main__":
