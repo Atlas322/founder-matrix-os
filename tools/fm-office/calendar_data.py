@@ -55,6 +55,8 @@ def build(vault, state, start, end):
     rooms = state["rooms"]
     rooms_by_name = {r["project"]: r["id"] for r in rooms if r["kind"] == "project"}
     stage_of = {r["project"]: r["stage"] for r in rooms if r["kind"] == "project"}
+    # тавиурт зөвхөн идэвхтэй/төлөвлөж буй төслийн task (архив, on-hold, someday, дууссан, өрөөгүй төсөл биш)
+    shelf_ok = {r["project"] for r in rooms if r["kind"] == "project" and r.get("status") not in ("on-hold", "someday", "completed", "done", "cancelled")}
     working = {a["id"] for a in agents if a.get("state") == "working" and not a.get("human")}
     items, shelf, ms, daily = [], {}, [], []
     for n in vault_index.index(vault):
@@ -95,7 +97,7 @@ def build(vault, state, start, end):
             if d:
                 if start <= d <= end:
                     items.append(item)
-            elif st == "next-action":
+            elif st == "next-action" and (not proj or proj in shelf_ok):
                 shelf.setdefault(proj or "Төсөлгүй", []).append(item)
         elif t in ("event", "meeting"):
             d, tm = parse_dt(fm.get("scheduled") or fm.get("date") or fm.get("met"))

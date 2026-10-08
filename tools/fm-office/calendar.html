@@ -22,7 +22,7 @@ a{color:var(--link)}
 .ghost{display:inline-flex;align-items:stretch;border:var(--border-strong);border-radius:var(--radius-btn);overflow:hidden;color:var(--text);text-decoration:none;font:500 var(--t-xs) var(--font-ui)}
 .ghost span{padding:5px 10px} .ghost i{font-style:normal;display:grid;place-items:center;width:28px;border-left:var(--border-strong);color:var(--link)}
 /* shell */
-.shell{display:grid;grid-template-columns:var(--shell-nav) 1fr;height:100vh}
+.shell{display:grid;grid-template-columns:var(--shell-nav) 1fr;height:100vh;height:100dvh;width:100%}
 nav.side{border-right:var(--border);display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 0;background:var(--panel)}
 .logo{font:400 22px/1 var(--font-display);margin-bottom:18px;text-decoration:none;color:var(--text)} .logo b{color:var(--link);font-weight:400}
 .nav-i{width:64px;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0;border-radius:var(--radius-btn);font:500 var(--t-micro) var(--font-ui);color:var(--text-2);text-decoration:none;cursor:not-allowed}
@@ -31,7 +31,7 @@ a.nav-i{cursor:pointer} a.nav-i:hover{background:var(--hover)}
 .nav-i.on{background:var(--card);color:var(--text);cursor:default} .nav-i.on .ic{background:var(--accent);border-color:var(--accent)}
 .nav-i small{font-size:9px} .nav-sp{flex:1}
 .avatar{width:32px;height:32px;border-radius:50%;border:var(--border-strong);display:grid;place-items:center;font:600 var(--t-xs) var(--font-ui)}
-.main{display:grid;grid-template-rows:var(--shell-top) 1fr;min-width:0;height:100vh}
+.main{display:grid;grid-template-rows:var(--shell-top) minmax(0,1fr);min-width:0;height:100vh;height:100dvh}
 header.top{display:flex;align-items:center;gap:18px;padding:0 24px;border-bottom:var(--border)}
 .ttl h1{margin:0;font:400 var(--t-h3)/1.1 var(--font-display);letter-spacing:-1px}
 .ttl p{margin:2px 0 0;color:var(--text-2);font-size:var(--t-xs)}
@@ -41,12 +41,12 @@ header.top{display:flex;align-items:center;gap:18px;padding:0 24px;border-bottom
 .nav-dates button{padding:5px 9px}
 .ask{flex:1;max-width:320px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:8px;border:var(--border-strong);border-radius:var(--radius-btn);padding:7px 12px;color:var(--text-2);background:var(--card)}
 .top .sp{flex:1}
-.content{display:grid;grid-template-columns:1fr 340px;gap:20px;padding:20px 24px;min-height:0;overflow:hidden}
+.content{display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-rows:minmax(0,1fr);gap:20px;padding:20px 24px;min-height:0;overflow:hidden}
 .panel{border:var(--border);border-radius:var(--radius-card);background:var(--card);overflow:hidden}
 .strip{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px 8px}
 .body{padding:4px 14px 14px}
 /* ---- хуанли ---- */
-.cal{display:flex;flex-direction:column;min-height:0}
+.cal{display:flex;flex-direction:column;min-height:0;height:100%}
 .grid{flex:1;overflow:auto;position:relative}
 .cols{display:grid;grid-template-columns:56px repeat(var(--n),minmax(110px,1fr));min-width:fit-content}
 .dh{position:sticky;top:0;z-index:4;background:var(--card);padding:14px 10px 8px;border-left:var(--border);border-bottom:var(--border);font:600 var(--t-sm) var(--font-ui)}
@@ -87,7 +87,9 @@ header.top{display:flex;align-items:center;gap:18px;padding:0 24px;border-bottom
 .mcell .blk{padding:3px 6px} .mcell .chip{display:none}
 .mhead{display:grid;grid-template-columns:repeat(7,1fr)} .mhead div{padding:10px 8px;font:600 var(--t-micro) var(--font-ui);letter-spacing:var(--ls-label);color:var(--text-2)}
 /* баруун: тавиур, агент, төлөв, карт */
-.rail{display:flex;flex-direction:column;gap:16px;overflow:auto;min-height:0}
+.rail{display:flex;flex-direction:column;gap:16px;overflow:auto;min-height:0;height:100%}
+.rail .shelf{flex:1 1 auto;min-height:220px;display:flex;flex-direction:column}
+.rail .shelf .body{overflow:auto;min-height:0}
 .shelf h4{margin:10px 0 6px;font:600 var(--t-micro) var(--font-ui);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--text-2);display:flex;gap:6px;align-items:center}
 .shelf h4 i{width:7px;height:7px;border-radius:50%;background:var(--c,var(--text-2))}
 .shelf .blk{margin-bottom:6px;border-style:dashed}
@@ -113,7 +115,7 @@ dialog h3{margin:0 0 8px;font:400 var(--t-h4)/1.2 var(--font-display)}
 .ag-day{margin-bottom:14px} .ag-day h4{margin:0 0 6px;font:600 var(--t-label) var(--font-ui);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--text-2)}
 .ag-day.today h4{color:var(--accent)} .ag-day .blk{margin-bottom:6px}
 #err{position:fixed;left:calc(var(--shell-nav) + 16px);bottom:10px;color:var(--warn);font-size:var(--t-xs)}
-@media (max-width:1100px){.content{grid-template-columns:1fr}.rail{max-height:none}}
+@media (max-width:1100px){.content{grid-template-columns:1fr;grid-template-rows:minmax(560px,78vh) max-content;overflow:auto}.rail{height:auto;overflow:visible;min-height:max-content}.rail .shelf{flex:none}.rail .shelf .body{max-height:50vh}}
 @media (max-width:700px){
   .shell{grid-template-columns:1fr}
   nav.side{position:fixed;left:0;right:0;bottom:0;height:58px;flex-direction:row;justify-content:space-around;border-right:0;border-top:var(--border);padding:4px;z-index:40}

@@ -29,6 +29,10 @@ class DiscoveryTest(unittest.TestCase):
         w(v / "02-GTD/tasks/legacy.md", "---\nstatus: waiting\n---\n# Legacy task\n")  # type-гүй, хуучин хавтас
         w(v / "01-GTD/Events/e.md", "---\ntype: meeting\nscheduled: 2026-10-15 19:00\n---\n# Уулзалт\n")
         w(v / "01-GTD/Daily/2026-10-14.md", "---\ntype: daily\n---\n")
+        w(v / "01-GTD/Tasks/hold.md", '---\ntype: task\nstatus: next-action\nproject: "[[02-Projects/3-On-hold/Project Hold/Project Hold]]"\n---\n# Зогссон төслийн task\n')
+        w(v / "01-GTD/Tasks/arch.md", '---\ntype: task\nstatus: next-action\nproject: "[[99-Archive/Projects/Project Done/Project Done]]"\n---\n# Архивын task\n')
+        w(v / "01-GTD/Tasks/bd.md", '---\ntype: task\nstatus: next-action\nowner: bd\ndue: 2026-10-13\nproject: "[[02-Projects/Project New/Project New]]"\n---\n# itge.e-ийн task\n')
+        w(v / "01-GTD/Tasks/cl.md", '---\ntype: task\nstatus: next-action\nowner: claude\ndue: 2026-10-13\nproject: "[[02-Projects/Project New/Project New]]"\n---\n# Агентын task\n')
 
     def tearDown(self):
         vault_index.invalidate()
@@ -62,6 +66,17 @@ class DiscoveryTest(unittest.TestCase):
         self.assertNotIn("нууц", titles)
         self.assertEqual([t["title"] for g in d["shelf"] for t in g["tasks"]], ["Хуучин task"])
         self.assertEqual(d["daily"], ["2026-10-14"])
+
+    def test_working_state_human_never_working(self):
+        rooms = read_projects(self.v)
+        agents = [{"id": "itgee", "name": "itge.e", "human": True, "state": "working", "room": "hq"},
+                  {"id": "a1", "name": "📁 Project New", "state": "working", "room": "p:Project New", "device_name": "PC"}]
+        d = calendar_data.build(self.v, {"agents": agents, "rooms": rooms}, "2026-10-12", "2026-10-18")
+        by = {i["title"]: i for i in d["items"]}
+        self.assertEqual(by["itge.e-ийн task"]["agent"], "itgee")
+        self.assertEqual(by["itge.e-ийн task"]["state"], "scheduled")  # хүн «ажиллаж» болохгүй
+        self.assertEqual(by["Агентын task"]["agent"], "a1")
+        self.assertEqual(by["Агентын task"]["state"], "working")
 
 
 class ScheduleTest(unittest.TestCase):
