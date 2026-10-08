@@ -12,11 +12,13 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from office_state import build_state, load_config  # noqa: E402
-import room_info, sender  # noqa: E402
+import room_info, sender, calendar_data  # noqa: E402
 
 STATIC = {"/": ("office2d.html", "text/html; charset=utf-8"),          # 2.5D зурагт оффис (үндсэн)
           "/office2d.js": ("office2d.js", "text/javascript; charset=utf-8"),
           "/tokens.css": ("tokens.css", "text/css; charset=utf-8"),
+          "/calendar": ("calendar.html", "text/html; charset=utf-8"),          # 📅 Цаглабар модуль
+          "/calendar.js": ("calendar.js", "text/javascript; charset=utf-8"),
           "/3d": ("index.html", "text/html; charset=utf-8"),             # хуучин Three.js хувилбар
           "/index.html": ("index.html", "text/html; charset=utf-8"),
           "/main.js": ("main.js", "text/javascript; charset=utf-8")}
@@ -90,6 +92,17 @@ def make_handler(vault):
                     rid = (parse_qs(urlparse(self.path).query).get("id") or [""])[0]
                     info = room_payload(vault, rid)
                     return self._send(200 if info else 404, info or {"error": "өрөө алга"})
+                if path == "/api/calendar":
+                    from urllib.parse import parse_qs, urlparse
+                    from datetime import date, timedelta
+                    q = parse_qs(urlparse(self.path).query)
+                    t0 = date.today()
+                    a = (q.get("from") or [str(t0 - timedelta(days=t0.weekday()))])[0][:10]
+                    b = (q.get("to") or [str(date.fromisoformat(a) + timedelta(days=6))])[0][:10]
+                    st = build_state(vault, discord=False)
+                    data = calendar_data.build(vault, st, a, b)
+                    data["agents"] = st["agents"]
+                    return self._send(200, data)
                 if path == "/api/state":
                     return self._send(200, build_state(vault))
                 if path == "/favicon.ico":
@@ -98,13 +111,23 @@ def make_handler(vault):
             except Exception as e:
                 self._send(500, {"error": str(e)})
         def do_POST(self):
-            if self.path.split("?")[0] != "/api/send":
+            route = self.path.split("?")[0]
+            if route not in ("/api/send", "/api/schedule"):
                 return self._send(404, {"error": "not found"})
             origin = self.headers.get("Origin") or ""
             if origin and not re.match(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$", origin):
                 return self._send(403, {"error": "зөвхөн localhost-оос"})
             if "application/json" not in (self.headers.get("Content-Type") or ""):
                 return self._send(415, {"error": "JSON хэрэгтэй"})
+            if route == "/api/schedule":
+                try:
+                    n = min(int(self.headers.get("Content-Length", 0)), 4000)
+                    req = json.loads(self.rfile.read(n) or b"{}")
+                    return self._send(200, calendar_data.set_due(vault, req.get("task_path"), req.get("due"), req.get("confirm")))
+                except calendar_data.ScheduleError as e:
+                    return self._send(400, {"error": str(e)})
+                except Exception as e:
+                    return self._send(500, {"error": type(e).__name__})
             try:
                 n = min(int(self.headers.get("Content-Length", 0)), 20000)
                 req = json.loads(self.rfile.read(n) or b"{}")
