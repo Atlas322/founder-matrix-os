@@ -12,6 +12,7 @@
 Finance/санхүүгийн сешн, Personal/Home сешнийг алгасна.
 """
 import json, re
+import discord_feed
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -234,17 +235,28 @@ def conversations(vault, agents, now=None, limit=12):
             continue
         typ = "✅" if text.startswith("✅") or dst.startswith("✅") else ("🙋" if "🙋" in text else "send_message")
         dst_clean = dst.lstrip("✅ ").strip()
-        out.append({"time": hhmm, "from": match(src), "to": match(dst_clean), "from_label": src,
+        out.append({"id": f"log:{hhmm}:{len(out)}", "ts": f"{now:%Y-%m-%d} {hhmm}:00", "time": hhmm, "from": match(src), "to": match(dst_clean), "from_label": src,
                     "to_label": dst_clean, "type": typ,
                     "text": re.sub(r"\[\[(?:[^\]|]*\|)?([^\]]*)\]\]", r"\1", text)[:140]})
     return out[-limit:]
 
 
-def build_state(vault, now=None):
+HUMAN = {"id": discord_feed.HUMAN_ID, "name": "itge.e", "title": "itge.e", "role": "founder", "project": "",
+         "room": "hq", "device": "🙂", "device_name": "", "state": "working", "last_seen": None,
+         "channel": None, "guild": None, "human": True}
+
+
+def build_state(vault, now=None, discord=True):
     vault = Path(vault)
     now = now or datetime.now()
     rooms = build_rooms(vault)
     agents = build_agents(vault, rooms, now)
+    cfg = load_config(vault)
+    conv = conversations(vault, agents, now)
+    if discord:
+        conv = conv + discord_feed.fetch(vault, agents + [HUMAN], cfg.get("aliases"))
+    conv = [c for c in conv if c.get("from")]
+    conv.sort(key=lambda c: c.get("ts") or "")
     return {"generated": now.strftime("%Y-%m-%d %H:%M:%S"), "floors": FLOORS, "rooms": rooms,
-            "agents": agents, "conversations": conversations(vault, agents, now),
+            "agents": agents + [HUMAN], "conversations": conv[-60:],
             "working_window_min": WORKING_MIN}
