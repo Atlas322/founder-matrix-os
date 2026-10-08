@@ -48,8 +48,8 @@ class Ctx:
         self.data = self.vault / "_system" / "fm"
         self.data.mkdir(parents=True)
         self.reg = self.data / "registry.json"
-        sessions = sessions or {"sid-a": {"name": "PC-BYD", "group": "projects", "project": "byd",
-                                          "title": "BYD Website", "device": "PC"}}
+        sessions = sessions or {"sid-a": {"name": "PC-Acme", "group": "projects", "project": "acme",
+                                          "title": "Acme Website", "device": "PC"}}
         self.reg.write_text(json.dumps({"sessions": sessions}, ensure_ascii=False), encoding="utf-8")
         (self.data / "discord.json").write_text(json.dumps(
             {"guild": {"id": "G"}, "member": "Soyol", "owner_ids": [OWNER], "broadcast": "03-sys-admin"}), encoding="utf-8")
@@ -82,15 +82,15 @@ def sent(out):
 
 def t_send_file_and_stdin():
     c = Ctx()
-    body = "✅ BYD тайлан\n- мөр 1\n- мөр 2 \"quoted\"\n"
+    body = "✅ Acme тайлан\n- мөр 1\n- мөр 2 \"quoted\"\n"
     f = c.tmp / "report.md"; f.write_text(body, encoding="utf-8")
-    rc, out, err = c.py(SEND % json.dumps(["send", "08-byd-website", "--file", str(f), "--no-thread"]))
-    check(rc == 0 and sent(out) == ["08-byd-website", body], "send --file PATH: whole multi-line file is the message", (rc, out, err))
-    rc, out, err = c.py(SEND % json.dumps(["send", "08-byd-website", "-"]), stdin=body)
-    check(rc == 0 and sent(out) == ["08-byd-website", body], "send TO -: message read from stdin", (rc, out, err))
-    rc, out, err = c.py(SEND % json.dumps(["send", "08-byd-website", "сайн", "байна", "--no-thread"]))
-    check(rc == 0 and sent(out) == ["08-byd-website", "сайн байна"], "send TO words…: positional form unchanged", (rc, out, err))
-    rc, out, err = c.py(SEND % json.dumps(["send", "08-byd-website", "--file", str(c.tmp / "nope.md")]))
+    rc, out, err = c.py(SEND % json.dumps(["send", "08-acme-website", "--file", str(f), "--no-thread"]))
+    check(rc == 0 and sent(out) == ["08-acme-website", body], "send --file PATH: whole multi-line file is the message", (rc, out, err))
+    rc, out, err = c.py(SEND % json.dumps(["send", "08-acme-website", "-"]), stdin=body)
+    check(rc == 0 and sent(out) == ["08-acme-website", body], "send TO -: message read from stdin", (rc, out, err))
+    rc, out, err = c.py(SEND % json.dumps(["send", "08-acme-website", "сайн", "байна", "--no-thread"]))
+    check(rc == 0 and sent(out) == ["08-acme-website", "сайн байна"], "send TO words…: positional form unchanged", (rc, out, err))
+    rc, out, err = c.py(SEND % json.dumps(["send", "08-acme-website", "--file", str(c.tmp / "nope.md")]))
     check(rc == 1 and sent(out) is None and "Traceback" not in err and "nope.md" in (out + err),
           "send --file missing: one-line error, exit 1, nothing sent", (rc, out, err))
 
@@ -98,7 +98,7 @@ def t_send_file_and_stdin():
 def t_send_unknown_channel():
     c = Ctx()
     code = """
-    relay.dchannels = lambda st: {"01-area": "1", "02-developer": "2", "08-byd-website": "8"}
+    relay.dchannels = lambda st: {"01-area": "1", "02-developer": "2", "08-acme-website": "8"}
     relay.dapi = lambda *a, **k: (_ for _ in ()).throw(AssertionError("no network"))
     sys.argv = ["relay.py"] + %s
     relay.main()
@@ -119,8 +119,8 @@ def dapi(method, path, body=None):
         out = list(MSGS); MSGS.clear(); return out
     return list(MSGS)
 relay.dapi = dapi
-relay.dchannels = lambda st: {"08-byd-website": "C8", "03-sys-admin": "C3"}
-relay.chmap = lambda: {"sid-a": "08-byd-website"}
+relay.dchannels = lambda st: {"08-acme-website": "C8", "03-sys-admin": "C3"}
+relay.chmap = lambda: {"sid-a": "08-acme-website"}
 relay._threads = lambda ids: {}
 relay._channel_live = lambda ch, window=90: False
 n = [0]
@@ -178,7 +178,7 @@ runpy.run_path(script, run_name="__main__")
 
 def t_baton_concurrent_and_safe():
     n = 10
-    sessions = {f"sid-{i:02d}": {"name": f"W{i:02d}", "group": "projects", "project": "byd", "title": f"W{i:02d}", "device": "PC"}
+    sessions = {f"sid-{i:02d}": {"name": f"W{i:02d}", "group": "projects", "project": "acme", "title": f"W{i:02d}", "device": "PC"}
                 for i in range(n)}
     c = Ctx(sessions)
     go = c.tmp / "GO"; procs = []
@@ -194,7 +194,7 @@ def t_baton_concurrent_and_safe():
     time.sleep(1.5); go.write_text("go")
     res = [(p.wait(timeout=180), p.stderr.read()) for p in procs]
     check(all(r[0] == 0 for r in res), "baton: all concurrent hooks exit 0", res[:2])
-    f = c.data / "state" / "byd.md"
+    f = c.data / "state" / "acme.md"
     txt = f.read_text(encoding="utf-8") if f.exists() else ""
     missing = [i for i in range(n) if f"MARK-{i:02d}" not in txt.split("## ТҮҮХ")[-1]]
     check(not missing, f"baton: all {n} concurrent ТҮҮХ lines survive", f"missing {missing}")
