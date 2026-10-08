@@ -1,51 +1,90 @@
-/* Inai design tokens — Figma «Second Brain» файлын 🌐 Inai Website (03 Нүүр, 07 /products, 11 /about, 14 /second-brain)
-   фреймүүдээс plugin API-аар уншсан бодит утга (2026-10-09). Цаглабарын бүх модуль энэ файлыг ашиглана. */
+/* Цаглабар / Inai design tokens.
+   Эх сурвалж (Figma «Second Brain», plugin API-аар уншсан, 2026-10-09):
+   - Dark (үндсэн): 📅 Цаглабар → 13 Оффис · Барилга (402:24619), Шууд (389:21571), Business өрөө (389:22279), Ultra Planner v2 (291:1081)
+   - Light: 🌐 Inai Website → 03 Нүүр (149:5493), 07 /products (172:8727), 11 /about, 14 /second-brain
+   Цаглабарын бүх модуль зөвхөн семантик хувьсагч (--bg, --text …) ашиглана. */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Spectral:wght@400;500&display=swap");
 
 :root {
-  /* өнгө */
-  --inai-paper: #F0EDE4;        /* хуудасны дэвсгэр */
-  --inai-strip: #E2DED3;        /* толгой зурвас, сонгосон мөр */
-  --inai-stone: #CFC9BA;        /* гүн саарал гадаргуу */
-  --inai-ink: #080808;          /* гол текст, хүрээ */
-  --inai-body: #3D3D3A;         /* бие текст */
-  --inai-muted: #6B6860;        /* туслах текст */
-  --inai-blue: #1B5CFF;         /* Inai blue — товч, tag, идэвхтэй */
-  --inai-blue-deep: #0F47D6;    /* товчны «↗» хэсэг */
-  --inai-white: #FFFFFF;
-  --ink-85: rgba(8, 8, 8, .85);
-  --ink-55: rgba(8, 8, 8, .55);
-  --ink-20: rgba(8, 8, 8, .20);
-  --ink-15: rgba(8, 8, 8, .15);
-  --ink-10: rgba(8, 8, 8, .10);  /* үндсэн 1px хүрээ */
-  --ink-07: rgba(8, 8, 8, .07);  /* grid шугам, hover дэвсгэр */
-  --ok: #1F9D55;                 /* ✓ дууссан / ажиллаж буй */
-  --warn: #C2410C;
-  /* Key Activity (13 Оффис · Барилга фреймийн цэгүүд) */
-  --ka-brief: #F5A524;
-  --ka-beltgel: #22B8A0;
-  --ka-dizain: #EF5350;
-  --ka-hugjuulelt: #1B5CFF;
-  --ka-kontent: #8B6CF6;
+  /* ---- primitives: Inai light ---- */
+  --inai-paper: #F0EDE4; --inai-strip: #E2DED3; --inai-stone: #CFC9BA;
+  --inai-ink: #080808; --inai-body: #3D3D3A; --inai-muted: #6B6860;
+  --inai-blue: #1B5CFF; --inai-blue-deep: #0F47D6;
+  /* ---- primitives: Цаглабар dark ---- */
+  --dk-bg: #0A0C11;        /* апп дэвсгэр */
+  --dk-panel: #11141B;     /* самбар, nav */
+  --dk-card: #161A23;      /* карт, мөр, сегмент */
+  --dk-line: #232837;      /* хүрээ */
+  --dk-text: #E9EDF5;      /* үндсэн текст (16.9:1) */
+  --dk-text-2: #8790A3;    /* туслах текст (6.2:1 bg дээр) */
+  --dk-text-3: #5A6275;    /* зөвхөн чимэг/хүрээ — текстэд бүү ашигла (<4.5:1) */
+  --dk-teal: #2DD4BF;      /* идэвхтэй nav, цагийн тэмдэг */
+  --dk-green: #34D399;     /* ажиллаж буй / ✓ */
+  --dk-sky: #60A5FA;       /* яриа нум, цэнхэр текст (dark дээр) */
+  --dk-amber: #F5B544; --dk-red: #F87171; --dk-violet: #A78BFA;
+  --dk-warm: #14110D;      /* Барилгын vault самбар (дулаан хар) */
 
-  /* фонт */
-  --font-display: "Spectral", Georgia, serif;          /* Spectral Regular, ls −1…−2.5, гарчиг цэгээр төгсөнө */
+  /* ---- семантик: DARK (үндсэн) ---- */
+  color-scheme: dark;
+  --bg: var(--dk-bg);
+  --panel: var(--dk-panel);
+  --card: var(--dk-card);
+  --surface-warm: var(--dk-warm);
+  --line: var(--dk-line);
+  --line-strong: #2E3446;
+  --text: var(--dk-text);
+  --text-body: #C9CFDB;
+  --text-2: var(--dk-text-2);
+  --accent: var(--dk-teal);
+  --ok: var(--dk-green);
+  --link: var(--dk-sky);
+  --blue: var(--inai-blue);
+  --blue-deep: var(--inai-blue-deep);
+  --on-blue: #FFFFFF;
+  --warn: var(--dk-red);
+  --hover: rgba(233, 237, 245, .06);
+  --img-frame: rgba(233, 237, 245, .16);
+  --grain: #FFFFFF; --grain-op: .025;
+  --ka-brief: var(--dk-amber); --ka-beltgel: var(--dk-teal); --ka-dizain: var(--dk-red);
+  --ka-hugjuulelt: var(--dk-sky); --ka-kontent: var(--dk-violet);
+  --radius-card: 10px;     /* dark фреймүүд: 10 */
+  --radius-btn: 6px;
+
+  /* ---- фонт (Inai) ---- */
+  --font-display: "Spectral", Georgia, serif;
   --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --t-hero: 64px; --t-h1: 48px; --t-h2: 30px; --t-h3: 24px; --t-h4: 22px;
+  --t-body: 15px; --t-sm: 13px; --t-xs: 12px; --t-label: 11px; --t-micro: 10px;
+  --ls-display: -0.04em; --ls-label: 0.04em;
 
-  /* бичвэрийн хэмжээ (Figma text-ийн давтамжаар) */
-  --t-hero: 64px;  --t-h1: 48px;  --t-h2: 30px;  --t-h3: 24px;  --t-h4: 22px;
-  --t-body: 15px;  --t-sm: 13px;  --t-xs: 12px;  --t-label: 11px;  --t-micro: 10px;
-  --ls-display: -0.04em;      /* ≈ −1…−2.5px */
-  --ls-label: 0.04em;         /* Inter SemiBold 10–11, UPPERCASE, «[01] LABEL» */
-
-  /* хэлбэр */
-  --radius-btn: 6px;          /* товч, input (Figma radius 6) */
-  --radius-card: 0;           /* карт — дөрвөлжин */
-  --border: 1px solid var(--ink-10);
-  --border-strong: 1px solid var(--ink-20);
-  --border-blue: 1px solid var(--inai-blue);
+  /* ---- хэлбэр ---- */
+  --border: 1px solid var(--line);
+  --border-strong: 1px solid var(--line-strong);
+  --border-blue: 1px solid var(--blue);
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 48px;
-  --shell-nav: 76px;          /* зүүн nav (13 Оффис фрейм) */
-  --shell-top: 72px;          /* дээд мөр */
+  --shell-nav: 76px; --shell-top: 72px;
+}
+
+/* ---- семантик: LIGHT (Inai website) ---- */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: var(--inai-paper);
+  --panel: var(--inai-strip);
+  --card: #F7F5EF;
+  --surface-warm: var(--inai-paper);
+  --line: rgba(8, 8, 8, .10);
+  --line-strong: rgba(8, 8, 8, .20);
+  --text: var(--inai-ink);
+  --text-body: var(--inai-body);
+  --text-2: var(--inai-muted);
+  --accent: var(--inai-blue);
+  --ok: #1F7A45;
+  --link: var(--inai-blue-deep);   /* #1B5CFF paper дээр 4.46:1 → текстэд гүн цэнхэр (5.9:1) */
+  --warn: #C2410C;
+  --hover: rgba(8, 8, 8, .07);
+  --img-frame: rgba(8, 8, 8, .10);
+  --grain: #080808; --grain-op: .035;
+  --ka-brief: #D98E04; --ka-beltgel: #0F9F8A; --ka-dizain: #E04848; --ka-hugjuulelt: #1B5CFF; --ka-kontent: #7C5CE6;
+  --radius-card: 0;
 }

@@ -24,15 +24,15 @@ function imgKey(r) {
 }
 const imgUrl = key => `/assets/img/${H.rooms[key]?.img || key + ".webp"}`;
 // Inai tag: дөрвөлжин, 1px хүрээ, өнгөт цэг
-const tagHtml = (txt, col, cls = "") => `<span class="tag ${cls}" style="--c:${col || "var(--inai-muted)"}"><i></i>${esc(txt)}</span>`;
+const tagHtml = (txt, col, cls = "") => `<span class="tag ${cls}" style="--c:${col || "var(--text-2)"};--tagc:${col || "var(--text-2)"}"><i></i>${esc(txt)}</span>`;
 function chip(r) {
-  if (r.kind === "vault") return tagHtml("🔒 Сейф", "var(--inai-ink)");
+  if (r.kind === "vault") return tagHtml("🔒 Сейф", "var(--text)");
   if (r.kind === "workshop") return tagHtml(`${r.load} төсөл`, STAGE_COL[r.stage]);
   if (r.stage) return tagHtml(r.stage, STAGE_COL[r.stage]);
-  if (r.kind === "project") return tagHtml(r.status === "on-hold" ? "зогссон" : "шатгүй", "var(--inai-muted)");
-  if (r.kind === "archive") return tagHtml("хаагдсан", "var(--inai-muted)");
+  if (r.kind === "project") return tagHtml(r.status === "on-hold" ? "зогссон" : "шатгүй", "var(--text-2)");
+  if (r.kind === "archive") return tagHtml("хаагдсан", "var(--text-2)");
   if (r.kind === "library") return tagHtml("Номын сан", "var(--ka-beltgel)");
-  return tagHtml(STATUS[r.status] || r.status, "var(--inai-blue)");
+  return tagHtml(STATUS[r.status] || r.status, "var(--link)");
 }
 const convOf = ids => (S.conversations || []).filter(c => ids.has(c.from) || ids.has(c.to));
 const nameOf = (id, fb) => agentById(id)?.name || fb || "";
@@ -356,3 +356,12 @@ await poll();
 setInterval(poll, 30000);
 if (location.hash === "#office") setView("office");
 const m = location.hash.match(/^#room=(.+)$/); if (m) enterRoom(decodeURIComponent(m[1]));
+
+// ---------- өнгөний горим (dark үндсэн, light = Inai website) ----------
+function applyTheme(th) {
+  if (th === "light") document.documentElement.dataset.theme = "light"; else delete document.documentElement.dataset.theme;
+  $("themeBtn").textContent = th === "light" ? "☀ Light" : "☾ Dark";
+  try { localStorage.setItem("fm-theme", th); } catch (e) { /* хадгалж чадахгүй ч ажиллана */ }
+}
+applyTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
+$("themeBtn").onclick = () => applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
