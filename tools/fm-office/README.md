@@ -19,6 +19,7 @@ python server.py --vault "D:/My Drive/Second Brain 2.0" --port 5191
 | Архивын харанхуй өрөө | `99-Archive/Projects/*` |
 | Key Activity цехийн ачаалал | тухайн stage-тэй төслийн тоо |
 | Агент | `_system/fm/registry.json` → `sessions` |
+| slug → төслийн нэр, Research slug-ууд | `_system/fm/fm-office.json` (vault-д; загвар нь `fm-office.example.json`). Repo-д төсөл, харилцагчийн нэр бичихгүй |
 | last_seen / working | `_system/fm/state/<project>.md`-ийн `## ОДОО · <YYYY-MM-DD HH:MM> · <session name> (<PC/Mac>)` гарчиг |
 | Discord суваг | `_system/fm/channels.json` (+ `discord.json`-ийн guild id) |
 | Яриа | өнөөдрийн `_system/logs/<YYYY-MM-DD>.md`-ийн `- **HH:MM** · A → B: текст` мөр |
@@ -27,6 +28,14 @@ python server.py --vault "D:/My Drive/Second Brain 2.0" --port 5191
 Хязгаар: state файлыг зөвхөн `/fm:save`/hook бичдэг тул сешн нээлттэй ч хадгалаагүй бол «сул» харагдана;
 гарчиггүй сешн `last_seen = null` (тодорхойгүй). Бодит «одоо ажиллаж байна» дохио vault-д алга.
 Лог дахь нэрийг агенттай нэр/project/role-оор тааруулна; таараагүй бол дуудлага зөвхөн bubble болно.
+
+## Харагдац
+
+- Ачаалахад Projects давхарт төвлөрнө; «Бүгд» бүх барилгыг дэлгэцэнд багтаана.
+- Projects: stage → нэрээр эрэмбэлсэн 2–3 мөрийн grid; stage-гүй эсвэл on-hold/someday төсөл нь
+  жижиг саарал «Шатгүй / Зогссон» бүлэгт (дээд мөрийн товчоор нууна).
+- Өрөө/агентын шошго зөвхөн hover, сонголт эсвэл ойртуулсан үед; давхцвал нуугдана
+  (эрэмбэ: сонгосон > ажиллаж буй агент > өрөө). Давхрын нэр үргэлж харагдана.
 
 ## Нууцлал
 
