@@ -22,7 +22,8 @@ python server.py --vault "D:/My Drive/Second Brain 2.0" --port 5191
 | slug → төслийн нэр, Research slug-ууд | `_system/fm/fm-office.json` (vault-д; загвар нь `fm-office.example.json`). Repo-д төсөл, харилцагчийн нэр бичихгүй |
 | last_seen / working | `_system/fm/state/<project>.md`-ийн `## ОДОО · <YYYY-MM-DD HH:MM> · <session name> (<PC/Mac>)` гарчиг |
 | Discord суваг | `_system/fm/channels.json` (+ `discord.json`-ийн guild id) |
-| Яриа | өнөөдрийн `_system/logs/<YYYY-MM-DD>.md`-ийн `- **HH:MM** · A → B: текст` мөр |
+| Яриа (1) | relay Discord: `channels.json`-ийн сешн сувгууд + #gtd + идэвхтэй thread-ууд, сүүлийн 24 цаг, ≤50, 60 с cache (арын thread-ээр). Token (`~/.fmos_discord_token`) зөвхөн сервер талд (`discord_feed.py`) |
+| Яриа (2) | өнөөдрийн `_system/logs/<YYYY-MM-DD>.md`-ийн `- **HH:MM** · A → B: текст` мөр |
 
 **working** = тухайн сешний нэр (ба төхөөрөмж) таарсан `ОДОО` гарчиг сүүлийн 20 минутад шинэчлэгдсэн.
 Хязгаар: state файлыг зөвхөн `/fm:save`/hook бичдэг тул сешн нээлттэй ч хадгалаагүй бол «сул» харагдана;
@@ -37,11 +38,19 @@ python server.py --vault "D:/My Drive/Second Brain 2.0" --port 5191
 - Өрөө/агентын шошго зөвхөн hover, сонголт эсвэл ойртуулсан үед; давхцвал нуугдана
   (эрэмбэ: сонгосон > ажиллаж буй агент > өрөө). Давхрын нэр үргэлж харагдана.
 
+## Discord мессежийг задлах
+
+- Зохиогч: footer `-# 🖥️ PC · 🏛️ Architect` / `🍎 Mac · 📥 GTD`, хуучин prefix `🖥️ [Name · PC]`; footer-гүй бот → сувгийн эзэн (тэр төхөөрөмжийн).
+  Хүн (bot биш, эсвэл «bd») → itge.e (Төв оффисын урд ширээнд).
+- Хүлээн авагч: `→ PC (Architect)`, `→ Mac @mac`, `for pc`, `@architect`; хаяггүй бол itge.e → сувгийн эзэн, агент өөрийн сувагт → itge.e.
+- Төрөл: `🙋` авлаа, `✅` дууслаа (ногоон pulse), `itge.e`, бусад `Discord`. Текст ≤80 тэмдэгт; түүхий JSON browser руу явахгүй.
+
 ## Нууцлал
 
 - `04-Areas/Business/finances/private/`-ийг огт нээхгүй.
 - `private: true` төсөл/сешн, нэр/group/role-д finance/санхүү/personal/home агуулсан сешн алгасна.
 - Санхүү, private гэсэн лог мөрийг яриа болгохгүй.
+- Discord: business / personal / 💰 / finance / санхүү сувгийг уншихгүй; агентын жагсаалтад байхгүй (private) сешний мессежийг алгасна.
 - Business давхарын «Санхүүгийн сан» — зөвхөн түгжээтэй сейф, тоо байхгүй.
 
 ## Demo ба бодит
