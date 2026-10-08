@@ -43,9 +43,15 @@ def strip_md(s):
     return re.sub(r"\s+", " ", s).strip()
 
 
+DEV_TAIL = re.compile(r"\s*\((?:PC|Mac)\)\s*$", re.I)
+
+
 def match_agent(label, agents, device=None, aliases=None):
-    """Нэр/гарчиг/дүр/project-оор агент олно; device өгвөл тэрийг илүүд үзнэ."""
-    n = norm(label)
+    """Нэр/гарчиг/дүр/project/хуучин нэр (keys)-ээр агент олно; «Name (PC)» → device; device өгвөл тэрийг илүүд үзнэ."""
+    dm = re.search(r"\((PC|Mac)\)\s*$", str(label or ""), re.I)
+    if dm and not device:
+        device = DEV.get(dm.group(1).lower())
+    n = norm(DEV_TAIL.sub("", str(label or "")))
     if not n:
         return None
     alias = norm((aliases or {}).get(label.strip().lower(), ""))
@@ -53,7 +59,8 @@ def match_agent(label, agents, device=None, aliases=None):
     for a in agents:
         if a.get("human"):
             continue
-        keys = {norm(a["name"]), norm(a["title"]), norm(a.get("role")), norm(a["project"])}
+        keys = {norm(a["name"]), norm(a["title"]), norm(a.get("role")), norm(a["project"])} | set(a.get("keys") or ())
+        keys |= {norm(DEV_TAIL.sub("", k)) for k in (a["name"], a["title"])}
         keys.discard("")
         if n in keys or (alias and alias in keys) or any(len(n) >= 4 and (n in k or k in n) for k in keys if len(k) >= 4):
             cands.append(a)
@@ -61,6 +68,15 @@ def match_agent(label, agents, device=None, aliases=None):
         dc = [a for a in cands if a.get("device_name") == device]
         cands = dc or cands
     return cands[0]["id"] if cands else None
+
+
+def local_time(iso):
+    """Discord-ийн UTC ISO → машины локал цагийн бүс (UB = UTC+8) дахь aware datetime."""
+    try:
+        d = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+    return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).astimezone()
 
 
 def parse_message(m, channel_name, owners, agents, aliases=None, human_names=("bd", "itge.e", "itgee")):
@@ -133,11 +149,9 @@ def parse_message(m, channel_name, owners, agents, aliases=None, human_names=("b
     typ = "🙋" if t.startswith("🙋") else "✅" if t.startswith("✅") else "itge.e" if src == HUMAN_ID else "Discord"
     if len(text) > TEXT_MAX:
         text = text[:TEXT_MAX - 1].rstrip() + "…"
-    try:
-        ts = datetime.fromisoformat(m["timestamp"]).astimezone().strftime("%Y-%m-%d %H:%M:%S")
-    except (KeyError, ValueError, TypeError):
-        ts = ""
-    return {"id": str(m.get("id", "")), "ts": ts, "from": src, "to": dst,
+    loc = local_time(m.get("timestamp"))
+    return {"id": str(m.get("id", "")), "ts": loc.strftime("%Y-%m-%d %H:%M:%S") if loc else "",
+            "hhmm": loc.strftime("%H:%M") if loc else "", "iso": loc.isoformat() if loc else "", "from": src, "to": dst,
             "type": typ, "text": text, "channel": (channel_name or "").removeprefix(BUSY)}
 
 
@@ -192,7 +206,7 @@ def _refresh(vault, agents, aliases, now):
                     watch[t["id"]] = watch[t["parent_id"]]
         except Exception:
             pass
-        since = (now or datetime.now(timezone.utc)) - timedelta(hours=WINDOW_H)
+        since = (now or datetime.now().astimezone()) - timedelta(hours=WINDOW_H)  # локал tz, aware
         out = []
         for cid, (cname, owners) in watch.items():
             try:
@@ -201,9 +215,9 @@ def _refresh(vault, agents, aliases, now):
                 continue
             for m in msgs:
                 try:
-                    if datetime.fromisoformat(m["timestamp"]) < since:
+                    if local_time(m["timestamp"]) < since:
                         continue
-                except (KeyError, ValueError):
+                except (KeyError, ValueError, TypeError):
                     continue
                 ev = parse_message(m, cname, owners, agents, aliases)
                 if ev:

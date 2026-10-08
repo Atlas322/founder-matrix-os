@@ -13,6 +13,7 @@ Finance/санхүүгийн сешн, Personal/Home сешнийг алгасн
 """
 import json, re
 import discord_feed
+from names import Names, norm as _nnorm, clean as _clean
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -188,22 +189,40 @@ def build_agents(vault, rooms, now=None):
     seen = last_seen_map(vault)
     cfg = load_config(vault)
     proj_rooms = [r for r in rooms if r["kind"] == "project"]
-    agents = []
+    room_name = {r["id"]: r["project"] for r in rooms}
+    nm = Names(vault, cfg)
+    merged = {}  # (одоогийн нэр, төхөөрөмж) → агент — хуучин нэртэй давхар сешнийг нэгтгэнэ
     for sid, v in (reg.get("sessions") or {}).items():
         if not isinstance(v, dict) or _skip_session(v):
             continue
-        name = v.get("name") or v.get("title") or sid[:8]
+        old = v.get("name") or v.get("title") or sid[:8]
         proj = str(v.get("project", ""))
         dev = v.get("device", "")
-        ts = seen.get((proj, name, dev)) or seen.get((proj, name, ""))
-        state = "working" if ts and timedelta(0) <= now - ts < timedelta(minutes=WORKING_MIN) else "idle"
-        agents.append({
-            "id": sid[:8], "name": name, "title": v.get("title") or "", "role": v.get("role") or v.get("group"),
-            "project": proj, "room": room_for(v, proj_rooms, cfg),
-            "device": "🍎" if dev == "Mac" else "🖥️", "device_name": dev,
-            "state": state, "last_seen": ts.strftime("%Y-%m-%d %H:%M") if ts else None,
-            "channel": chans.get(proj), "guild": guild,
-        })
+        ts = seen.get((proj, old, dev)) or seen.get((proj, old, ""))
+        room = room_for(v, proj_rooms, cfg)
+        name = nm.display(v, room_name.get(room) if room.startswith("p:") else None)
+        keys = {_nnorm(x) for x in (name, _clean(name), old, _clean(old), v.get("title"), _clean(v.get("title")),
+                                    v.get("old_title"), _clean(v.get("old_title")), v.get("role"), proj) if x}
+        keys |= {k for k, title in nm.alias.items() if title == name}
+        keys.discard("")
+        a = merged.get((name, dev))
+        if a:
+            a["keys"] |= keys
+            a["merged"] += 1
+            if ts and (not a["_ts"] or ts > a["_ts"]):
+                a["_ts"] = ts
+            continue
+        merged[(name, dev)] = {
+            "id": sid[:8], "name": name, "title": name, "role": v.get("role") or v.get("group"),
+            "project": proj, "room": room, "device": "🍎" if dev == "Mac" else "🖥️", "device_name": dev,
+            "_ts": ts, "channel": chans.get(proj), "guild": guild, "keys": keys, "merged": 1,
+        }
+    agents = []
+    for a in merged.values():
+        ts = a.pop("_ts")
+        a["state"] = "working" if ts and timedelta(0) <= now - ts < timedelta(minutes=WORKING_MIN) else "idle"
+        a["last_seen"] = ts.strftime("%Y-%m-%d %H:%M") if ts else None
+        agents.append(a)
     return agents
 
 
@@ -217,13 +236,7 @@ def conversations(vault, agents, now=None, limit=12):
         return []
 
     def match(label):
-        n = _norm(label)
-        if not n:
-            return None
-        for a in agents:
-            if n in (_norm(a["name"]), _norm(a["project"]), _norm(a["role"] or "")) or _norm(a["title"]).endswith(n):
-                return a["id"]
-        return None
+        return discord_feed.match_agent(label, agents)
 
     out = []
     for line in f.read_text(encoding="utf-8", errors="ignore").splitlines():
@@ -257,6 +270,7 @@ def build_state(vault, now=None, discord=True):
         conv = conv + discord_feed.fetch(vault, agents + [HUMAN], cfg.get("aliases"))
     conv = [c for c in conv if c.get("from")]
     conv.sort(key=lambda c: c.get("ts") or "")
+    public = [{k: v for k, v in a.items() if k != "keys"} for a in agents]
     return {"generated": now.strftime("%Y-%m-%d %H:%M:%S"), "floors": FLOORS, "rooms": rooms,
-            "agents": agents + [HUMAN], "conversations": conv[-60:],
+            "agents": public + [HUMAN], "conversations": conv[-60:],
             "working_window_min": WORKING_MIN}

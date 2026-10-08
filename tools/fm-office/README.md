@@ -38,6 +38,15 @@ python server.py --vault "D:/My Drive/Second Brain 2.0" --port 5191
 - Өрөө/агентын шошго зөвхөн hover, сонголт эсвэл ойртуулсан үед; давхцвал нуугдана
   (эрэмбэ: сонгосон > ажиллаж буй агент > өрөө). Давхрын нэр үргэлж харагдана.
 
+## Нэр ба цаг
+
+- Харуулах нэр = одоогийн дүрийн бүтэц: `plugins/fm/sidebar.json` (role → «🏛️ Architect», «📥 GTD» …),
+  дүрийн note-уудын `aliases:` (`_system/fm/agents/`, fallback `04-Areas/AI Team/ai-workers/`), vault-ийн
+  `fm-office.json` → `names` (хуучин → шинэ). Ижил нэр + төхөөрөмжтэй сешнүүд нэг агент болно; PC/Mac нь badge.
+  Хуучин нэрс (footer, хаяглалт)-ийг сервер талын `keys`-ээр тааруулна, client руу явуулахгүй.
+- Discord-ийн UTC цагийг машины tz (UB = UTC+8) руу `astimezone()`-оор хөрвүүлнэ: `ts`, `hhmm`, `iso` (offset-той);
+  24 цагийн цонх ч локал. Логийн мөр аль хэдийн локал тул шилжүүлэхгүй.
+
 ## Discord мессежийг задлах
 
 - Зохиогч: footer `-# 🖥️ PC · 🏛️ Architect` / `🍎 Mac · 📥 GTD`, хуучин prefix `🖥️ [Name · PC]`; footer-гүй бот → сувгийн эзэн (тэр төхөөрөмжийн).

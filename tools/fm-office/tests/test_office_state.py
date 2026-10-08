@@ -29,10 +29,14 @@ class OfficeStateTest(unittest.TestCase):
             "cccccccc-3": {"name": "💰 Санхүү (PC)", "group": "areas", "project": "finance", "device": "PC", "private": True},
             "dddddddd-4": {"name": "Finance · Business", "group": "finance", "project": "finance", "device": "PC"},
             "eeeeeeee-5": {"name": "Mac-Home", "group": "areas", "project": "area", "device": "Mac", "private": True},
-            "ffffffff-6": {"name": "Mac-Gold", "group": "resources", "project": "gold", "device": "Mac"},
+            "ffffffff-6": {"name": "Mac-Gold", "group": "resources", "project": "gold", "device": "Mac", "role": "research", "title": "Research · Gold"},
+            "11111111-7": {"name": "Tool Developer (PC)", "group": "development", "project": "developer", "device": "PC", "role": "developer"},
+            "22222222-8": {"name": "PC-Old-Dev", "group": "development", "project": "developer", "device": "PC", "title": "Old Dev"},
+            "33333333-9": {"name": "PC-Dispatcher", "group": "tasks", "project": "area", "device": "PC"},
         }, "roles": {}}
         w(v / "_system/fm/registry.json", json.dumps(reg, ensure_ascii=False))
-        w(v / "_system/fm/fm-office.json", json.dumps({"aliases": {"proj-a": "Project A"}, "research": ["gold"]}))
+        w(v / "_system/fm/fm-office.json", json.dumps({"aliases": {"proj-a": "Project A"}, "research": ["gold"],
+                                                         "names": {"old dev": "🏛️ Architect", "dispatcher": "📥 GTD"}}))
         w(v / "_system/fm/channels.json", json.dumps({"proj-a": "project-a"}))
         w(v / "_system/fm/state/proj-a.md", "# proj-a\n\n## ОДОО · 2026-10-09 10:00 · Mac-A (Mac)\nтекст\n")
         w(v / "_system/logs/2026-10-09.md",
@@ -62,20 +66,25 @@ class OfficeStateTest(unittest.TestCase):
         self.assertEqual(ws["Контент"], 0)
 
     def test_agents_private_filtered_and_working(self):
-        ag = {a["name"]: a for a in self.state["agents"] if not a.get("human")}
-        self.assertEqual(set(ag), {"Mac-A", "A (PC)", "Mac-Gold"})
-        self.assertEqual(ag["Mac-A"]["state"], "working")
-        self.assertEqual(ag["Mac-A"]["device"], "🍎")
-        self.assertEqual(ag["Mac-A"]["room"], "p:Project A")
-        self.assertEqual(ag["Mac-A"]["channel"], "project-a")
-        self.assertEqual(ag["A (PC)"]["state"], "idle")
-        self.assertIsNone(ag["A (PC)"]["last_seen"])
-        self.assertEqual(ag["Mac-Gold"]["room"], "research")
+        ag = {(a["name"], a["device_name"]): a for a in self.state["agents"] if not a.get("human")}
+        self.assertEqual(set(ag), {("📁 Project A", "Mac"), ("📁 Project A", "PC"), ("🔍 Research · Gold", "Mac"),
+                                   ("🏛️ Architect", "PC"), ("📥 GTD", "PC")})
+        a = ag[("📁 Project A", "Mac")]
+        self.assertEqual(a["state"], "working")
+        self.assertEqual(a["device"], "🍎")
+        self.assertEqual(a["room"], "p:Project A")
+        self.assertEqual(a["channel"], "project-a")
+        self.assertEqual(ag[("📁 Project A", "PC")]["state"], "idle")
+        self.assertIsNone(ag[("📁 Project A", "PC")]["last_seen"])
+        self.assertEqual(ag[("🔍 Research · Gold", "Mac")]["room"], "research")
+        self.assertEqual(ag[("🏛️ Architect", "PC")]["merged"], 2)  # «Tool Developer (PC)» + «Old Dev» → нэг
+        self.assertNotIn("keys", a)  # сервер талын тааруулах түлхүүр client руу явахгүй
 
     def test_conversations_and_no_private_leak(self):
         conv = self.state["conversations"]
         self.assertEqual(len(conv), 1)
         self.assertEqual(conv[0]["from"], "aaaaaaaa")
+        self.assertTrue(conv[0]["ts"].startswith("2026-10-09 09:55"))  # лог аль хэдийн локал — шилжүүлэхгүй
         self.assertEqual(conv[0]["to"], "ffffffff")
         dump = json.dumps(self.state, ensure_ascii=False)
         self.assertNotIn("999999", dump)
