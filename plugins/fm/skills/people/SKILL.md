@@ -9,7 +9,7 @@ argument-hint: "[<Нэр>] [new | touch | hot | follow-up]"
 Хүн бүр нэг note: `04-Areas/people/<Бүтэн нэр>.md` (`type: person`). Энэ бол vault-ийн CRM - HubSpot г.м. гадны CRM skill энд бичихгүй.
 
 - Vault: `${user_config.vault_path}` (доор `<V>`). Дүрэм: `<V>/_system/BOOT.md`.
-- Загвар: `<V>/_system/templates/Person.md`. Харагдац: `<V>/_system/bases/People.base` (Бүгд · Hot · Холбогдох · Баг).
+- Загвар: `<V>/_system/templates/Person.md`. Харагдац: `<V>/04-Areas/people/People.base` (Бүгд · Hot · Холбогдох · Баг).
 - Эзэн дүр: **Area**. Бусад дүр (Project, Creative…) өөрийн ажлын явцад хүний note-д харилцааны мөр нэмж болно.
 
 ## Frontmatter
@@ -40,7 +40,7 @@ aliases: ["Бат", "Batbold"]   # товч нэр, латин бичлэг - х
 
 «<Нэр>-тэй уулзсан / ярьсан / мессеж бичсэн»:
 1. `last_interaction:`-ийг өнөөдөр (`date +%F`) болго, `updated:`-ийг шинэчил.
-2. `## Харилцаа` хэсэгт мөр нэм: `- YYYY-MM-DD · <уулзалт|утас|чат|имэйл> - <нэг мөр> · [[холбогдох атом/task/meeting]]`. Агуулга урт бол атом (`/fm:save`) эсвэл meeting note (`02-GTD/meetings/`) болгоод энд холбоос л.
+2. `## Харилцаа` хэсэгт мөр нэм: `- YYYY-MM-DD · <уулзалт|утас|чат|имэйл> - <нэг мөр> · [[холбогдох атом/task/meeting]]`. Агуулга урт бол атом (`/fm:save`) эсвэл meeting note (`00-GTD/Events/`) болгоод энд холбоос л.
 3. Шинэ амлалт, дараагийн алхам гарсан бол `/fm:task`-аар task (owner, project) үүсгэ; хэзээ дахин холбогдох нь тодорхой бол `follow_up_date:`.
 4. Хүн одоо идэвхтэй ажилтай холбоотой бол `hot: true` болгох эсэхийг асуу.
 
