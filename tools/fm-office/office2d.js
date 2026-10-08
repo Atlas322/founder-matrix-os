@@ -1,7 +1,13 @@
 // FM Office 2.5D — батлагдсан зурагтай барилга / өрөө / оффис. /api/state-ийг (3D-тэй ижил) ашиглана.
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const STAGE_COL = { "Brief": "#c8892f", "Бэлтгэл": "#8a6d3b", "Дизайн": "#b5462b", "Хөгжүүлэлт": "#1B5CFF", "Контент": "#2e9b55" };
+const STAGE_COL = { "Brief": "var(--ka-brief)", "Бэлтгэл": "var(--ka-beltgel)", "Дизайн": "var(--ka-dizain)", "Хөгжүүлэлт": "var(--ka-hugjuulelt)", "Контент": "var(--ka-kontent)" };
+const FLOOR_NUM = { projects: "03", areas: "04", resources: "05", business: "B", archive: "99" };
+const FLOOR_NAME = { projects: "Projects", areas: "Areas", resources: "Resources", business: "Business", archive: "Archive" };
+const VIEW_TXT = {
+  building: ["Оффис · Барилга.", "Vault = барилга · давхар = PARA · төсөл бүр өөрийн өрөө · тохижилт = шат"],
+  office: ["Оффис.", "Агент бүр нэг ширээ · өрөө = vault-ийн хавтас · шууд төлөв"],
+};
 const STATUS = { active: "идэвхтэй", planning: "төлөвлөж буй", "on-hold": "түр зогссон", someday: "хэзээ нэгэн цагт", archived: "архив", workshop: "Key Activity цех", locked: "түгжээтэй", area: "хүрээ", resource: "лавлагаа" };
 const TYPE_ICON = { "✅": "✅", "🙋": "🙋", "itge.e": "🙂", "Discord": "💬", "send_message": "📨" };
 const FLOOR_SUB = { projects: "Төсөл бүр = өрөө · дотор нь одоогийн шат", areas: "Key Activity цех · ачаалал", resources: "Wiki · Research", business: "Сейф · түгжээтэй", archive: "Дууссан төслүүд" };
@@ -17,39 +23,66 @@ function imgKey(r) {
   return H.kind_image[r.kind] || H.kind_image.none;
 }
 const imgUrl = key => `/assets/img/${H.rooms[key]?.img || key + ".webp"}`;
+// Inai tag: дөрвөлжин, 1px хүрээ, өнгөт цэг
+const tagHtml = (txt, col, cls = "") => `<span class="tag ${cls}" style="--c:${col || "var(--inai-muted)"}"><i></i>${esc(txt)}</span>`;
 function chip(r) {
-  if (r.kind === "vault") return `<span class="chip" style="background:#1d1a16">🔒 түгжээтэй</span>`;
-  if (r.kind === "workshop") return `<span class="chip" style="background:${STAGE_COL[r.stage]}">${r.load} төсөл</span>`;
-  if (r.stage) return `<span class="chip" style="background:${STAGE_COL[r.stage]}">${esc(r.stage)}</span>`;
-  if (r.kind === "project") return `<span class="chip" style="background:#8a8378">шатгүй</span>`;
-  return `<span class="chip" style="background:#6f6556">${esc(STATUS[r.status] || r.status)}</span>`;
+  if (r.kind === "vault") return tagHtml("🔒 Сейф", "var(--inai-ink)");
+  if (r.kind === "workshop") return tagHtml(`${r.load} төсөл`, STAGE_COL[r.stage]);
+  if (r.stage) return tagHtml(r.stage, STAGE_COL[r.stage]);
+  if (r.kind === "project") return tagHtml(r.status === "on-hold" ? "зогссон" : "шатгүй", "var(--inai-muted)");
+  if (r.kind === "archive") return tagHtml("хаагдсан", "var(--inai-muted)");
+  if (r.kind === "library") return tagHtml("Номын сан", "var(--ka-beltgel)");
+  return tagHtml(STATUS[r.status] || r.status, "var(--inai-blue)");
 }
 const convOf = ids => (S.conversations || []).filter(c => ids.has(c.from) || ids.has(c.to));
 const nameOf = (id, fb) => agentById(id)?.name || fb || "";
 
-// ---------- Барилга ----------
+// ---------- Барилга (13 Оффис · Барилга фрейм) ----------
 function tile(r) {
-  const ags = agentsIn(r.id);
+  const ags = agentsIn(r.id).filter(a => !a.human);
   const cls = ["tile", r.kind === "archive" ? "dark" : (r.kind === "project" && (!r.stage || r.parked)) ? "grey" : "", r.parked ? "small" : ""].join(" ");
   return `<div class="${cls}" tabindex="0" role="button" data-room="${esc(r.id)}" aria-label="${esc(r.project)}">
-    <div class="im" style="background-image:url('${imgUrl(imgKey(r))}')"></div>
-    ${r.kind === "vault" ? '<div class="lock">🔒</div>' : ""}
-    <div class="dots">${ags.filter(a => !a.human).slice(0, 6).map(a => `<span class="dot ${a.state === "working" ? "w" : ""}" title="${esc(a.device)} ${esc(a.name)}"></span>`).join("")}</div>
-    <div class="cap"><div class="nm">${esc(r.kind === "workshop" ? "⚙️ " + r.project : r.project)}</div>${chip(r)}</div></div>`;
+    <div class="im" style="background-image:url('${imgUrl(imgKey(r))}')">${chip(r)}
+      ${r.kind === "vault" ? '<div class="lock">🔒</div>' : ""}
+      <div class="dots">${ags.slice(0, 6).map(a => `<span class="dot ${a.state === "working" ? "w" : ""}" title="${esc(a.name)} ${esc(a.device_name)}"></span>`).join("")}</div></div>
+    <div class="nm">${esc(r.kind === "workshop" ? r.project : r.project)}</div></div>`;
 }
 function renderBuilding() {
-  const html = S.floors.map(f => {
+  const floors = S.floors.map(f => {
     const rooms = S.rooms.filter(r => r.floor === f.id);
     const main = rooms.filter(r => !r.parked), parked = rooms.filter(r => r.parked);
-    return `<div class="floor ${f.id}"><div><h2>${esc(f.label)}</h2><div class="sub">${esc(FLOOR_SUB[f.id] || "")}</div></div>
+    return `<div class="floor ${f.id}"><div class="fl"><div class="label"><b>${FLOOR_NUM[f.id] || ""}</b>${esc(FLOOR_NAME[f.id] || f.label)}</div><p>${esc(FLOOR_SUB[f.id] || "")}</p></div>
       <div class="tiles">${main.map(tile).join("")}
-      ${parked.length && showParked ? `<div class="group">Шатгүй / Зогссон · ${parked.length}</div>${parked.map(tile).join("")}` : ""}</div></div>`;
+      ${parked.length && showParked ? `<div class="group label mute">Шатгүй / Зогссон · ${parked.length}</div>${parked.map(tile).join("")}` : ""}</div></div>`;
   }).join("");
-  $("building").innerHTML = html;
+  $("building").innerHTML = `<div class="panel"><div class="strip"><span class="label">▲ Vault · <b>Second Brain 2.0</b></span><span class="label mute">${S.rooms.filter(r => r.kind === "project").length} төсөл</span></div>${floors}</div>`;
   $("building").querySelectorAll("[data-room]").forEach(el => {
     el.onclick = () => enterRoom(el.dataset.room);
     el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); enterRoom(el.dataset.room); } };
   });
+}
+// баруун хүрээ: Барилга = удирдлагын самбар, Шууд = одоо ажиллаж буй
+function renderRail() {
+  if (!S) return;
+  if (view === "building") {
+    const ws = S.rooms.filter(r => r.kind === "workshop");
+    $("railPanel").innerHTML = `<div class="strip"><span class="label">Цаглабар = <b>удирдлагын самбар</b></span></div><div class="body">
+      <ul class="arrows"><li>Өрөө = төсөл. Өрөөний дотор тал = төслийн одоогийн шат (Key Activity).</li>
+      <li>Шат солигдоход өрөөний тохижилт солигдоно (Цаглабараас).</li>
+      <li>04 Areas давхарт 5 цех: тэнд хэдэн төсөл байгаа = ачаалал.</li>
+      <li>Шат frontmatter-ийн <span class="mono">stage:</span>-ээс уншина.</li>
+      <li>Хаагдсан төсөл 99 Archive руу бууж харанхуй болно.</li></ul>
+      <div class="label" style="margin-top:14px">Key Activity</div>
+      <ul class="legend">${ws.map(w => `<li style="--c:${STAGE_COL[w.stage]}"><i></i>${esc(w.stage)} <span>· ${w.load}</span></li>`).join("")}</ul>
+      <div class="note">🔒 Хувийн санхүү барилгад байхгүй</div></div>`;
+  } else {
+    const ag = S.agents.filter(a => !a.human).slice().sort((a, b) => (b.state === "working") - (a.state === "working") || String(b.last_seen || "").localeCompare(String(a.last_seen || "")));
+    $("railPanel").innerHTML = `<div class="strip"><span class="label">Одоо <b>ажиллаж байна</b></span><span class="label mute">${ag.filter(a => a.state === "working").length}/${ag.length}</span></div><div class="body"><ul class="who">${ag.slice(0, 9).map(a => {
+      const r = roomById(a.room);
+      return `<li data-room="${esc(a.room)}"><span class="st ${a.state === "working" ? "w" : ""}"></span><span><b>${esc(a.name)}</b> <span class="badge">${esc(a.device_name)}</span><small>${esc(r?.project || "")}${r?.stage ? " · " + esc(r.stage) : ""}</small></span><span class="t">${esc(a.last_seen ? a.last_seen.slice(5) : "—")}</span></li>`;
+    }).join("")}</ul></div>`;
+    $("railPanel").querySelectorAll("[data-room]").forEach(li => li.onclick = () => enterRoom(li.dataset.room));
+  }
 }
 
 // ---------- Өрөө (дашбоард: шат · task · сешн удирдлага · яриа · холбоос) ----------
@@ -65,7 +98,8 @@ async function enterRoom(id) {
   try { const res = await fetch("/api/room?id=" + encodeURIComponent(id), { cache: "no-store" }); if (res.ok && openRoom === id) { roomInfo = await res.json(); renderRoom(); } }
   catch (e) { /* дашбоард хоосон үлдэнэ */ }
 }
-function sec(title, body, cls = "") { return `<section class="card ${cls}"><h3>${title}</h3>${body}</section>`; }
+let secN = 0;
+function sec(title, body, cls = "", extra = "") { secN++; return `<section class="card ${cls}"><div class="strip"><span class="label"><b>[0${secN}]</b>&nbsp; ${title}</span><span class="label mute">${extra}</span></div><div class="body">${body}</div></section>`; }
 function renderRoom() {
   const r = roomById(openRoom); if (!r) return closeRoom();
   const scene = $("scene");
@@ -83,7 +117,8 @@ function renderRoom() {
     scene.appendChild(m);
   });
   const I = roomInfo;
-  $("rtitle").innerHTML = `<h2>${esc(r.kind === "workshop" ? "⚙️ " + r.project : r.project)}</h2>${chip(r)}
+  const fl = S.floors.find(f => f.id === r.floor);
+  $("rtitle").innerHTML = `<div class="label">[${FLOOR_NUM[r.floor] || ""}] ${esc(fl?.label || "")} · Өрөө</div><h2>${esc(r.project)}.</h2>${chip(r)}
     <div class="meta"><span>Төлөв: <b>${esc(STATUS[r.status] || r.status)}</b></span>${I?.due ? `<span>Дуусах: <b>${esc(I.due)}</b></span>` : ""}
     <span>Агент: <b>${ags.filter(a => !a.human).length}</b> · ажиллаж <b>${ags.filter(a => a.state === "working" && !a.human).length}</b></span>
     ${I?.tasks ? `<span>Нээлттэй task: <b>${I.tasks.open}</b> · энэ 7 хоногт дууссан <b>${I.tasks.done_week}</b></span>` : ""}</div>`;
@@ -91,19 +126,19 @@ function renderRoom() {
   const conv = convOf(ids).slice(-12);
   roomBubbles = conv.slice(-3);
   const convHtml = conv.length ? `<ul class="conv">${conv.slice().reverse().map(c => `<li class="${c.type === "✅" ? "ok" : ""}"><span class="t">${esc(hhmm(c))}${c.channel ? " · #" + esc(c.channel) : ""}</span><b>${TYPE_ICON[c.type] || "💬"} ${esc(nameOf(c.from, c.from_label))}${c.to ? " → " + esc(nameOf(c.to, c.to_label)) : ""}</b><span>${esc(c.text)}</span></li>`).join("")}</ul>` : '<p class="mute">Сүүлийн 24 цагт яриа алга.</p>';
-  let html = "";
+  let html = ""; secN = 0;
   if (!I) html = '<p class="mute">Ачаалж байна…</p>';
   else if (r.kind === "project") {
     const cur = I.stages.indexOf(r.stage);
-    html += sec("Шат", `<ol class="steps">${I.stages.map((s, i) => `<li class="${i === cur ? "cur" : i < cur ? "past" : ""}" style="--c:${STAGE_COL[s]}"><span>${i + 1}</span>${esc(s)}</li>`).join("")}</ol>
+    html += sec("Шат · Key Activity", `<ol class="steps">${I.stages.map((s, i) => `<li class="${i === cur ? "cur" : i < cur ? "past" : ""}" style="--c:${STAGE_COL[s]}"><span>0${i + 1}</span><i></i>${esc(s)}</li>`).join("")}</ol>
       ${cur < 0 ? '<p class="mute">Шат тодорхойгүй — төслийн note-д <code>stage:</code> тавина уу.</p>' : ""}
-      ${I.milestones.length ? `<ul class="ms">${I.milestones.map(m => `<li class="${m.done ? "done" : ""}">${m.done ? "✔" : "○"} ${esc(m.label)} <span class="mute">${esc(m.date || "")}</span></li>`).join("")}</ul>` : '<p class="mute">Milestone алга.</p>'}`, "wide");
-    html += sec(`Task-ууд <span class="mute">· ${I.tasks.open} нээлттэй · 7 хоногт ✔ ${I.tasks.done_week}</span>`, taskGroups(I.tasks));
+      ${I.milestones.length ? `<div class="label" style="margin-bottom:4px">Milestone</div><ul class="ms">${I.milestones.map(m => `<li class="${m.done ? "done" : ""}"><span class="ck">${m.done ? "✓" : ""}</span><span class="lb">${esc(m.label)}</span> <span class="mute mono">${esc(m.date || "")}</span></li>`).join("")}</ul>` : '<p class="mute">Milestone алга.</p>'}`, "wide");
+    html += sec("Task-ууд", taskGroups(I.tasks), "", `${I.tasks.open} нээлттэй · 7 хоногт ✓ ${I.tasks.done_week}`);
     html += sec("Сешнүүд", sessionsHtml(I));
     html += sec("Сүүлийн яриа", convHtml);
-    html += sec("Холбоос", I.links.length ? `<ul class="links">${I.links.map(l => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a></li>`).join("")}</ul>` : '<p class="mute">Холбоос алга.</p>');
+    html += sec("Холбоос", I.links.length ? `<ul class="links">${I.links.map(l => `<li><a class="ghost" href="${esc(l.url)}" target="_blank" rel="noopener"><span>${esc(l.label)}</span><i>↗</i></a></li>`).join("")}</ul>` : '<p class="mute">Холбоос алга.</p>');
   } else if (r.kind === "workshop") {
-    html += sec(`Энэ шатанд буй төслүүд · ${I.projects.length}`, I.projects.length ? `<ul class="wp">${I.projects.map(p => `<li><a href="#" data-go="${esc(p.id)}">${esc(p.project)}</a> <span class="mute">${esc(STATUS[p.status] || p.status)}</span>
+    html += sec(`Энэ шатанд буй төслүүд`, I.projects.length ? `<ul class="wp">${I.projects.map(p => `<li><a href="#" data-go="${esc(p.id)}">${esc(p.project)}</a> <span class="mute">${esc(STATUS[p.status] || p.status)}</span>
       <div class="tsum">${["next-action", "waiting", "inbox", "someday"].map(g => `<span>${GROUP_LBL[g]}: <b>${p.tasks.groups[g].length}</b></span>`).join("")}<span>7 хоногт ✔ <b>${p.tasks.done_week}</b></span></div></li>`).join("")}</ul>` : '<p class="mute">Энэ шатанд төсөл алга.</p>', "wide");
     html += sec("Сүүлийн яриа", convHtml);
   } else {
@@ -118,16 +153,16 @@ function renderRoom() {
 function taskGroups(t) {
   const gs = ["next-action", "waiting", "inbox", "someday"].filter(g => t.groups[g].length);
   if (!gs.length) return '<p class="mute">Нээлттэй task алга.</p>';
-  return gs.map(g => `<h4>${GROUP_LBL[g]} · ${t.groups[g].length}</h4><ul class="tasks">${t.groups[g].map(x => `<li><span class="pr">${esc(x.priority || "·")}</span><span class="tt">${esc(x.title)}</span>
+  return gs.map(g => `<h4 class="label">${GROUP_LBL[g]} <span class="mute mono">· ${t.groups[g].length}</span></h4><ul class="tasks">${t.groups[g].map(x => `<li><span class="pr">${esc(x.priority || "·")}</span><span class="tt">${esc(x.title)}</span>
     <span class="mute">${x.due ? "⏰ " + esc(x.due) : ""}${x.owner ? " · " + esc(x.owner) : ""}</span></li>`).join("")}</ul>`).join("");
 }
 function sessionsHtml(I) {
   if (!I.sessions.length) return '<p class="mute">Энэ төсөлд холбогдсон сешн алга.</p>';
   return I.sessions.map(s => `<div class="srow" data-id="${esc(s.id)}">
-    <div class="sh"><span class="st ${s.state === "working" ? "w" : ""}"></span><b>${esc(s.name)}</b><span class="badge">${esc(s.device)} ${esc(s.device_name)}</span>
+    <div class="sh"><span class="st ${s.state === "working" ? "w" : ""}"></span><b>${esc(s.name)}</b><span class="badge">${esc(s.device_name)}</span>${s.state === "working" ? '<span class="tag ok">✓ ажиллаж</span>' : ""}
       <span class="mute">${s.state === "working" ? "ажиллаж" : "сул"} · ${esc(s.last_seen || "тодорхойгүй")}${s.bound ? "" : " · дүрийн сешн"}</span></div>
     ${s.baton ? `<div class="bt">${s.baton.stopped ? `<p><b>Хаана зогссон:</b> ${esc(s.baton.stopped)}</p>` : ""}${s.baton.next ? `<p><b>Дараагийн алхам:</b> ${esc(s.baton.next)}</p>` : ""}<p class="mute">baton · ${esc(s.baton.ts)} · ${esc(s.baton.by)}</p></div>` : '<p class="mute">Baton алга.</p>'}
-    <div class="acts">${s.channel ? `<a class="btn" href="https://discord.com/channels/${esc(S.agents.find(a => a.guild)?.guild || "@me")}" target="_blank" rel="noopener">Discord руу →</a>` : ""}
+    <div class="acts">${s.channel ? `<a class="cta" href="https://discord.com/channels/${esc(S.agents.find(a => a.guild)?.guild || "@me")}" target="_blank" rel="noopener"><span>Discord руу</span><i>↗</i></a>` : ""}
       ${s.channel && I.send_channels.includes(s.channel) ? `<button data-act="message" data-ch="${esc(s.channel)}" data-id="${esc(s.id)}">Мессеж илгээх</button>` : ""}
       <button data-act="wake" data-ch="gtd" data-id="${esc(s.id)}">Сэрээх</button></div>
     <div class="sendbox" hidden></div></div>`).join("");
@@ -256,6 +291,7 @@ function enqueue(list) {
 function renderFeed() {
   const items = [...(S.conversations || [])].reverse().slice(0, 40);
   $("feedEmpty").style.display = items.length ? "none" : "block";
+  $("feedCount").textContent = items.length ? `${(S.conversations || []).length} · 24 цаг` : "";
   $("feedList").innerHTML = items.map((c, i) => `<li data-i="${i}" class="${c.type === "✅" ? "ok" : ""}"><span class="t">${esc(hhmm(c))}${c.channel ? " · #" + esc(c.channel) : ""}</span>
     <b>${TYPE_ICON[c.type] || "💬"} ${esc(nameOf(c.from, c.from_label))}${c.to ? " → " + esc(nameOf(c.to, c.to_label)) : ""}</b><span class="x">${esc(c.text)}</span></li>`).join("");
   $("feedList").querySelectorAll("li").forEach(li => li.onclick = () => focusConv(items[+li.dataset.i]));
@@ -291,6 +327,8 @@ function setView(v) {
   view = v;
   document.querySelectorAll("header [data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   $("building").classList.toggle("show", v === "building"); $("office").classList.toggle("show", v === "office");
+  $("vTitle").textContent = VIEW_TXT[v][0]; $("vSub").textContent = VIEW_TXT[v][1];
+  renderRail();
   if (!location.hash.startsWith("#room")) history.replaceState(null, "", location.pathname + (v === "office" ? "#office" : ""));
 }
 document.querySelectorAll("header [data-v]").forEach(b => b.onclick = () => { closeRoom(); setView(b.dataset.v); });
@@ -310,7 +348,7 @@ async function poll() {
     if (!r.ok) throw new Error("HTTP " + r.status);
     S = await r.json();
     const ns = JSON.stringify([S.rooms, S.agents.map(a => [a.id, a.room, a.state, a.name])]);
-    if (ns !== sig) { sig = ns; renderBuilding(); renderOffice(); if (openRoom) renderRoom(); }
+    if (ns !== sig) { sig = ns; renderBuilding(); renderOffice(); renderRail(); if (openRoom) renderRoom(); }
     enqueue(S.conversations || []); renderFeed(); counts(); $("err").textContent = "";
   } catch (e) { $("err").textContent = "Өгөгдөл татаж чадсангүй: " + e.message; }
 }
