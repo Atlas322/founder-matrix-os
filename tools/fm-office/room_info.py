@@ -1,6 +1,6 @@
 """FM Office — нэг өрөөний (төслийн) дашбоард: шат, milestone, task, сешний baton, холбоос. Зөвхөн уншина.
 
-Task: 00-GTD/Tasks/*.md (fallback 02-GTD/tasks/), frontmatter `type: task`, `project: [[…/<Name>/<Name>]]`.
+Task: 01-GTD/Tasks/*.md (fallback 02-GTD/tasks/), frontmatter `type: task`, `project: [[…/<Name>/<Name>]]`.
 Baton: _system/fm/state/<slug>.md-ийн «## ОДОО» хэсэг.
 Нууцлал: төслийн frontmatter-оос зөвхөн цагаан жагсаалтын талбар (finance гэх мэт хэзээ ч биш).
 """
@@ -8,7 +8,7 @@ import re, urllib.parse
 from datetime import datetime, timedelta
 from pathlib import Path
 
-TASK_DIRS = ["00-GTD/Tasks", "02-GTD/tasks"]
+TASK_DIRS = ["01-GTD/Tasks", "00-GTD/Tasks", "02-GTD/tasks"]  # шинэ, одоогийн, хуучин
 OPEN = ["next-action", "waiting", "inbox", "someday"]
 DONE = {"completed", "done"}
 ACTIVITIES = ["Brief", "Бэлтгэл", "Дизайн", "Хөгжүүлэлт", "Контент"]
@@ -121,10 +121,11 @@ def baton(vault, slug):
 
 
 def project_note(vault, name):
-    for d in ("1-Active", "2-Planning", "3-On-hold"):
-        p = Path(vault) / "03-Projects" / d / name / f"{name}.md"
-        if p.is_file():
-            return p
+    for root in ("02-Projects", "03-Projects"):  # шинэ, одоогийн layout
+        for d in ("1-Active", "2-Planning", "3-On-hold"):
+            p = Path(vault) / root / d / name / f"{name}.md"
+            if p.is_file():
+                return p
     return None
 
 

@@ -11,25 +11,25 @@ def w(p, t):
     p.write_text(t, encoding="utf-8")
 
 
-TASK = '---\ntype: task\nstatus: {st}\npriority: 🔴\ndue: {due}\nowner: "bd"\nproject: "[[03-Projects/1-Active/Project A/Project A]]"\nupdated: {upd}\n---\n# {title}\n'
+TASK = '---\ntype: task\nstatus: {st}\npriority: 🔴\ndue: {due}\nowner: "bd"\nproject: "[[02-Projects/1-Active/Project A/Project A]]"\nupdated: {upd}\n---\n# {title}\n'
 
 
 class TaskBatonTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         v = self.v = Path(self.tmp.name)
-        w(v / "00-GTD/Tasks/a.md", TASK.format(st="next-action", due="2026-10-10", upd="2026-10-01", title="Шинэ бүтцийн task"))
-        w(v / "00-GTD/Tasks/b.md", TASK.format(st="waiting", due="", upd="2026-10-01", title="Хүлээж буй"))
-        w(v / "00-GTD/Tasks/c.md", TASK.format(st="completed", due="", upd="2026-10-08", title="Дууссан"))
-        w(v / "00-GTD/Tasks/d.md", TASK.format(st="next-action", due="", upd="", title="Өөр төсөл").replace("Project A/Project A", "Project B/Project B"))
+        w(v / "01-GTD/Tasks/a.md", TASK.format(st="next-action", due="2026-10-10", upd="2026-10-01", title="Шинэ бүтцийн task"))
+        w(v / "01-GTD/Tasks/b.md", TASK.format(st="waiting", due="", upd="2026-10-01", title="Хүлээж буй"))
+        w(v / "01-GTD/Tasks/c.md", TASK.format(st="completed", due="", upd="2026-10-08", title="Дууссан"))
+        w(v / "01-GTD/Tasks/d.md", TASK.format(st="next-action", due="", upd="", title="Өөр төсөл").replace("Project A/Project A", "Project B/Project B"))
         w(v / "02-GTD/tasks/legacy.md", TASK.format(st="someday", due="", upd="", title="Хуучин замын task"))
         w(v / "_system/fm/state/proj-a.md",
           "# proj-a\n\n## ОДОО · 2026-10-09 10:00 · Mac-A (Mac)\n**Дараагийн алхам (Mac-A, 10-09):** deploy хийх\n"
           "**itge.e-ийн сүүлийн хүсэлт:** нууц хүсэлт\n\n**Хаана зогссон (сүүлийн хариу):**\nHeader засагдсан.\n\n## ТҮҮХ\n- x\n")
-        w(v / "03-Projects/1-Active/Project A/Project A.md",
+        w(v / "02-Projects/1-Active/Project A/Project A.md",
           '---\nstatus: active\nstage: "[[x/activities/Дизайн]]"\ndue: 2026-12-01\nfigma: https://figma.com/file/x\n'
           'finance:\n  - amount: 999999\nmilestones:\n  - label: MVP\n    date: 2026-11-01\n    done: false\n  - label: Kickoff\n    date: 2026-09-01\n    done: true\n---\n')
-        (v / "03-Projects/1-Active/Project A/_BRAIN.md").write_text("x", encoding="utf-8")
+        (v / "02-Projects/1-Active/Project A/_BRAIN.md").write_text("x", encoding="utf-8")
 
     def tearDown(self):
         self.tmp.cleanup()

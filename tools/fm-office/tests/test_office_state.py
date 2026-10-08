@@ -15,14 +15,14 @@ class OfficeStateTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         v = self.v = Path(self.tmp.name)
-        w(v / "03-Projects/1-Active/Project A/Project A.md",
-          '---\ntype: project\nstatus: active\nstage: "[[04-Areas/Business/activities/Хөгжүүлэлт]]"\n---\n# A\n')
-        w(v / "03-Projects/2-Planning/Project B/Project B.md",
-          '---\nstatus: planning\nstage: "[[04-Areas/Business/activities/Brief]]"\n---\n')
-        w(v / "03-Projects/1-Active/Secret/Secret.md", "---\nstatus: active\nprivate: true\n---\n")
-        w(v / "03-Projects/3-On-hold/Lab/Lab.md", "---\nstatus: on-hold\n---\n")
+        w(v / "02-Projects/1-Active/Project A/Project A.md",
+          '---\ntype: project\nstatus: active\nstage: "[[03-Areas/Business/activities/Хөгжүүлэлт]]"\n---\n# A\n')
+        w(v / "02-Projects/2-Planning/Project B/Project B.md",
+          '---\nstatus: planning\nstage: "[[03-Areas/Business/activities/Brief]]"\n---\n')
+        w(v / "02-Projects/1-Active/Secret/Secret.md", "---\nstatus: active\nprivate: true\n---\n")
+        w(v / "02-Projects/3-On-hold/Lab/Lab.md", "---\nstatus: on-hold\n---\n")
         (v / "99-Archive/Projects/Old One").mkdir(parents=True)
-        w(v / "04-Areas/Business/finances/private/secret.md", "SHOULD NEVER APPEAR 999999")
+        w(v / "03-Areas/Business/finances/private/secret.md", "SHOULD NEVER APPEAR 999999")
         reg = {"sessions": {
             "aaaaaaaa-1": {"name": "Mac-A", "group": "projects", "project": "proj-a", "device": "Mac", "role": "project"},
             "bbbbbbbb-2": {"name": "A (PC)", "group": "projects", "project": "proj-a", "device": "PC", "role": "project"},

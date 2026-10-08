@@ -11,7 +11,7 @@
     (ажиллаж = ногоон гэрэл, сул = бүдэг), өрөөний яриа bubble, хажуугийн карт. Esc / «Буцах».
   - **Оффис**: тойм зураг + бүсийн шошго + агентын цэг + SVG нум/bubble, «Яриа» самбар.
   - **Өрөө = дашбоард** (`GET /api/room?id=`): жижиг зураг + агентын цэг, нэр/шат/төлөв/due; Шат (5 Key Activity stepper +
-    `milestones`), Task-ууд (`00-GTD/Tasks/`, fallback `02-GTD/tasks/`, `project:` холбоосоор; статусаар бүлэг, 7 хоногт дууссан),
+    `milestones`), Task-ууд (`01-GTD/Tasks/`, fallback `02-GTD/tasks/`, `project:` холбоосоор; статусаар бүлэг, 7 хоногт дууссан),
     Сешнүүд (baton: хаана зогссон / дараагийн алхам; Discord, Мессеж илгээх, Сэрээх), Сүүлийн яриа, Холбоос (obsidian://, _BRAIN, figma/repo/url).
     Цех → тухайн шатны төслүүд + task-ын товч. Номын сан/Сейф → жижиг карт.
 - **Илгээх** (`POST /api/send`, `sender.py`): `{room, kind: message|wake, channel, target, text, confirm: true}`.
@@ -35,7 +35,7 @@ python server.py --vault "D:/My Drive/Second Brain 2.0" --port 5191
 
 | Юу | Хаанаас |
 |---|---|
-| Төслийн өрөө, status, stage | `03-Projects/{1-Active,2-Planning,3-On-hold}/<Name>/<Name>.md` frontmatter `status`, `stage: "[[…/activities/<Activity>]]"` |
+| Төслийн өрөө, status, stage | `02-Projects/{1-Active,2-Planning,3-On-hold}/<Name>/<Name>.md` frontmatter `status`, `stage: "[[…/activities/<Activity>]]"` |
 | Архивын харанхуй өрөө | `99-Archive/Projects/*` |
 | Key Activity цехийн ачаалал | тухайн stage-тэй төслийн тоо |
 | Агент | `_system/fm/registry.json` → `sessions` |
@@ -61,7 +61,7 @@ python server.py --vault "D:/My Drive/Second Brain 2.0" --port 5191
 ## Нэр ба цаг
 
 - Харуулах нэр = одоогийн дүрийн бүтэц: `plugins/fm/sidebar.json` (role → «🏛️ Architect», «📥 GTD» …),
-  дүрийн note-уудын `aliases:` (`_system/fm/agents/`, fallback `04-Areas/AI Team/ai-workers/`), vault-ийн
+  дүрийн note-уудын `aliases:` (`_system/fm/agents/`, fallback `03-Areas/AI Team/ai-workers/`), vault-ийн
   `fm-office.json` → `names` (хуучин → шинэ). Ижил нэр + төхөөрөмжтэй сешнүүд нэг агент болно; PC/Mac нь badge.
   Хуучин нэрс (footer, хаяглалт)-ийг сервер талын `keys`-ээр тааруулна, client руу явуулахгүй.
 - Discord-ийн UTC цагийг машины tz (UB = UTC+8) руу `astimezone()`-оор хөрвүүлнэ: `ts`, `hhmm`, `iso` (offset-той);
@@ -76,7 +76,7 @@ python server.py --vault "D:/My Drive/Second Brain 2.0" --port 5191
 
 ## Нууцлал
 
-- `04-Areas/Business/finances/private/`-ийг огт нээхгүй.
+- `03-Areas/Business/finances/private/`-ийг огт нээхгүй.
 - `private: true` төсөл/сешн, нэр/group/role-д finance/санхүү/personal/home агуулсан сешн алгасна.
 - Санхүү, private гэсэн лог мөрийг яриа болгохгүй.
 - Discord: business / personal / 💰 / finance / санхүү сувгийг уншихгүй; агентын жагсаалтад байхгүй (private) сешний мессежийг алгасна.
