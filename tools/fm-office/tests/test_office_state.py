@@ -17,7 +17,7 @@ class OfficeStateTest(unittest.TestCase):
         v = self.v = Path(self.tmp.name)
         w(v / "02-Projects/1-Active/Project A/Project A.md",
           '---\ntype: project\nstatus: active\nstage: "[[03-Areas/Business/activities/Хөгжүүлэлт]]"\n---\n# A\n')
-        w(v / "02-Projects/2-Planning/Project B/Project B.md",
+        w(v / "02-Projects/Project B/Project B.md",  # flat (layout 2026-10-09); бусад нь хуучин дэд хавтас
           '---\nstatus: planning\nstage: "[[03-Areas/Business/activities/Brief]]"\n---\n')
         w(v / "02-Projects/1-Active/Secret/Secret.md", "---\nstatus: active\nprivate: true\n---\n")
         w(v / "02-Projects/3-On-hold/Lab/Lab.md", "---\nstatus: on-hold\n---\n")
