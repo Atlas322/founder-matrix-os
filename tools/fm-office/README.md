@@ -10,6 +10,16 @@
   - **Өрөө** (tile дээр дарах): том зураг + parallax, агентын тэмдэг `assets/hotspots.json`-ийн ширээний цэгүүд дээр
     (ажиллаж = ногоон гэрэл, сул = бүдэг), өрөөний яриа bubble, хажуугийн карт. Esc / «Буцах».
   - **Оффис**: тойм зураг + бүсийн шошго + агентын цэг + SVG нум/bubble, «Яриа» самбар.
+  - **Өрөө = дашбоард** (`GET /api/room?id=`): жижиг зураг + агентын цэг, нэр/шат/төлөв/due; Шат (5 Key Activity stepper +
+    `milestones`), Task-ууд (`00-GTD/Tasks/`, fallback `02-GTD/tasks/`, `project:` холбоосоор; статусаар бүлэг, 7 хоногт дууссан),
+    Сешнүүд (baton: хаана зогссон / дараагийн алхам; Discord, Мессеж илгээх, Сэрээх), Сүүлийн яриа, Холбоос (obsidian://, _BRAIN, figma/repo/url).
+    Цех → тухайн шатны төслүүд + task-ын товч. Номын сан/Сейф → жижиг карт.
+- **Илгээх** (`POST /api/send`, `sender.py`): `{room, kind: message|wake, channel, target, text, confirm: true}`.
+  Сервер шалгана: confirm заавал, текст 1–1500, суваг = тухайн өрөөний төслийн суваг эсвэл `gtd` (finance/private хориотой),
+  Origin = localhost, 10 с-д 1 / цагт 20. Relay-тэй ижил Discord API-аар (token `~/.fmos_discord_token` зөвхөн сервер)
+  `<текст>
+-# 🖥️ PC · FM Office` гэж бичнэ. «Сэрээх» = `#gtd`-д `→ <сешн> @pc|@mac: <текст>` (dispatcher сэрээнэ).
+  UI: «Илгээх…» → «Баталгаажуул: #суваг руу илгээх» гэсэн 2 дахь товшилт.
 - `/3d` — хуучин Three.js хувилбар (`index.html` + `main.js`).
 - `assets/hotspots.json` — зураг бүрийн ширээний цэг, оффисын бүс (%), нэргүй. Тест: `tests/test_hotspots.py`.
 

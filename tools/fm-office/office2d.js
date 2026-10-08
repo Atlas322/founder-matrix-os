@@ -52,15 +52,20 @@ function renderBuilding() {
   });
 }
 
-// ---------- Өрөө ----------
-function enterRoom(id) {
+// ---------- Өрөө (дашбоард: шат · task · сешн удирдлага · яриа · холбоос) ----------
+let roomInfo = null;
+const GROUP_LBL = { "next-action": "Дараагийн алхам", waiting: "Хүлээж буй", inbox: "Inbox", someday: "Хэзээ нэгэн цагт" };
+async function enterRoom(id) {
   const r = roomById(id); if (!r) return;
   openRoom = id; location.hash = "room=" + encodeURIComponent(id);
   $("roomImg").src = imgUrl(imgKey(r));
   $("roomImg").style.filter = r.kind === "archive" ? "grayscale(1) brightness(.5)" : (r.kind === "project" && !r.stage) ? "grayscale(1)" : "";
-  $("room").classList.add("show");
-  renderRoom();
+  $("room").classList.add("show"); $("room").scrollTop = 0;
+  roomInfo = null; renderRoom();
+  try { const res = await fetch("/api/room?id=" + encodeURIComponent(id), { cache: "no-store" }); if (res.ok && openRoom === id) { roomInfo = await res.json(); renderRoom(); } }
+  catch (e) { /* дашбоард хоосон үлдэнэ */ }
 }
+function sec(title, body, cls = "") { return `<section class="card ${cls}"><h3>${title}</h3>${body}</section>`; }
 function renderRoom() {
   const r = roomById(openRoom); if (!r) return closeRoom();
   const scene = $("scene");
@@ -69,49 +74,100 @@ function renderRoom() {
   const ags = agentsIn(r.id);
   ags.forEach((a, i) => {
     const [x, y] = desks[i % desks.length];
-    const off = Math.floor(i / desks.length) * 3;
     const m = document.createElement("div");
     m.className = "mk " + (a.human ? "human w" : a.state === "working" ? "w" : "i");
-    m.style.left = x + off + "%"; m.style.top = y + off + "%"; m.dataset.agent = a.id;
-    m.innerHTML = `<span class="av">${a.human ? "🙂" : ""}</span><span class="tag">${esc(a.name)} ${esc(a.device_name ? a.device : "")}</span>`;
-    m.title = a.last_seen ? "Сүүлд: " + a.last_seen : "";
-    m.onclick = () => agentSide(a);
+    m.style.left = x + "%"; m.style.top = y + "%"; m.dataset.agent = a.id;
+    m.innerHTML = `<span class="av">${a.human ? "🙂" : ""}</span>`;
+    m.title = `${a.name} ${a.device_name || ""}${a.last_seen ? " · " + a.last_seen : ""}`;
+    m.onclick = () => document.querySelector(`.srow[data-id="${CSS.escape(a.id)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     scene.appendChild(m);
   });
+  const I = roomInfo;
+  $("rtitle").innerHTML = `<h2>${esc(r.kind === "workshop" ? "⚙️ " + r.project : r.project)}</h2>${chip(r)}
+    <div class="meta"><span>Төлөв: <b>${esc(STATUS[r.status] || r.status)}</b></span>${I?.due ? `<span>Дуусах: <b>${esc(I.due)}</b></span>` : ""}
+    <span>Агент: <b>${ags.filter(a => !a.human).length}</b> · ажиллаж <b>${ags.filter(a => a.state === "working" && !a.human).length}</b></span>
+    ${I?.tasks ? `<span>Нээлттэй task: <b>${I.tasks.open}</b> · энэ 7 хоногт дууссан <b>${I.tasks.done_week}</b></span>` : ""}</div>`;
   const ids = new Set(ags.map(a => a.id));
-  const conv = convOf(ids).slice(-6);
-  const work = r.kind === "workshop" ? S.rooms.filter(x => x.kind === "project" && x.stage === r.stage) : [];
-  const disc = ags.find(a => a.channel);
-  $("side").innerHTML = `<h2>${esc(r.project)}</h2>${chip(r)}
-    <dl><dt>Шат</dt><dd>${esc(r.stage || "—")}</dd><dt>Төлөв</dt><dd>${esc(STATUS[r.status] || r.status)}</dd>
-    <dt>Агент</dt><dd>${ags.filter(a => !a.human).length} (${ags.filter(a => a.state === "working" && !a.human).length} ажиллаж)</dd></dl>
-    ${r.kind === "vault" ? "<p>🔒 Санхүүгийн өгөгдөл энд харагдахгүй.</p>" : ""}
-    ${work.length ? `<h3>Энэ шатанд</h3><ul>${work.map(x => `<li>${esc(x.project)}</li>`).join("")}</ul>` : ""}
-    ${ags.length ? `<h3>Агентууд</h3><ul>${ags.map(a => `<li>${esc(a.device_name ? a.device : "🙂")} ${esc(a.name)} — ${a.human ? "itge.e" : a.state === "working" ? "ажиллаж" : "сул"}${a.last_seen ? ` <span style="color:var(--mute)">· ${esc(a.last_seen.slice(5))}</span>` : ""}</li>`).join("")}</ul>` : ""}
-    <h3>Сүүлийн яриа</h3>${conv.length ? `<ul>${conv.slice().reverse().map(c => `<li><b>${TYPE_ICON[c.type] || "💬"} ${esc(nameOf(c.from, c.from_label))}${c.to ? " → " + esc(nameOf(c.to, c.to_label)) : ""}</b><br>${esc(c.text)} <span style="color:var(--mute)">${esc(hhmm(c))}</span></li>`).join("")}</ul>` : '<p style="color:var(--mute)">Яриа алга.</p>'}
-    ${disc ? `<p><a href="https://discord.com/channels/${esc(disc.guild || "@me")}" target="_blank" rel="noopener">Discord руу → #${esc(disc.channel)}</a></p>` : ""}`;
-  // өрөөний яриаг bubble-ээр
+  const conv = convOf(ids).slice(-12);
   roomBubbles = conv.slice(-3);
+  const convHtml = conv.length ? `<ul class="conv">${conv.slice().reverse().map(c => `<li class="${c.type === "✅" ? "ok" : ""}"><span class="t">${esc(hhmm(c))}${c.channel ? " · #" + esc(c.channel) : ""}</span><b>${TYPE_ICON[c.type] || "💬"} ${esc(nameOf(c.from, c.from_label))}${c.to ? " → " + esc(nameOf(c.to, c.to_label)) : ""}</b><span>${esc(c.text)}</span></li>`).join("")}</ul>` : '<p class="mute">Сүүлийн 24 цагт яриа алга.</p>';
+  let html = "";
+  if (!I) html = '<p class="mute">Ачаалж байна…</p>';
+  else if (r.kind === "project") {
+    const cur = I.stages.indexOf(r.stage);
+    html += sec("Шат", `<ol class="steps">${I.stages.map((s, i) => `<li class="${i === cur ? "cur" : i < cur ? "past" : ""}" style="--c:${STAGE_COL[s]}"><span>${i + 1}</span>${esc(s)}</li>`).join("")}</ol>
+      ${cur < 0 ? '<p class="mute">Шат тодорхойгүй — төслийн note-д <code>stage:</code> тавина уу.</p>' : ""}
+      ${I.milestones.length ? `<ul class="ms">${I.milestones.map(m => `<li class="${m.done ? "done" : ""}">${m.done ? "✔" : "○"} ${esc(m.label)} <span class="mute">${esc(m.date || "")}</span></li>`).join("")}</ul>` : '<p class="mute">Milestone алга.</p>'}`, "wide");
+    html += sec(`Task-ууд <span class="mute">· ${I.tasks.open} нээлттэй · 7 хоногт ✔ ${I.tasks.done_week}</span>`, taskGroups(I.tasks));
+    html += sec("Сешнүүд", sessionsHtml(I));
+    html += sec("Сүүлийн яриа", convHtml);
+    html += sec("Холбоос", I.links.length ? `<ul class="links">${I.links.map(l => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a></li>`).join("")}</ul>` : '<p class="mute">Холбоос алга.</p>');
+  } else if (r.kind === "workshop") {
+    html += sec(`Энэ шатанд буй төслүүд · ${I.projects.length}`, I.projects.length ? `<ul class="wp">${I.projects.map(p => `<li><a href="#" data-go="${esc(p.id)}">${esc(p.project)}</a> <span class="mute">${esc(STATUS[p.status] || p.status)}</span>
+      <div class="tsum">${["next-action", "waiting", "inbox", "someday"].map(g => `<span>${GROUP_LBL[g]}: <b>${p.tasks.groups[g].length}</b></span>`).join("")}<span>7 хоногт ✔ <b>${p.tasks.done_week}</b></span></div></li>`).join("")}</ul>` : '<p class="mute">Энэ шатанд төсөл алга.</p>', "wide");
+    html += sec("Сүүлийн яриа", convHtml);
+  } else {
+    const msg = r.kind === "vault" ? "🔒 Санхүүгийн өгөгдөл энд харагдахгүй." : r.kind === "library" ? "📚 Wiki, Research — лавлагаа, судалгааны сешнүүд." : r.kind === "archive" ? "🗄 Дууссан төсөл." : "🏢 Дүрийн сешнүүд (GTD, Architect, Creative, Portfolio).";
+    html += sec("Мэдээлэл", `<p>${msg}</p><ul>${ags.map(a => `<li>${esc(a.device_name ? a.device : "🙂")} ${esc(a.name)} — ${a.human ? "itge.e" : a.state === "working" ? "ажиллаж" : "сул"}</li>`).join("")}</ul>`);
+    if (r.kind !== "vault") html += sec("Сүүлийн яриа", convHtml);
+  }
+  $("dash").innerHTML = html;
+  $("dash").querySelectorAll("[data-go]").forEach(a => a.onclick = e => { e.preventDefault(); enterRoom(a.dataset.go); });
+  $("dash").querySelectorAll("[data-act]").forEach(b => b.onclick = () => openSend(b));
 }
-function agentSide(a) {
-  const r = roomById(a.room);
-  $("side").innerHTML = `<h2>${esc(a.device_name ? a.device : "🙂")} ${esc(a.name)}</h2>
-    <dl><dt>Дүр</dt><dd>${esc(a.role || "—")}</dd><dt>Өрөө</dt><dd>${esc(r?.project || "—")}</dd><dt>Шат</dt><dd>${esc(r?.stage || "—")}</dd>
-    <dt>Төхөөрөмж</dt><dd>${esc(a.device_name || "—")}</dd><dt>Төлөв</dt><dd>${a.state === "working" ? "ажиллаж байна" : "сул"}</dd>
-    <dt>Сүүлд</dt><dd>${esc(a.last_seen || "тодорхойгүй")}</dd></dl>
-    ${a.channel ? `<p><a href="https://discord.com/channels/${esc(a.guild || "@me")}" target="_blank" rel="noopener">Discord руу → #${esc(a.channel)}</a></p>` : ""}
-    <p><button id="sideBack">← Өрөөний мэдээлэл</button></p>`;
-  $("sideBack").onclick = renderRoom;
+function taskGroups(t) {
+  const gs = ["next-action", "waiting", "inbox", "someday"].filter(g => t.groups[g].length);
+  if (!gs.length) return '<p class="mute">Нээлттэй task алга.</p>';
+  return gs.map(g => `<h4>${GROUP_LBL[g]} · ${t.groups[g].length}</h4><ul class="tasks">${t.groups[g].map(x => `<li><span class="pr">${esc(x.priority || "·")}</span><span class="tt">${esc(x.title)}</span>
+    <span class="mute">${x.due ? "⏰ " + esc(x.due) : ""}${x.owner ? " · " + esc(x.owner) : ""}</span></li>`).join("")}</ul>`).join("");
+}
+function sessionsHtml(I) {
+  if (!I.sessions.length) return '<p class="mute">Энэ төсөлд холбогдсон сешн алга.</p>';
+  return I.sessions.map(s => `<div class="srow" data-id="${esc(s.id)}">
+    <div class="sh"><span class="st ${s.state === "working" ? "w" : ""}"></span><b>${esc(s.name)}</b><span class="badge">${esc(s.device)} ${esc(s.device_name)}</span>
+      <span class="mute">${s.state === "working" ? "ажиллаж" : "сул"} · ${esc(s.last_seen || "тодорхойгүй")}${s.bound ? "" : " · дүрийн сешн"}</span></div>
+    ${s.baton ? `<div class="bt">${s.baton.stopped ? `<p><b>Хаана зогссон:</b> ${esc(s.baton.stopped)}</p>` : ""}${s.baton.next ? `<p><b>Дараагийн алхам:</b> ${esc(s.baton.next)}</p>` : ""}<p class="mute">baton · ${esc(s.baton.ts)} · ${esc(s.baton.by)}</p></div>` : '<p class="mute">Baton алга.</p>'}
+    <div class="acts">${s.channel ? `<a class="btn" href="https://discord.com/channels/${esc(S.agents.find(a => a.guild)?.guild || "@me")}" target="_blank" rel="noopener">Discord руу →</a>` : ""}
+      ${s.channel && I.send_channels.includes(s.channel) ? `<button data-act="message" data-ch="${esc(s.channel)}" data-id="${esc(s.id)}">Мессеж илгээх</button>` : ""}
+      <button data-act="wake" data-ch="gtd" data-id="${esc(s.id)}">Сэрээх</button></div>
+    <div class="sendbox" hidden></div></div>`).join("");
+}
+function openSend(btn) {
+  const row = btn.closest(".srow"), box = row.querySelector(".sendbox");
+  const kind = btn.dataset.act, ch = btn.dataset.ch, sid = btn.dataset.id;
+  const s = roomInfo.sessions.find(x => x.id === sid);
+  const target = kind === "wake" ? `#gtd · → ${s.name} @${(s.device_name || "pc").toLowerCase()}` : `#${ch}`;
+  box.hidden = false;
+  box.innerHTML = `<label>${kind === "wake" ? "Сэрээх мессеж" : "Мессеж"} → <b>${esc(target)}</b></label>
+    <textarea maxlength="1500" rows="3" placeholder="${kind === "wake" ? "Юу хийхийг товч бич…" : "Мессеж…"}"></textarea>
+    <div class="acts"><button class="go">Илгээх…</button><button class="cancel">Болих</button><span class="res mute"></span></div>`;
+  const ta = box.querySelector("textarea"), go = box.querySelector(".go"), res = box.querySelector(".res");
+  ta.focus();
+  let armed = false;
+  box.querySelector(".cancel").onclick = () => { box.hidden = true; box.innerHTML = ""; };
+  go.onclick = async () => {
+    if (!ta.value.trim()) { res.textContent = "Текст хоосон байна."; return; }
+    if (!armed) { armed = true; go.textContent = `Баталгаажуул: ${target} руу илгээх`; go.classList.add("warn"); return; }
+    go.disabled = true; res.textContent = "Илгээж байна…";
+    try {
+      const r = await fetch("/api/send", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room: openRoom, kind, channel: ch, target: sid, text: ta.value, confirm: true }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || r.status);
+      res.textContent = `✔ #${j.channel} руу илгээгдлээ.`; ta.value = ""; go.textContent = "Илгээх…"; go.classList.remove("warn"); armed = false;
+    } catch (e) { res.textContent = "✖ " + e.message; armed = false; go.textContent = "Илгээх…"; go.classList.remove("warn"); }
+    go.disabled = false;
+  };
 }
 function closeRoom() {
-  openRoom = null; $("room").classList.remove("show");
+  openRoom = null; roomInfo = null; $("room").classList.remove("show");
   if (location.hash.startsWith("#room")) history.replaceState(null, "", location.pathname + (view === "office" ? "#office" : ""));
 }
 $("back").onclick = closeRoom;
-addEventListener("keydown", e => { if (e.key === "Escape") { if (openRoom) closeRoom(); else $("feed").classList.remove("open"); } });
-// parallax (хулгана / gyro)
-function parallax(dx, dy) { $("scene").style.transform = `translate(${dx * -14}px,${dy * -10}px) scale(1.04)`; }
-$("stage").addEventListener("pointermove", e => { const b = $("stage").getBoundingClientRect(); parallax((e.clientX - b.left) / b.width - .5, (e.clientY - b.top) / b.height - .5); });
+addEventListener("keydown", e => { if (e.key === "Escape" && !/TEXTAREA/.test(document.activeElement?.tagName)) { if (openRoom) closeRoom(); else $("feed").classList.remove("open"); } });
+// parallax (хулгана / gyro) — жижиг зураг дээр бага зэрэг
+function parallax(dx, dy) { $("scene").style.transform = `translate(${dx * -6}px,${dy * -4}px) scale(1.05)`; }
+$("thumb").addEventListener("pointermove", e => { const b = $("thumb").getBoundingClientRect(); parallax((e.clientX - b.left) / b.width - .5, (e.clientY - b.top) / b.height - .5); });
 addEventListener("deviceorientation", e => { if (openRoom && e.gamma != null) parallax(Math.max(-1, Math.min(1, e.gamma / 30)) / 2, Math.max(-1, Math.min(1, (e.beta - 45) / 30)) / 2); });
 
 // ---------- Оффис ----------
@@ -149,7 +205,7 @@ function renderOffice() {
       ${w ? `<circle cx="${x}" cy="${y}" r="1.6" fill="${a.human ? "#c8892f" : "#2e9b55"}" opacity=".35"/>` : ""}
       <circle cx="${x}" cy="${y}" r=".9" fill="${a.human ? "#c8892f" : w ? "#2e9b55" : "#9b958b"}" stroke="#1d1a16" stroke-width=".3" opacity="${w ? 1 : .7}"/></g>`;
   }).join("");
-  $("ofsvg").querySelectorAll(".ag").forEach(g => g.onclick = () => { const a = agentById(g.dataset.id); if (a) { enterRoom(a.room); agentSide(a); } });
+  $("ofsvg").querySelectorAll(".ag").forEach(g => g.onclick = () => { const a = agentById(g.dataset.id); if (a) enterRoom(a.room); });
 }
 
 // ---------- яриа: дараалал, bubble, нум ----------
