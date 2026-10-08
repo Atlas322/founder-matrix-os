@@ -3,9 +3,9 @@
 
   python _system/tools/sidepanel/server.py        → http://127.0.0.1:8770
 
-Reads on every request: 02-GTD/tasks, 03-Projects/*/<name>.md, 02-GTD/meetings, 02-GTD/daily,
+Reads on every request: 00-GTD/Tasks, 03-Projects/*/<name>.md, 00-GTD/Events, 00-GTD/Daily,
 research/reference notes, today's _system/logs. Writes only: task `status:` (mark done / change) and
-new captures in 00-Inbox/. Nothing else in the vault is touched.
+new captures in 00-GTD/Inbox/. Nothing else in the vault is touched.
 """
 import json, re, sys, uuid, shutil, subprocess, datetime as dt
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -25,6 +25,33 @@ def _vault():
 
 VAULT = _vault()
 HERE = Path(__file__).parent
+
+
+def gtd_dir(new, *olds, vault=None):
+    """Шинэ зам байхгүй бол хуучин замуудаас эхний байгааг нь дарааллаар (шилжилтийн хамгаалалт):
+    00-GTD/<Нэр> -> 02-GTD/<нэр> -> 00-Inbox / 02-GTD/meetings."""
+    vault = Path(vault) if vault else VAULT
+    if not (vault / new).is_dir():
+        for old in olds:
+            if (vault / old).is_dir():
+                return vault / old
+    return vault / new
+
+
+def inbox_dir(vault=None):
+    return gtd_dir("00-GTD/Inbox", "02-GTD/inbox", "00-Inbox", vault=vault)
+
+
+def events_dir(vault=None):
+    return gtd_dir("00-GTD/Events", "02-GTD/events", "02-GTD/meetings", vault=vault)
+
+
+def tasks_dir(vault=None):
+    return gtd_dir("00-GTD/Tasks", "02-GTD/tasks", vault=vault)
+
+
+def daily_dir(vault=None):
+    return gtd_dir("00-GTD/Daily", "02-GTD/daily", vault=vault)
 PORT = 8770
 FM = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.S)
 
@@ -72,7 +99,7 @@ def date_of(s):
 
 def tasks():
     out = []
-    for p in sorted((VAULT / "02-GTD/tasks").glob("*.md")):
+    for p in sorted(tasks_dir().glob("*.md")):
         fm, body = frontmatter(p.read_text(encoding="utf-8", errors="ignore"))
         out.append({
             "file": str(p.relative_to(VAULT)).replace("\\", "/"), "title": p.stem,
@@ -108,7 +135,7 @@ def projects(all_tasks):
 
 def meetings():
     out = []
-    for p in (VAULT / "02-GTD/meetings").glob("*.md"):
+    for p in events_dir().glob("*.md"):
         fm, body = frontmatter(p.read_text(encoding="utf-8", errors="ignore"))
         d = fm.get("date") or fm.get("meeting-date") or (re.match(r"\d{4}-\d{2}-\d{2}", p.stem) or [None])[0]
         out.append({"title": p.stem, "date": d if isinstance(d, str) else "", "status": fm.get("status", ""), "file": str(p.relative_to(VAULT)).replace("\\", "/")})
@@ -116,7 +143,7 @@ def meetings():
 
 
 def research(limit=14):
-    roots = ["05-Resources", "01-Soul/creative", "03-Projects", "06-Atomic", "00-Inbox"]
+    roots = ["05-Resources", "01-Soul/creative", "03-Projects", "06-Atomic", inbox_dir().relative_to(VAULT).as_posix()]
     cand = []
     for r in roots:
         for p in (VAULT / r).rglob("*.md"):
@@ -147,7 +174,7 @@ def today_log():
 
 def set_status(rel, status):
     p = (VAULT / rel).resolve()
-    if VAULT not in p.parents or not str(p).replace("\\", "/").count("/02-GTD/tasks/"):
+    if VAULT not in p.parents or not any(s in str(p).replace("\\", "/") for s in ("/00-GTD/Tasks/", "/02-GTD/tasks/")):
         raise ValueError("only task files")
     text = p.read_text(encoding="utf-8")
     today = dt.date.today().isoformat()
@@ -187,7 +214,7 @@ def set_prop(rel, key, val):
     if key == "status" and not is_soc:
         return set_status(rel, val)
     p = (VAULT / rel).resolve()
-    if VAULT not in p.parents or not ("/02-GTD/tasks/" in str(p).replace("\\", "/") or is_soc):
+    if VAULT not in p.parents or not (any(s in str(p).replace("\\", "/") for s in ("/00-GTD/Tasks/", "/02-GTD/tasks/")) or is_soc):
         raise ValueError("only task files")
     text = p.read_text(encoding="utf-8")
     if key == "project" and val and not val.startswith("[["):
@@ -240,7 +267,9 @@ def ask(msg, new=False):
 def capture(txt):
     now = dt.datetime.now()
     title = re.sub(r'[\\/:*?"<>|\n]+', " ", txt.strip())[:60] or "capture"
-    p = VAULT / "00-Inbox" / f"{now:%Y-%m-%d %H%M} - {title}.md"
+    d = inbox_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    p = d / f"{now:%Y-%m-%d %H%M} - {title}.md"
     p.write_text(f"---\ndate: {now:%Y-%m-%d}\ntype: inbox\nsource: sidepanel\ntags:\n  - inbox\nai-first: true\n---\n\n# {title}\n\n## For future agent\n\nSide panel-аас {now:%Y-%m-%d %H:%M}-д хурдан бичсэн санаа. Боловсруулаагүй.\n\n{txt.strip()}\n", encoding="utf-8")
     return str(p.relative_to(VAULT)).replace("\\", "/")
 

@@ -6,6 +6,14 @@
 
 ---
 
+## Unreleased
+
+- **GTD = `00-GTD/` томоор (itge.e 2026-10-09):** `02-GTD/{inbox,tasks,events,daily}` → `00-GTD/{Inbox,Tasks,Events,Daily}`, бусад `02-GTD` → `00-GTD` (`boards/` хэвээр). Skill-үүд, agent-ууд, routines, docs, README, ARCHITECTURE, vault-template (`git mv`), relay `task`, fm_task, fm_project, fm_brain_check, fm_onboard, Notion pull, Inbox Gallery, side panel, save-to-inbox, Finder/screenshot shortcut шинэчлэгдэв. **Шилжилтийн хамгаалалт:** шинэ зам байхгүй бол дарааллаар `02-GTD/<жижиг үсэг>` → `00-Inbox` / `02-GTD/meetings`; relay/fm_task нь `00-GTD/Tasks` байхгүй, `02-GTD/tasks` байвал тэр рүү бичнэ. Тест: case-sensitive бүтэц, `02-GTD` үлдэгдэлгүй, fallback дараалал.
+- **GTD = Inbox → Task → Events (itge.e 2026-10-09):** `00-Inbox/` → `02-GTD/inbox/`, `02-GTD/meetings/` → `02-GTD/events/` (уулзалт `type: meeting` + бусад үйл явдал шинэ `type: event`; Project-ийн base, Notion push хоёуланг нь таньна). Skill-үүд (inbox, update, vault, notion, people), `routines/daily.md`, vault-template (Home, BOOT, index, templates, registry, 02 Area), Inbox Gallery, side panel, save-to-inbox extension, Finder/screenshot shortcut, docs шинэчлэгдэв. **Шилжилтийн хамгаалалт:** шинэ зам байхгүй ч хуучин `00-Inbox` (side panel-д `02-GTD/meetings` ч) байвал хэрэгслүүд хуучныг ашиглана. Тест: шинэ бүтэц, хуучин замын үлдэгдэлгүй, fallback.
+- **Folder-base (itge.e 2026-10-08):** `_system/bases/` хасагдав — хавтас бүр өөрийн `<Нэр>.base`-тэй (`02-GTD/tasks/Tasks.base`, `03-Projects/Projects.base`, `04-Areas/people/People.base`, `06-Atomic/knowledge/Atoms.base`, 🔒 `finances/private/Monthly Bills.base` г.м.; шинэ `05-Resources/library/Reading.base`). Home, index, README, skill-үүдийн зам шинэчлэгдэв.
+- **🔒 Хувийн санхүүгийн схем:** Finance Record-д `net`, `flow`, `month`, `state` (actual|saved|forecast), `variable`, `bill`, `balance_after` (багийн app-тэй ижил нэр). `fm_bills.py paid` forecast-ийг actual болгоно, шинэ `rebalance` команд (`_balance.md` эхлэх үлдэгдэл) — `record`/`paid`-ийн дараа автоматаар. Bill note-ийн «Төлөлтийн түүх» = `records/`-аас Bases embed; `Finance Records.base`. Засвар: загварын `{{date:…}}`/`{{title}}`/`<% %>` тэмдэгт үлддэг байсан. Тест `tests/test_finance.py`.
+- **Sidebar = itge.e-ийн бүтэц (2026-10-07):** `Projects · Areas · Resources · Finance` 4 бүлэг. Areas = 🎨 Creative · 🏛️ Architect · 📥 GTD (Content Writer → Creative-д нэгдсэн); Resources-д 📖 Library (номын сан); Projects = 📁 Portfolio + төсөл бүр; Finance = 💼 Business · 🔒 Personal тусдаа. Tasks/Creative/Archive бүлэг хасагдав.
+
 ## [0.3.1] — 2026-10-06 · Гарын авлага, цэвэрлэгээ
 
 ### Нэмсэн
@@ -21,6 +29,8 @@
 - **Танилцах:** `/fm:setup` хамгийн эхэнд өөрийгөө танилцуулж «Таныг юу гэж дуудах вэ?» гэж асууна → `member`, `soul.call_me` (SOUL-ийн «Намайг ингэж дууд»), `~/.fmos/config.json`. SessionStart hook сешн бүрт «Эзэн: <нэр> — ингэж дууд» гэж Agent-д сануулна.
 - **Vault = Google Drive:** Google Drive desktop `fm_doctor`-д **заавал** боллоо; `/fm:setup` 2-р алхам vault-ийг `My Drive/Second Brain`-д (Mirror files) үүсгэж Obsidian-оор нээлгэнэ; 2 дахь төхөөрөмж ижил хавтсыг нээнэ. Нэрийг дахин асуухгүй. **Код → локал:** repo-гийн clone локал дискэнд (Drive `.git`-ийг эвддэг).
 - Repo `Atlas322/founder-matrix-os` руу шилжив (баг).
+- Routine `scope`: `one-device` (vault руу бичдэг — daily, weekly, санхүү) зөвхөн гол машин дээр, `per-device` (Harvester) машин бүрт — 2 дахь компьютер дээр давхар бичилт үүсэхгүй.
+- **🔒 Finance Discord** (itge.e 2026-10-08): `#business`, `#personal` — screenshot ирэхэд санхүүгийн сешн сэрнэ (event агуулгагүй), `relay.py fetch` хавсралтыг private inbox руу татна; бот зөвхөн тоогүй «🙋 авлаа / ✅ бүртгэлээ».
 - Тест: routine загвар, sidebar загвар, нэрээр дуудах.
 
 ### Засварласан

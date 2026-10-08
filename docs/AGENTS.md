@@ -52,7 +52,7 @@ Sidebar дээрх нэрс (📥 GTD, 🏛️ Architect, 💼 Project Manager, 
 ## 📥 Area · GTD — `/fm:role area`
 
 - **Зорилго:** юу ч алдагдахгүй — орж ирсэн бүхэн эзэнтэй task, атом, лавлагаа болох; vault цэвэр.
-- **Эзэмшинэ:** `00-Inbox`, `02-GTD` (task, өдөр, уулзалт, самбар), `04-Areas` (бизнес, амьдрал, хүмүүс), `_system`.
+- **Эзэмшинэ:** `00-GTD/Inbox`, `00-GTD` (task, өдөр, уулзалт, самбар), `04-Areas` (бизнес, амьдрал, хүмүүс), `_system`.
 - **Дүрэм:** inbox → task → өдрийн тэмдэглэл → долоо хоногийн тойм. Зөөхөөс өмнө төлөвлөгөө гаргаж батлуулна. Discord dispatcher — бүх сувгийг сонсож, хариуцагч сешнийг сэрээнэ.
 - **Sidebar:** 📥 GTD (Areas) — өдөр тутмын гол сешн, setup-ийн сешн өөрөө.
 
@@ -91,14 +91,14 @@ Sidebar дээрх нэрс (📥 GTD, 🏛️ Architect, 💼 Project Manager, 
 - **Эзэмшинэ:** `04-Areas/Business/finances/private/` 🔒 (төлбөр, орлого, хувийн бичлэг), `finances/` (багийн тайлан).
 - **Дүрэм:** хөрөнгө оруулалтын зөвлөгөө өгөхгүй; төлбөр хийхгүй, банкинд нэвтрэхгүй. Данс, карт, PIN, нууц үгийг хэзээ ч бичихгүй. Санхүүгийн мэдээлэл vault-аас гарахгүй (Discord, лог, атом, STATUS-т ч). Бичихээс өмнө асууна.
 - **Routine:** сарын 1-нд төлбөрийн жагсаалт, 20-нд төлөгдөөгүй сануулга ([GUIDE](GUIDE.md#5-routine-ууд--өөрөө-ажилладаг)).
-- **Sidebar:** 🔒 Personal · 💼 Business (Finance) — Discord суваггүй.
+- **Sidebar:** 🔒 Personal · 💼 Business (Finance) — Discord-д `#business` / `#personal` (зөвхөн screenshot хүлээн авна; бот дүн бичихгүй).
 
 ---
 
 ## Бүх Agent-д нийтлэг
 
 1. Frontmatter (`type`, `date`, `tags`, `ai-first: true`) ба `[[wikilink]]`.
-2. Бусдын бичдэг файлд (`02-GTD/daily/*`, `_system/logs/*`) зөвхөн **append**.
+2. Бусдын бичдэг файлд (`00-GTD/Daily/*`, `_system/logs/*`) зөвхөн **append**.
 3. 🔒 `private: true` болон `finances/private/`-ийг уншихгүй, иш татахгүй (Finance-аас бусад).
 4. Ажлаа дуусгаад: юу хийсэн, аль файлд, юу үлдсэнийг товч тайлагнана; сешн дуусахад baton үлдэнэ.
 

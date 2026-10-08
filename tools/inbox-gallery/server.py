@@ -1,4 +1,4 @@
-"""Inbox Gallery — vault-ийн 00-Inbox-ийг localhost дээр gallery хэлбэрээр харуулж,
+"""Inbox Gallery — vault-ийн 00-GTD/Inbox-ийг localhost дээр gallery хэлбэрээр харуулж,
 зүйл бүрт очих газар сонгоод «Apply» дарахад л зөөнө.
 
 Ажиллуулах:  python server.py [--vault "<vault хавтас>"] [--port 5190]
@@ -32,7 +32,21 @@ ARGS = ap.parse_args()
 if not ARGS.vault:
     sys.exit("Vault олдсонгүй: --vault өг эсвэл ~/.fmos/config.json тохируул")
 VAULT = Path(ARGS.vault)
-INBOX = VAULT / "00-Inbox"
+INBOX_NEW, INBOX_OLDS = "00-GTD/Inbox", ("02-GTD/inbox", "00-Inbox")
+
+
+def resolve_inbox(vault):
+    """Шинэ зам 00-GTD/Inbox; байхгүй бол хуучин 02-GTD/inbox -> 00-Inbox (шилжилтийн хамгаалалт)."""
+    vault = Path(vault)
+    if not (vault / INBOX_NEW).is_dir():
+        for old in INBOX_OLDS:
+            if (vault / old).is_dir():
+                return vault / old
+    return vault / INBOX_NEW
+
+
+INBOX = resolve_inbox(VAULT)
+INBOX_REL = INBOX.relative_to(VAULT).as_posix()
 RELAY = Path(os.environ.get("FMOS_REPO", HERE.parents[1])) / "tools" / "relay" / "relay.py"
 
 _refs = {"t": 0, "text": ""}
@@ -44,7 +58,7 @@ def vault_text():
         parts = []
         for p in VAULT.rglob("*.md"):
             s = str(p)
-            if "00-Inbox" in s or "_trash" in s or ".obsidian" in s:
+            if INBOX_REL in s.replace("\\", "/") or "_trash" in s or ".obsidian" in s:
                 continue
             try:
                 parts.append(p.read_text(encoding="utf-8", errors="ignore"))
@@ -126,7 +140,7 @@ def items():
             it["url"] = u.group(1) if u else ""
         else:
             it["kind"] = "file"
-        it["embedded"] = txt.count(p.name) if it["kind"] in ("image", "video") else txt.count("[[" + p.stem) + txt.count("00-Inbox/" + p.stem)
+        it["embedded"] = txt.count(p.name) if it["kind"] in ("image", "video") else txt.count("[[" + p.stem) + txt.count(INBOX_REL + "/" + p.stem)
         it["suggest"], it["reason"] = suggest(it, fm, body, it["embedded"])
         out.append(it)
     return out
@@ -162,7 +176,7 @@ def apply(decisions):
                 raise FileNotFoundError(name)
             if dest == "task":
                 cmd = [sys.executable, str(RELAY), "task", Path(name).stem, "--owner", "itge.e",
-                       "--status", "next-action", "--body", f"Inbox-оос: [[00-Inbox/{Path(name).stem}]]"]
+                       "--status", "next-action", "--body", f"Inbox-оос: [[{INBOX_REL}/{Path(name).stem}]]"]
                 subprocess.run(cmd, check=True, capture_output=True, timeout=60)
                 done.append(f"✅ task ← {name}")
                 continue
@@ -230,6 +244,6 @@ class H(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     if not INBOX.is_dir():
-        sys.exit(f"00-Inbox олдсонгүй: {INBOX}")
+        sys.exit(f"Inbox олдсонгүй (00-GTD/Inbox, 02-GTD/inbox эсвэл 00-Inbox): {INBOX}")
     print(f"Inbox Gallery → http://localhost:{ARGS.port}  (vault: {VAULT})", flush=True)
     ThreadingHTTPServer(("127.0.0.1", ARGS.port), H).serve_forever()

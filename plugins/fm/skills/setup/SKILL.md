@@ -168,7 +168,7 @@ fm нь албан ёсны skill-ийг өөртөө хуулдаггүй — �
 
 ## 4. Agent-ууд
 
-Тайлбарла: **бүгд Agent, зөвхөн дүрээрээ ялгарна.** Claude-ийн сешн бүр нэг дүрд холбогдож (`/fm:role <slug>`), тэр дүрийн дүрмээр ажиллана. Claude Desktop-ийн sidebar-т сешнүүдийг бүлгээр (`Tasks · Projects · Areas · Resources · Creative · Finance · Archive`) 7-р алхамд цэгцэлнэ.
+Тайлбарла: **бүгд Agent, зөвхөн дүрээрээ ялгарна.** Claude-ийн сешн бүр нэг дүрд холбогдож (`/fm:role <slug>`), тэр дүрийн дүрмээр ажиллана. Claude Desktop-ийн sidebar-т сешнүүдийг бүлгээр (`Projects · Areas · Resources · Finance`) 7-р алхамд цэгцэлнэ — яг itge.e-ийн sidebar шиг.
 
 | Slug | Agent | Юу хийдэг | Санал |
 |---|---|---|---|
@@ -183,7 +183,7 @@ fm нь албан ёсны skill-ийг өөртөө хуулдаггүй — �
 Мөн **Active төсөл бүрт нэг Project агентын дүр** санал болго: slug = англи kebab (жишээ `narny-site`), нэр = кирилл. Гишүүн батална. Тэр төслийн бүх ажил нэг сешнд.
 → `roles.activate[]`, `roles.work[]` (эсвэл `"auto"` = Active төсөл бүрт). Скрипт дүрийн note-ыг `04-Areas/AI Team/ai-workers/<NN Нэр>.md`-д бичиж, `_system/fm/registry.json`-ийн `roles`-д нэмнэ (сонгоогүй дүр `active: false`). Хуучин slug (`gtd`, `content-writer`, `creative-director`, `tool-developer`) автоматаар шинэ Agent руу хөрвөнө.
 
-Өдрийн тэмдэглэл ба Home-д тусдаа асуулт хэрэггүй: скрипт өнөөдрийн `02-GTD/daily/<огноо>.md`-г (Active төслүүдийг «гол 3»-д) үүсгэж, `Home.md`, `_system/index.md`-г бөглөнө.
+Өдрийн тэмдэглэл ба Home-д тусдаа асуулт хэрэггүй: скрипт өнөөдрийн `00-GTD/Daily/<огноо>.md`-г (Active төслүүдийг «гол 3»-д) үүсгэж, `Home.md`, `_system/index.md`-г бөглөнө.
 
 ## 5. Нэмэлт хэрэгсэл (заавал биш)
 
@@ -253,11 +253,11 @@ fm нь албан ёсны skill-ийг өөртөө хуулдаггүй — �
 
 Загвар: `${CLAUDE_PLUGIN_ROOT}/sidebar.json` — **бүлгийн дараалал, сешний дараалал, гарчиг, icon яг үүгээр.** Sidebar = PARA = Discord-ийн ангилал.
 
-1. **Бүлгүүд** (энэ дарааллаар): `Tasks · Projects · Areas · Resources · Creative · Finance · Archive`. Эхлээд `mcp__ccd_sidebar__list_groups` — нэр нь таарах бүлэг байвал түүнийг ашигла, байхгүйг л `mcp__ccd_sidebar__create_group`-ээр үүсгэ. Давхар бүлэг бүү үүсгэ.
+1. **Бүлгүүд** (энэ дарааллаар): `Projects · Areas · Resources · Finance`. Эхлээд `mcp__ccd_sidebar__list_groups` — нэр нь таарах бүлэг байвал түүнийг ашигла, байхгүйг л `mcp__ccd_sidebar__create_group`-ээр үүсгэ. Давхар бүлэг бүү үүсгэ.
 2. **Энэ сешн = 📥 GTD.** `set_session_title("self", "📥 GTD")` → `move_sessions(["self"], Areas)` → `/fm:role area`.
-3. **Бусад сешн** `sidebar.json`-ийн `order`-оор, 6-р алхамд бичигдсэн дүрүүдэд л (`_system/fm/registry.json` → `roles`, `active: true`): 💼 Project Manager → 📁 Active төсөл бүр → 📚 Wiki → (🔍 Research) → (🎨 Creative) → (🛠️ Developer) → (🔒 Personal, 💼 Business). Сешн бүрт `mcp__ccd_session__spawn_task` chip үүсгэ — гишүүн нэг дарахад нээгдэнэ. Chip-ийн prompt бие даасан байна:
+3. **Бусад сешн** `sidebar.json`-ийн `order`-оор, 6-р алхамд бичигдсэн дүрүүдэд л (`_system/fm/registry.json` → `roles`, `active: true`): 📁 Active төсөл бүр → 📁 Portfolio → (🎨 Creative) → (🏛️ Architect) → 📚 Wiki → 📖 Library → (🔍 Research · <сэдэв>) → (💼 Business, 🔒 Personal); `routines`-ийн 🧠 Matrix Harvester-ийг 8-р алхамд. Сешн бүрт `mcp__ccd_session__spawn_task` chip үүсгэ — гишүүн нэг дарахад нээгдэнэ. Chip-ийн prompt бие даасан байна:
    > «Энэ сешн нь `<гарчиг>`. 1) `set_session_title("self", "<гарчиг>")` 2) `move_sessions(["self"], "<бүлэг>")` 3) cwd = `<vault>/<cwd>` (`mcp__ccd_directory__change_directory`) 4) `/fm:role <slug>` 5) нэг мөрөөр «бэлэн» гэж хариул.»
-4. Гишүүнд жагсаалтаар харуул (бүлэг → сешн), chip-уудыг **дээрээс доош** дарахыг хэл. 🔒 Finance-ийн сешнүүд Discord-гүй, Tasks бүлэгт нэг удаагийн сешн, дууссаныг Archive руу.
+4. Гишүүнд жагсаалтаар харуул (бүлэг → сешн), chip-уудыг **дээрээс доош** дарахыг хэл. 🔒 Finance-ийн сешнүүд (Business, Personal тусдаа) Discord-гүй. Нэг удаагийн сешн бүлэггүй, дууссаныг апп-ын Archive руу.
 
 Sidebar-ийн хэрэгсэл (`ccd_sidebar`, `ccd_session`) байхгүй орчинд (CLI): жагсаалтыг өгөөд гараар хийхийг хэл.
 
@@ -273,6 +273,8 @@ Sidebar-ийн хэрэгсэл (`ccd_sidebar`, `ccd_session`) байхгүй о
 | 💰 Төлөгдөөгүй сануулга (`finance-month-20.md`) | Сарын 20, 09:00 | `finance` идэвхтэй |
 | 🧠 Harvester (`harvester.md`) — чатыг автоматаар атом болгоно | 2 цаг тутам | `~/.fmos/config.json` бий (Discord хэрэггүй) |
 
+**Нэг машин эсвэл машин бүр (`scope`):** `one-device` (vault руу бичдэг — daily, weekly, санхүү) зөвхөн **гол машин** дээр; `per-device` (Harvester) машин бүрт. Хоёр дахь төхөөрөмж дээр (registry-д өөр `device`-ийн сешн аль хэдийн бий, эсвэл гишүүн «энэ 2 дахь компьютер» гэвэл) зөвхөн `per-device`-ийг санал болго; `one-device`-ийг гол машин руу заа — давхар ажиллавал Drive-д `файл (1).md` үүснэ.
+
 Тийм гэсэн бүрд: файлыг унш → биеийн `{{VAULT}}`, `{{MEMBER}}`, `{{DEVICE}}`, `{{HARVEST}}`-г (`routines/README.md`) бодит утгаар соль → `mcp__scheduled-tasks__list_scheduled_tasks`-аар ижил `id` байгаа эсэхийг шалга (байвал алгас, дарж бичихгүй) → `mcp__scheduled-tasks__create_scheduled_task(taskId=id, title, description, cronExpression=cron, prompt=бие)`. Цаг гишүүнд тохирохгүй бол cron-ыг тэр үед нь солиод үүсгэ.
 
 Гишүүнд хэл: routine Claude апп **нээлттэй** үед ажиллана (хаалттай байсан бол дараа нээхэд). Sidebar-ийн **Routines** хэсгээс харж, унтрааж болно. Хэрэгсэл байхгүй (CLI) бол жагсаалтыг өгөөд Desktop → Scheduled-аас гараар үүсгэхийг хэл.
@@ -281,6 +283,7 @@ Sidebar-ийн хэрэгсэл (`ccd_sidebar`, `ccd_session`) байхгүй о
 
 Гишүүнд хэл:
 - Obsidian-оор vault-аа нээж **Home**-оос эхэл (`.obsidian/` тохиргоог гишүүн өөрөө удирдана: Settings → Core plugins → **Bases**, **Templates** асаа; Templates хавтас = `_system/templates`; Community plugins → **Kanban**).
+- **Folder-base дүрэм:** хавтас бүр өөрийн Bases харагдацтай — `<хавтас>/<Нэр>.base` (жишээ `00-GTD/Tasks/Tasks.base`, `04-Areas/people/People.base`); төв `_system/bases/` хавтас байхгүй.
 - Sidebar бэлэн (7-р алхам): энэ сешн **📥 GTD**; бусад сешнийг chip-ээр дээрээс доош нээ. Төсөл бүр **тусдаа нэг тогтмол сешн**, Finance тусдаа 🔒 сешн.
 - **Ганц команд: «update».** Ажлынхаа дараа «update» гэж бичихэд Agent атом, task, хүн, төсөл, inbox, STATUS-ыг өөрөө цэгцэлнэ. Өглөө «update daily», орой «update дүгнэлт», долоо хоногт «update weekly».
 - Дутуу үлдсэн алхмууд (алгассан програм, plugin, ярилцлагын хэсэг) → дараа `/fm:setup doctor`, `/fm:setup plugins`, эсвэл `/fm:setup`-ийг дахин; байгаа note хөндөгдөхгүй.

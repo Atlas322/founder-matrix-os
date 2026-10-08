@@ -2,6 +2,10 @@
 
 Энэ хуудас fm-ийн **бүх бүрэлдэхүүнийг нэг дор** харуулна: Agent, skill, хэрэгсэл, bridge, routine, Discord. Суулгах алхмыг [README](../README.md#суулгах-шинэ-хэрэглэгч-3060-минут)-ээс, хэрэгсэл бүрийн дэлгэрэнгүйг [docs/tools/](tools/)-оос хар.
 
+![Системийн зураг](img/system-map.png)
+
+> Figma-д `docs/img/system-map.figma.js`-ээр зурагдсан (`fig.py run -f`). Шинэчлэх бол скриптийг засаад дахин ажиллуулж, export хий.
+
 ```
          ┌──────────── Та ────────────┐
          │  «update» · /fm:<skill>    │
@@ -37,13 +41,12 @@ Project agent мэргэжлийн ажлыг (дизайн, код, судал�
 
 | # | Бүлэг | Сешн (нээх дараалал) |
 |---|---|---|
-| 1 | **Tasks** | нэг удаагийн богино сешн → дуусахад Archive |
-| 2 | **Projects** | 📁 `<Төсөл>` — Active төсөл бүрт нэг |
-| 3 | **Areas** | 📥 GTD (setup-ийн сешн өөрөө) · 💼 Project Manager |
-| 4 | **Resources** | 📚 Wiki · 🔍 Research · `<сэдэв>` |
-| 5 | **Creative** | 🎨 Creative · 🛠️ Developer |
-| 6 | **Finance** 🔒 | 🔒 Personal · 💼 Business (Discord-гүй) |
-| 7 | **Archive** | дууссан сешн — устгахгүй |
+| 1 | **Projects** | 📁 Portfolio (бүх төслийн төлөв) · 📁 `<Төсөл>` — Active төсөл бүрт нэг |
+| 2 | **Areas** | 🎨 Creative · 🏛️ Architect · 📥 GTD (setup-ийн сешн өөрөө) — бараг бүх ажлыг эдгээр 3 agent хийнэ |
+| 3 | **Resources** | 📚 Wiki · 📖 Library (номын сан: нэмэх, байршуулах, судлах) · 🔍 Research · `<сэдэв>` |
+| 4 | **Finance** 🔒 | 💼 Business · 🔒 Personal (тусдаа; Discord-д зөвхөн screenshot хүлээн авах #business/#personal) |
+
+Нэг удаагийн сешн бүлэггүй; дууссан сешнийг апп-ын Archive руу (устгахгүй). Энэ бүтэц itge.e-ийн sidebar-тай ижил (2026-10-07); Season 2-ын 12 хичээл үүнийг алхам алхмаар барина.
 
 Нэг дүр = нэг тогтмол сешн. Mac, PC хос сешн ижил гарчигтай (нэг baton, нэг Discord суваг).
 
@@ -55,7 +58,7 @@ Project agent мэргэжлийн ажлыг (дизайн, код, судал�
 |---|---|
 | `/fm:update` | **Ганц команд.** save → task → хүмүүс → төсөл → inbox → өдрийн note → STATUS. `daily`, `weekly` горимтой |
 | `/fm:save` | Яриаг атом + PARA холбоос болгоно. `--checkpoint` = дундуур барьж авах; `<url>` = лавлагаа + атом |
-| `/fm:inbox` | 00-Inbox-ийг ангилж төлөвлөгөө гаргаад **зогсоно**; батласны дараа зөөнө |
+| `/fm:inbox` | 00-GTD/Inbox-ийг ангилж төлөвлөгөө гаргаад **зогсоно**; батласны дараа зөөнө |
 | `/fm:task` | Task үүсгэх, 🙋 авах, ✅ дуусгах, жагсаах |
 | `/fm:project` | Төсөл нээх, төлөв (Active/Planning/On-hold/Archive), хаах, самбар цэгцлэх |
 | `/fm:people` | Хүний note, харилцааны бүртгэл, hot list |
@@ -88,7 +91,7 @@ Project agent мэргэжлийн ажлыг (дизайн, код, судал�
 
 | Хэрэгсэл | Юу | Ажиллуулах |
 |---|---|---|
-| **Inbox Gallery** | 00-Inbox-ийг gallery-аар харж, очих газрыг сонгоод Apply | `python3 tools/inbox-gallery/server.py` → localhost:5190 |
+| **Inbox Gallery** | 00-GTD/Inbox-ийг gallery-аар харж, очих газрыг сонгоод Apply | `python3 tools/inbox-gallery/server.py` → localhost:5190 |
 | **Side panel** | Нарийн GTD dashboard (task, төсөл, өдөр) | `python3 tools/sidepanel/server.py` → localhost:8770 |
 | **Save to Inbox** | Chrome extension: хуудсыг vault-ийн inbox руу | `tools/save-to-inbox/README.txt` |
 | **move-to-inbox.sh** | Finder-ийн файл → inbox (Shortcuts-аар товчлол) | Shortcuts → Run Shell Script |
@@ -97,7 +100,7 @@ Project agent мэргэжлийн ажлыг (дизайн, код, судал�
 
 ## 5. Routine-ууд — өөрөө ажилладаг
 
-`/fm:setup` (8-р алхам) [`plugins/fm/routines/`](../plugins/fm/routines/)-ийн загвараас асууж үүсгэнэ. Sidebar → **Routines**-оос харж, унтрааж болно.
+`/fm:setup` (8-р алхам) [`plugins/fm/routines/`](../plugins/fm/routines/)-ийн загвараас асууж үүсгэнэ. Sidebar → **Routines**-оос харж, унтрааж болно. **Vault руу бичдэг routine зөвхөн нэг (гол) машин дээр**, Harvester машин бүрт — 2 дахь компьютер дээр 5 routine биш, ганц Harvester байх нь зөв.
 
 | Routine | Хэзээ | Юу |
 |---|---|---|
@@ -117,7 +120,7 @@ Project agent мэргэжлийн ажлыг (дизайн, код, судал�
 | Areas | `#gtd` (бүгдийг сонсоно), `#architect`, … |
 | Projects | төсөл бүрт нэг суваг (Mac + PC хос сешн хуваалцана) |
 | Resources · Research · Creative · Development | дүр бүрт нэг суваг |
-| Finance | **суваггүй** 🔒 |
+| Finance 🔒 | `#business`, `#personal` — зөвхөн screenshot/баримт илгээх. Бот зөвхөн «🙋 авлаа / ✅ бүртгэлээ» (тоогүй); хавсралтыг санхүүгийн сешн vault-ийн private inbox руу татна (`relay.py fetch`) |
 
 **Дүрэм:**
 1. Нэг хүсэлт = нэг **thread**. Хариулт тэр thread дотор.
