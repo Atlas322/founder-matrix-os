@@ -16,6 +16,7 @@ import room_info, sender  # noqa: E402
 
 STATIC = {"/": ("office2d.html", "text/html; charset=utf-8"),          # 2.5D зурагт оффис (үндсэн)
           "/office2d.js": ("office2d.js", "text/javascript; charset=utf-8"),
+          "/tokens.css": ("tokens.css", "text/css; charset=utf-8"),
           "/3d": ("index.html", "text/html; charset=utf-8"),             # хуучин Three.js хувилбар
           "/index.html": ("index.html", "text/html; charset=utf-8"),
           "/main.js": ("main.js", "text/javascript; charset=utf-8")}

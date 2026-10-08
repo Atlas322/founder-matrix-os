@@ -1,0 +1,51 @@
+/* Inai design tokens — Figma «Second Brain» файлын 🌐 Inai Website (03 Нүүр, 07 /products, 11 /about, 14 /second-brain)
+   фреймүүдээс plugin API-аар уншсан бодит утга (2026-10-09). Цаглабарын бүх модуль энэ файлыг ашиглана. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Spectral:wght@400;500&display=swap");
+
+:root {
+  /* өнгө */
+  --inai-paper: #F0EDE4;        /* хуудасны дэвсгэр */
+  --inai-strip: #E2DED3;        /* толгой зурвас, сонгосон мөр */
+  --inai-stone: #CFC9BA;        /* гүн саарал гадаргуу */
+  --inai-ink: #080808;          /* гол текст, хүрээ */
+  --inai-body: #3D3D3A;         /* бие текст */
+  --inai-muted: #6B6860;        /* туслах текст */
+  --inai-blue: #1B5CFF;         /* Inai blue — товч, tag, идэвхтэй */
+  --inai-blue-deep: #0F47D6;    /* товчны «↗» хэсэг */
+  --inai-white: #FFFFFF;
+  --ink-85: rgba(8, 8, 8, .85);
+  --ink-55: rgba(8, 8, 8, .55);
+  --ink-20: rgba(8, 8, 8, .20);
+  --ink-15: rgba(8, 8, 8, .15);
+  --ink-10: rgba(8, 8, 8, .10);  /* үндсэн 1px хүрээ */
+  --ink-07: rgba(8, 8, 8, .07);  /* grid шугам, hover дэвсгэр */
+  --ok: #1F9D55;                 /* ✓ дууссан / ажиллаж буй */
+  --warn: #C2410C;
+  /* Key Activity (13 Оффис · Барилга фреймийн цэгүүд) */
+  --ka-brief: #F5A524;
+  --ka-beltgel: #22B8A0;
+  --ka-dizain: #EF5350;
+  --ka-hugjuulelt: #1B5CFF;
+  --ka-kontent: #8B6CF6;
+
+  /* фонт */
+  --font-display: "Spectral", Georgia, serif;          /* Spectral Regular, ls −1…−2.5, гарчиг цэгээр төгсөнө */
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* бичвэрийн хэмжээ (Figma text-ийн давтамжаар) */
+  --t-hero: 64px;  --t-h1: 48px;  --t-h2: 30px;  --t-h3: 24px;  --t-h4: 22px;
+  --t-body: 15px;  --t-sm: 13px;  --t-xs: 12px;  --t-label: 11px;  --t-micro: 10px;
+  --ls-display: -0.04em;      /* ≈ −1…−2.5px */
+  --ls-label: 0.04em;         /* Inter SemiBold 10–11, UPPERCASE, «[01] LABEL» */
+
+  /* хэлбэр */
+  --radius-btn: 6px;          /* товч, input (Figma radius 6) */
+  --radius-card: 0;           /* карт — дөрвөлжин */
+  --border: 1px solid var(--ink-10);
+  --border-strong: 1px solid var(--ink-20);
+  --border-blue: 1px solid var(--inai-blue);
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 48px;
+  --shell-nav: 76px;          /* зүүн nav (13 Оффис фрейм) */
+  --shell-top: 72px;          /* дээд мөр */
+}
