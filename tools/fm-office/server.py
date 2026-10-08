@@ -5,13 +5,14 @@ GET /            → index.html
 GET /main.js     → 3D scene
 GET /api/state   → floors, rooms, agents, conversations (office_state.py)
 """
-import argparse, json, os, sys
+import argparse, json, os, re, sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from office_state import build_state  # noqa: E402
+from office_state import build_state, load_config  # noqa: E402
+import room_info, sender  # noqa: E402
 
 STATIC = {"/": ("office2d.html", "text/html; charset=utf-8"),          # 2.5D зурагт оффис (үндсэн)
           "/office2d.js": ("office2d.js", "text/javascript; charset=utf-8"),
@@ -30,6 +31,32 @@ def _default_vault():
         except (OSError, ValueError):
             v = None
     return v
+
+
+def room_context(vault, room_id):
+    st = build_state(vault, discord=False)
+    room = next((r for r in st["rooms"] if r["id"] == room_id), None)
+    if not room:
+        return None, None, None
+    ags = [a for a in st["agents"] if a["room"] == room_id]
+    cfg = load_config(Path(vault))
+    slugs = {a["project"] for a in ags if not a.get("human")} | {k for k, v in (cfg.get("aliases") or {}).items() if v == room["project"]}
+    return st, room, (ags, slugs)
+
+
+def room_payload(vault, room_id):
+    st, room, ctx = room_context(vault, room_id)
+    if not room:
+        return None
+    ags, slugs = ctx
+    if room["kind"] == "project":
+        info = room_info.project_info(vault, room, ags, st["agents"], slugs)
+    elif room["kind"] == "workshop":
+        info = room_info.workshop_info(vault, room, st["rooms"])
+    else:
+        info = {"room": room}
+    info["send_channels"] = sorted({a["channel"] for a in ags if a.get("channel")} | {"gtd"})
+    return info
 
 
 def make_handler(vault):
@@ -57,6 +84,11 @@ def make_handler(vault):
                     if (HERE / "assets").resolve() in f.parents and f.is_file() and f.suffix in ASSET_TYPES:
                         return self._send(200, f.read_bytes(), ASSET_TYPES[f.suffix])
                     return self._send(404, {"error": "not found"})
+                if path == "/api/room":
+                    from urllib.parse import parse_qs, urlparse
+                    rid = (parse_qs(urlparse(self.path).query).get("id") or [""])[0]
+                    info = room_payload(vault, rid)
+                    return self._send(200 if info else 404, info or {"error": "өрөө алга"})
                 if path == "/api/state":
                     return self._send(200, build_state(vault))
                 if path == "/favicon.ico":
@@ -64,6 +96,26 @@ def make_handler(vault):
                 self._send(404, {"error": "not found"})
             except Exception as e:
                 self._send(500, {"error": str(e)})
+        def do_POST(self):
+            if self.path.split("?")[0] != "/api/send":
+                return self._send(404, {"error": "not found"})
+            origin = self.headers.get("Origin") or ""
+            if origin and not re.match(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$", origin):
+                return self._send(403, {"error": "зөвхөн localhost-оос"})
+            if "application/json" not in (self.headers.get("Content-Type") or ""):
+                return self._send(415, {"error": "JSON хэрэгтэй"})
+            try:
+                n = min(int(self.headers.get("Content-Length", 0)), 20000)
+                req = json.loads(self.rfile.read(n) or b"{}")
+                info = room_payload(vault, str(req.get("room") or ""))
+                if not info:
+                    return self._send(404, {"error": "өрөө алга"})
+                sess = info.get("sessions") or []
+                self._send(200, sender.handle(vault, req, set(info["send_channels"]), sess))
+            except sender.SendError as e:
+                self._send(400, {"error": str(e)})
+            except Exception as e:
+                self._send(502, {"error": "илгээж чадсангүй: " + type(e).__name__})
     return H
 
 
