@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FM Office</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Spectral:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#E9DCC3;--paper2:#f3e9d4;--ink:#1d1a16;--mute:#6f6556;--ochre:#c8892f;--amber:#f2b45a;--blue:#1B5CFF;--green:#2e9b55;--line:#cdbb98;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;--serif:"Spectral",Georgia,serif}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font:13px/1.45 var(--mono)}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opacity:.12;mix-blend-mode:multiply;
+  background-image:radial-gradient(#3a2c18 .7px,transparent 1px),radial-gradient(#3a2c18 .5px,transparent .9px);background-size:5px 5px,7px 7px;background-position:0 0,2px 3px}
+header{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:rgba(233,220,195,.94);border-bottom:3px solid var(--ink)}
+h1{font:700 20px/1 var(--serif);margin:0 10px 0 0}
+.stat{color:var(--mute)} .stat b{color:var(--ink)}
+.sp{flex:1}
+button{font:600 12px var(--mono);border:2px solid var(--ink);background:var(--paper2);color:var(--ink);border-radius:999px;padding:4px 11px;cursor:pointer}
+button.on{background:var(--ink);color:var(--paper)}
+main{padding:16px 16px 120px;max-width:1500px;margin:0 auto}
+.view{display:none;animation:fade .35s ease}
+.view.show{display:block}
+@keyframes fade{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
+/* ---------- Барилга ---------- */
+.floor{display:grid;grid-template-columns:150px 1fr;gap:14px;border:4px solid var(--ink);border-radius:4px;background:var(--paper2);margin:0 0 14px;padding:12px;box-shadow:6px 6px 0 var(--ink)}
+.floor h2{font:700 18px/1.1 var(--serif);margin:0}
+.floor .sub{color:var(--mute);font-size:11px;margin-top:4px}
+.floor.archive{filter:grayscale(1) brightness(.75)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.group{grid-column:1/-1;display:flex;align-items:center;gap:8px;color:var(--mute);font-size:11px;margin-top:4px}
+.group::after{content:"";flex:1;border-top:2px dashed var(--line)}
+.tile{position:relative;border:3px solid var(--ink);border-radius:4px;background:#d9c7a3;cursor:pointer;overflow:hidden;transition:transform .2s,box-shadow .2s}
+.tile:hover,.tile:focus-visible{transform:translateY(-3px);box-shadow:4px 6px 0 var(--ink);outline:none}
+.tile .im{aspect-ratio:4/3;background-size:128%;background-position:50% 50%;transition:background-size .4s}
+.tile:hover .im{background-size:136%}
+.tile.grey .im{filter:grayscale(1) contrast(.9) brightness(1.05)}
+.tile.dark .im{filter:grayscale(1) brightness(.45)}
+.tile.small{transform:scale(.94);opacity:.8}
+.tile .cap{padding:6px 8px;background:var(--paper2);border-top:3px solid var(--ink)}
+.tile .nm{font:700 14px/1.15 var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{display:inline-block;font:600 10px var(--mono);color:#fff;border-radius:999px;padding:1px 7px;margin-top:3px}
+.dots{position:absolute;top:6px;right:6px;display:flex;gap:3px}
+.dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--ink);background:#9b958b}
+.dot.w{background:var(--green);box-shadow:0 0 8px var(--green)}
+.lock{position:absolute;inset:0;display:grid;place-items:center;font-size:34px;background:rgba(29,26,22,.35)}
+/* ---------- Өрөө ---------- */
+#room{position:fixed;inset:0;z-index:30;background:var(--paper);display:none}
+#room.show{display:grid;grid-template-columns:1fr 340px;animation:zoomIn .4s ease}
+@keyframes zoomIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+.stage{position:relative;overflow:hidden;display:grid;place-items:center;border-right:4px solid var(--ink)}
+.scene{position:relative;width:min(100%,calc((100vh - 40px)*4/3));aspect-ratio:4/3;transition:transform .15s ease-out}
+.scene img{width:100%;height:100%;display:block;object-fit:cover;user-select:none;pointer-events:none}
+.mk{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;transition:opacity .3s}
+.mk .av{width:22px;height:22px;border-radius:50%;border:3px solid var(--ink);background:#b9a27c;display:grid;place-items:center;font-size:11px}
+.mk.w .av{background:var(--green);box-shadow:0 0 0 4px rgba(46,155,85,.35),0 0 16px var(--green);animation:breathe 2s ease-in-out infinite}
+.mk.i{opacity:.6}
+.mk .tag{font:600 10px var(--mono);background:var(--ink);color:var(--paper);border-radius:4px;padding:1px 5px;white-space:nowrap}
+.mk.human .av{background:var(--ochre)}
+@keyframes breathe{50%{box-shadow:0 0 0 7px rgba(46,155,85,.15),0 0 22px var(--green)}}
+.bub{position:absolute;transform:translate(-50%,calc(-100% - 34px));max-width:240px;background:#fff;border:2px solid var(--blue);border-radius:10px;padding:5px 9px;font-size:11px;box-shadow:3px 3px 0 var(--ink);animation:pop .25s ease-out;z-index:3}
+.bub.ok{border-color:var(--green)}
+.bub b{display:block;font-size:10px}
+@keyframes pop{from{opacity:0;transform:translate(-50%,calc(-100% - 20px)) scale(.7)}}
+.side{overflow:auto;padding:16px;background:var(--paper2)}
+.side h2{font:700 22px/1.15 var(--serif);margin:0 0 6px}
+.side dl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:10px 0}
+.side dt{color:var(--mute)} .side dd{margin:0}
+.side ul{list-style:none;padding:0;margin:6px 0}
+.side li{padding:5px 0;border-top:1px solid var(--line)}
+.side a{color:var(--blue);font-weight:600}
+.back{position:absolute;top:12px;left:12px;z-index:5}
+/* ---------- Оффис ---------- */
+.ofwrap{position:relative;max-width:1300px;margin:0 auto;border:4px solid var(--ink);box-shadow:6px 6px 0 var(--ink);background:#000}
+.ofwrap img{display:block;width:100%}
+.ofwrap svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.zone{position:absolute;transform:translate(-50%,-50%);cursor:pointer;font:600 11px var(--mono);background:rgba(243,233,212,.95);border:2px solid var(--ink);border-radius:6px;padding:2px 7px;white-space:nowrap;transition:transform .2s}
+.zone:hover{transform:translate(-50%,-50%) scale(1.08)}
+.arc{fill:none;stroke:var(--blue);stroke-width:.45;stroke-dasharray:1.2 .8;animation:dash 1s linear infinite}
+.arc.ok{stroke:var(--green)}
+@keyframes dash{to{stroke-dashoffset:-2}}
+.pulse{fill:none;stroke:var(--green);stroke-width:.4;animation:pulse 1s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pulse{from{transform:scale(.3);opacity:1}to{transform:scale(2.2);opacity:0}}
+/* ---------- Яриа ---------- */
+#feed{position:fixed;z-index:25;right:16px;bottom:16px;width:320px;max-height:42vh;overflow:auto;background:rgba(243,233,212,.97);border:3px solid var(--ink);border-radius:8px;box-shadow:4px 4px 0 var(--ink);padding:8px 10px;display:none}
+#feed.open{display:block}
+#feed h3{margin:0 0 4px;font:700 15px var(--serif)}
+#feed ul{list-style:none;margin:0;padding:0}
+#feed li{padding:5px 2px;border-top:1px solid var(--line);cursor:pointer;display:grid;gap:1px;font-size:11px}
+#feed li:hover{background:#efe3c9}
+#feed li.ok b{color:var(--green)}
+#feed .t{color:var(--mute);font-size:10px}
+#feed .x{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#err{position:fixed;left:16px;bottom:12px;color:#a33;z-index:40}
+@media (max-width:700px){
+  .floor{grid-template-columns:1fr}
+  .tiles{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  #room.show{grid-template-columns:1fr;grid-template-rows:1fr auto}
+  .stage{border-right:0;border-bottom:4px solid var(--ink)}
+  .scene{width:100%}
+  .side{max-height:45vh;border-radius:14px 14px 0 0}
+  #feed{left:0;right:0;bottom:0;width:auto;border-radius:14px 14px 0 0;max-height:45vh}
+  .zone{font-size:9px;padding:1px 4px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>FM Office</h1>
+  <span class="stat">ажиллаж <b id="nWork">0</b> · сул <b id="nIdle">0</b> · яриа <b id="nTalk">0</b></span>
+  <span class="sp"></span>
+  <button data-v="building" class="on">Барилга</button>
+  <button data-v="office">Оффис</button>
+  <button id="parkedBtn" class="on" title="Stage-гүй, зогссон төслүүд">Шатгүй / Зогссон</button>
+  <button id="feedBtn">Яриа</button>
+  <button id="demo">Demo</button>
+  <a href="/3d"><button>3D</button></a>
+</header>
+<main>
+  <section id="building" class="view show"></section>
+  <section id="office" class="view"><div class="ofwrap" id="ofwrap"><img src="/assets/img/office.webp" alt="Оффисын тойм зураг"><svg id="ofsvg" viewBox="0 0 100 74.7" preserveAspectRatio="none"></svg><div id="oflayer"></div></div></section>
+</main>
+<div id="room" role="dialog" aria-modal="true">
+  <div class="stage" id="stage"><button class="back" id="back">← Буцах</button><div class="scene" id="scene"><img id="roomImg" alt=""></div></div>
+  <aside class="side" id="side"></aside>
+</div>
+<aside id="feed" class="open"><h3>Яриа</h3><p id="feedEmpty" style="color:var(--mute)">Сүүлийн 24 цагт яриа алга — «Demo»-г асаа.</p><ul id="feedList"></ul></aside>
+<div id="err"></div>
+<script type="module" src="/office2d.js"></script>
+</body>
+</html>

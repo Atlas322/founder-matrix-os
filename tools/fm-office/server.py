@@ -13,9 +13,12 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from office_state import build_state  # noqa: E402
 
-STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
+STATIC = {"/": ("office2d.html", "text/html; charset=utf-8"),          # 2.5D зурагт оффис (үндсэн)
+          "/office2d.js": ("office2d.js", "text/javascript; charset=utf-8"),
+          "/3d": ("index.html", "text/html; charset=utf-8"),             # хуучин Three.js хувилбар
           "/index.html": ("index.html", "text/html; charset=utf-8"),
           "/main.js": ("main.js", "text/javascript; charset=utf-8")}
+ASSET_TYPES = {".webp": "image/webp", ".jpg": "image/jpeg", ".png": "image/png", ".json": "application/json; charset=utf-8"}
 
 
 def _default_vault():
@@ -49,6 +52,11 @@ def make_handler(vault):
                 if path in STATIC:
                     f, ct = STATIC[path]
                     return self._send(200, (HERE / f).read_bytes(), ct)
+                if path.startswith("/assets/"):
+                    f = (HERE / path.lstrip("/")).resolve()
+                    if (HERE / "assets").resolve() in f.parents and f.is_file() and f.suffix in ASSET_TYPES:
+                        return self._send(200, f.read_bytes(), ASSET_TYPES[f.suffix])
+                    return self._send(404, {"error": "not found"})
                 if path == "/api/state":
                     return self._send(200, build_state(vault))
                 if path == "/favicon.ico":
