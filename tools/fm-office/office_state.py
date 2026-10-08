@@ -25,14 +25,22 @@ FLOORS = [
     {"id": "business", "label": "Business"},
     {"id": "archive", "label": "99 Archive"},
 ]
-# registry-ийн project slug → төслийн хавтасны нэр (нэр таарахгүй үед)
-ALIASES = {
-    "probaitsaa": "Пробайцаа", "byd": "BYD Website", "maggod": "Maggod Artist Website",
-    "sb-ai-season-2": "SB+AI Season 2", "way-academy-ai-agent": "Way Academy AI Agent",
-    "itge-e-content": "itge.e Content",
+DEFAULT_CFG = {
+    "aliases": {},  # registry-ийн project slug → төслийн хавтасны нэр (vault-ийн _system/fm/fm-office.json)
+    "research": [],  # Research өрөөнд суух project slug-ууд
+    "generic": ["project", "area", "creative", "developer", "content-writer", "command-center", "resource", "finance"],
 }
-RESEARCH = {"gold", "tax", "mushroom"}
-GENERIC = {"project", "area", "creative", "developer", "content-writer", "command-center", "resource", "finance"}
+PARKED_STATUS = {"on-hold", "someday"}
+
+
+def load_config(vault):
+    """Нэр, slug-ийн тааруулгыг repo-д биш vault-д хадгална (_system/fm/fm-office.json)."""
+    cfg = dict(DEFAULT_CFG)
+    try:
+        cfg.update(json.loads((vault / "_system" / "fm" / "fm-office.json").read_text(encoding="utf-8")))
+    except (OSError, ValueError):
+        pass
+    return cfg
 
 
 def frontmatter(text):
@@ -75,9 +83,12 @@ def read_projects(vault):
                 fm = frontmatter(note.read_text(encoding="utf-8", errors="ignore"))
             if is_private(fm.get("private")):
                 continue
+            stg, stt = stage_of(fm.get("stage")), (fm.get("status") or status)
             rooms.append({"id": "p:" + p.name, "floor": "projects", "kind": "project",
-                          "project": p.name, "stage": stage_of(fm.get("stage")),
-                          "status": fm.get("status") or status})
+                          "project": p.name, "stage": stg, "status": stt,
+                          "parked": (not stg) or stt in PARKED_STATUS})
+    order = {a: i for i, a in enumerate(ACTIVITIES)}
+    rooms.sort(key=lambda r: (r["parked"], order.get(r["stage"], 99), r["project"].lower()))
     arch = vault / "99-Archive" / "Projects"
     if arch.is_dir():
         for p in sorted(arch.iterdir()):
@@ -140,15 +151,15 @@ def last_seen_map(vault):
     return out
 
 
-def room_for(v, project_rooms):
+def room_for(v, project_rooms, cfg=DEFAULT_CFG):
     proj, role = str(v.get("project", "")), str(v.get("role", ""))
-    if proj in RESEARCH:
+    if proj in set(cfg["research"]):
         return "research"
     if proj == "resource" or role == "resource":
         return "wiki"
-    if proj in GENERIC:
+    if proj in set(cfg["generic"]):
         return "hq"
-    target = ALIASES.get(proj, proj)
+    target = cfg["aliases"].get(proj, proj)
     for r in project_rooms:
         if _norm(r["project"]) == _norm(target):
             return r["id"]
@@ -174,6 +185,7 @@ def build_agents(vault, rooms, now=None):
     except (OSError, ValueError, KeyError, TypeError):
         guild = None
     seen = last_seen_map(vault)
+    cfg = load_config(vault)
     proj_rooms = [r for r in rooms if r["kind"] == "project"]
     agents = []
     for sid, v in (reg.get("sessions") or {}).items():
@@ -186,7 +198,7 @@ def build_agents(vault, rooms, now=None):
         state = "working" if ts and timedelta(0) <= now - ts < timedelta(minutes=WORKING_MIN) else "idle"
         agents.append({
             "id": sid[:8], "name": name, "title": v.get("title") or "", "role": v.get("role") or v.get("group"),
-            "project": proj, "room": room_for(v, proj_rooms),
+            "project": proj, "room": room_for(v, proj_rooms, cfg),
             "device": "🍎" if dev == "Mac" else "🖥️", "device_name": dev,
             "state": state, "last_seen": ts.strftime("%Y-%m-%d %H:%M") if ts else None,
             "channel": chans.get(proj), "guild": guild,

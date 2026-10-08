@@ -212,100 +212,169 @@ function deskSlot(a) {
   const lb = label(`${esc(a.device)} ${esc(a.name)}`, "alb");
   lb.position.set(p.position.x, 1.55, p.position.z);
   g.add(lb);
-  g.userData = { pick: { type: "agent", id: a.id }, person: p };
+  g.userData = { pick: { type: "agent", id: a.id }, person: p, label: lb };
   return g;
 }
 
 // ---------- building ----------
 let building = null, pickables = [], roomTiles = new Map(), agentNodes = new Map(), floorGroups = new Map();
-let STATE = null, sig = "", activeFloor = "all";
+let STATE = null, sig = "", activeFloor = "projects", showParked = true, parkedGroup = null, selected = null;
+const labelItems = []; // {obj, kind:'room'|'agent', id, working}
 
 function roomColor(r) {
   if (r.kind === "archive") return 0x3a352f;
   if (r.kind === "vault") return 0x4a443c;
-  if (r.kind === "project" && !r.stage) return 0xb9b2a5;
+  if (r.parked) return 0xa9a294;
   if (r.kind === "workshop") return 0xd8c39a;
   return 0xe6d6b4;
+}
+
+// Нэг хэсгийн өрөөнүүдийг grid-ээр байрлуулна
+function layoutSection(rooms, rows) {
+  const r = Math.min(rows, Math.max(1, rooms.length));
+  return { rooms, rows: r, cols: Math.max(1, Math.ceil(rooms.length / r)) };
+}
+
+function placeRoom(fg, r, cx, cz, rw, rd, agentsByRoom, glassMat) {
+  const rg = new THREE.Group(); rg.position.set(cx, 0, cz); fg.add(rg);
+  const tile = box(rw - 0.08, 0.04, rd - 0.08, null, 0, 0, 0, new THREE.MeshLambertMaterial({ color: roomColor(r) }));
+  tile.userData.pick = { type: "room", id: r.id }; rg.add(tile); pickables.push(tile); roomTiles.set(r.id, tile);
+  const sc = Math.min(rw / RW, rd / RD);
+  const gh = (FH - 0.6) * sc;
+  const g1 = new THREE.Mesh(new THREE.BoxGeometry(0.06, gh, rd - 0.1), glassMat); g1.position.set(rw / 2, gh / 2, 0); rg.add(g1);
+  const g2 = new THREE.Mesh(new THREE.BoxGeometry(rw - 0.1, gh, 0.06), glassMat); g2.position.set(0, gh / 2, rd / 2); rg.add(g2);
+  const ig = new THREE.Group(); ig.scale.setScalar(sc); rg.add(ig);
+  interior(ig, r);
+  const ags = agentsByRoom[r.id] || [];
+  const perRow = r.kind === "hq" ? 4 : 3;
+  ags.forEach((a, k) => {
+    const d = deskSlot(a);
+    const s2 = sc * (ags.length > 6 ? 0.8 : 1);
+    d.scale.setScalar(s2);
+    d.position.set((-rw / 2 + 0.9 * s2 + (k % perRow) * (rw - 1.8 * s2) / Math.max(1, perRow - 1)), 0.02, rd / 2 - 0.9 * s2 - Math.floor(k / perRow) * 1.25 * s2);
+    rg.add(d);
+    d.traverse(o => { if (o.isMesh) { o.userData.pick = d.userData.pick; pickables.push(o); } });
+    agentNodes.set(a.id, d);
+    labelItems.push({ obj: d.userData.label, kind: "agent", id: a.id, working: a.state === "working" });
+  });
+  let chip = "";
+  if (r.kind === "vault") chip = `<span class="chip" style="background:#1d1a16">🔒 түгжээтэй</span>`;
+  else if (r.kind === "workshop") chip = `<span class="chip" style="background:${STAGE_COL[r.stage] || "#777"}">${r.load} төсөл</span>`;
+  else if (r.stage) chip = `<span class="chip" style="background:${STAGE_COL[r.stage] || "#777"}">${esc(r.stage)}</span>`;
+  else if (r.kind === "project") chip = `<span class="chip" style="background:#8a8378">stage алга</span>`;
+  const lb = label(`${esc(r.kind === "workshop" ? "⚙️ " + r.project : r.project)}${chip}`, "lbl" + (r.kind === "archive" || r.parked ? " dim" : ""));
+  lb.position.set(0, gh + 0.2, 0); rg.add(lb);
+  labelItems.push({ obj: lb, kind: "room", id: r.id });
+  if (r.kind === "archive") rg.add(box(rw - 0.1, FH - 0.4, 0.05, 0x1d1a16, 0, 0, rd / 2 - 0.05, { transparent: true, opacity: 0.35 }));
 }
 
 function build(state) {
   if (building) { building.traverse(o => { if (o.isCSS2DObject) o.removeFromParent(); }); scene.remove(building); }
   building = new THREE.Group(); scene.add(building);
-  pickables = []; roomTiles.clear(); agentNodes.clear(); floorGroups.clear();
-  const byFloor = Object.fromEntries(FLOOR_ORDER.map(f => [f, state.rooms.filter(r => r.floor === f)]));
-  const rowsOf = f => (byFloor[f].length > 8 ? 2 : 1);
-  const colsOf = f => Math.max(1, Math.ceil(byFloor[f].length / rowsOf(f)));
-  const maxCols = Math.max(...FLOOR_ORDER.map(colsOf));
-  const W = maxCols * RW, D = 2 * RD;
+  pickables = []; roomTiles.clear(); agentNodes.clear(); floorGroups.clear(); labelItems.length = 0; parkedGroup = null;
   const agentsByRoom = {};
   for (const a of state.agents) (agentsByRoom[a.room] ||= []).push(a);
-
-  // газар
-  const ground = box(W + 8, 0.2, D + 8, 0xd7c6a5, 0, -0.2, 0); ground.receiveShadow = true; building.add(ground);
+  const glassMat = new THREE.MeshLambertMaterial({ color: 0xbfd6e0, transparent: true, opacity: 0.22 });
+  let maxW = 0, maxD = 0;
 
   FLOOR_ORDER.forEach((fid, level) => {
     const fg = new THREE.Group(); fg.position.y = level * LVL; building.add(fg); floorGroups.set(fid, fg);
     const fl = state.floors.find(f => f.id === fid);
+    const all = state.rooms.filter(r => r.floor === fid);
+    // Projects = үндсэн grid (2–3 мөр, stage → нэр) + «Шатгүй / Зогссон» жижиг саарал grid
+    const isP = fid === "projects";
+    const main = isP ? all.filter(r => !r.parked) : all;
+    const parked = isP ? all.filter(r => r.parked) : [];
+    const A = layoutSection(main, isP ? (main.length > 8 ? 3 : 2) : (all.length > 8 ? 2 : 1));
+    const PS = 0.6, gap = parked.length ? 1.5 : 0;
+    const B = parked.length ? layoutSection(parked, 3) : null;
+    const mainW = A.cols * RW, mainD = A.rows * RD;
+    const pW = B ? B.cols * RW * PS : 0, pD = B ? B.rows * RD * PS : 0;
+    const W = mainW + gap + pW, D = Math.max(mainD, pD);
+    maxW = Math.max(maxW, W); maxD = Math.max(maxD, D);
+    const x0 = -W / 2, z0 = -D / 2;
     fg.add(box(W + WALL * 2, 0.18, D + WALL * 2, C.char, 0, -0.18, 0));
-    // зузаан хар гадна хана (ар, зүүн) — урд/баруун нээлттэй тул дотор харагдана
     fg.add(box(W + WALL * 2, FH - 0.2, WALL, C.ink, 0, 0, -D / 2 - WALL / 2));
-    fg.add(box(WALL, FH - 0.2, D + WALL, C.ink, -W / 2 - WALL / 2, 0, WALL / 2 - WALL / 2));
-    const fLbl = label(`<b>${esc(fl?.label || fid)}</b>`); fLbl.position.set(-W / 2 - 1.2, 1.2, D / 2); fg.add(fLbl);
-    const rooms = byFloor[fid], rows = rowsOf(fid), cols = colsOf(fid);
-    const rw = W / cols, rd = D / rows;
-    rooms.forEach((r, i) => {
-      const cx = -W / 2 + rw * (i % cols) + rw / 2, cz = -D / 2 + rd * Math.floor(i / cols) + rd / 2;
-      const rg = new THREE.Group(); rg.position.set(cx, 0, cz); fg.add(rg);
-      const tile = box(rw - 0.08, 0.04, rd - 0.08, null, 0, 0, 0, new THREE.MeshLambertMaterial({ color: roomColor(r) }));
-      tile.userData.pick = { type: "room", id: r.id }; rg.add(tile); pickables.push(tile); roomTiles.set(r.id, tile);
-      // шилэн хана
-      const glass = new THREE.Mesh(new THREE.BoxGeometry(0.06, FH - 0.6, rd - 0.1), new THREE.MeshLambertMaterial({ color: 0xbfd6e0, transparent: true, opacity: 0.22 }));
-      glass.position.set(rw / 2, (FH - 0.6) / 2, 0); rg.add(glass);
-      if (rows > 1 && Math.floor(i / cols) === 0) {
-        const g2 = new THREE.Mesh(new THREE.BoxGeometry(rw - 0.1, FH - 0.6, 0.06), glass.material); g2.position.set(0, (FH - 0.6) / 2, rd / 2); rg.add(g2);
-      }
-      const ig = new THREE.Group(); ig.scale.setScalar(Math.min(1, rw / RW, rd / RD)); rg.add(ig);
-      interior(ig, r);
-      // агентуудын ширээ
-      const ags = agentsByRoom[r.id] || [];
-      const perRow = r.kind === "hq" ? 4 : 3;
-      ags.forEach((a, k) => {
-        const d = deskSlot(a);
-        const sc = Math.min(1, rw / RW) * (ags.length > 6 ? 0.8 : 1);
-        d.scale.setScalar(sc);
-        d.position.set((-rw / 2 + 0.9 + (k % perRow) * (rw - 1.4) / Math.max(1, perRow - 1)) * 0.95, 0.02, rd / 2 - 0.9 - Math.floor(k / perRow) * 1.25 * sc);
-        rg.add(d);
-        d.traverse(o => { if (o.isMesh) { o.userData.pick = d.userData.pick; pickables.push(o); } });
-        agentNodes.set(a.id, d);
-      });
-      // шошго
-      let chip = "";
-      if (r.kind === "vault") chip = `<span class="chip" style="background:#1d1a16">🔒 түгжээтэй</span>`;
-      else if (r.kind === "workshop") chip = `<span class="chip" style="background:${STAGE_COL[r.stage] || "#777"}">${r.load} төсөл</span>`;
-      else if (r.stage) chip = `<span class="chip" style="background:${STAGE_COL[r.stage] || "#777"}">${esc(r.stage)}</span>`;
-      else if (r.kind === "project") chip = `<span class="chip" style="background:#8a8378">stage алга</span>`;
-      const lb = label(`${esc(r.kind === "workshop" ? "⚙️ " + r.project : r.project)}${chip}`, "lbl" + (r.kind === "archive" || r.status === "on-hold" ? " dim" : ""));
-      lb.position.set(0, FH - 0.4, 0); rg.add(lb);
-      rg.userData.room = r;
-      if (r.kind === "archive") rg.add(box(rw - 0.1, FH - 0.4, 0.05, 0x1d1a16, 0, 0, rd / 2 - 0.05, { transparent: true, opacity: 0.35 }));
-    });
+    fg.add(box(WALL, FH - 0.2, D + WALL, C.ink, -W / 2 - WALL / 2, 0, 0));
+    const fLbl = label(`<b>${esc(fl?.label || fid)}</b>`, "lbl floor"); fLbl.position.set(-W / 2, FH + 0.3, -D / 2); fg.add(fLbl);
+    A.rooms.forEach((r, i) => placeRoom(fg, r, x0 + RW * (i % A.cols) + RW / 2, z0 + RD * Math.floor(i / A.cols) + RD / 2, RW, RD, agentsByRoom, glassMat));
+    if (B) {
+      parkedGroup = new THREE.Group(); fg.add(parkedGroup);
+      const px = x0 + mainW + gap, rw = RW * PS, rd = RD * PS;
+      parkedGroup.add(box(pW, 0.05, pD, 0x8f887c, px + pW / 2, 0, z0 + pD / 2));
+      B.rooms.forEach((r, i) => placeRoom(parkedGroup, r, px + rw * (i % B.cols) + rw / 2, z0 + rd * Math.floor(i / B.cols) + rd / 2, rw, rd, agentsByRoom, glassMat));
+      const pl = label("Шатгүй / Зогссон", "lbl floor dim"); pl.position.set(px + pW / 2, FH * PS + 0.4, z0); parkedGroup.add(pl);
+    }
   });
-  building.userData.size = { W, D, H: (FLOOR_ORDER.length - 1) * LVL + FH };
-  applyFloor(activeFloor);
+  const ground = box(maxW + 8, 0.2, maxD + 8, 0xd7c6a5, 0, -0.2, 0); ground.receiveShadow = true; building.add(ground);
+  building.userData.size = { W: maxW, D: maxD, H: (FLOOR_ORDER.length - 1) * LVL + FH };
 }
 
-function setVisible(obj, v) { obj.visible = v; obj.traverse(o => { if (o.isCSS2DObject) o.visible = v; }); }
+function setVisible(obj, v) { obj.visible = v; obj.traverse(o => { if (o.isCSS2DObject) o.visible = isShown(o.parent); }); }
 
-function applyFloor(fid) {
+function updateVisibility() {
+  for (const [id, g] of floorGroups) setVisible(g, activeFloor === "all" || id === activeFloor);
+  if (parkedGroup) setVisible(parkedGroup, showParked);
+}
+
+// Харагдаж буй хэсгийг камерт бүтэн багтаана (дээд мөрийн доор)
+function fitTo(obj) {
+  scene.updateMatrixWorld(true); // шинэ group-уудын matrixWorld хараахан шинэчлэгдээгүй
+  const b = new THREE.Box3();
+  obj.traverse(m => { if (m.isMesh && isShown(m)) b.expandByObject(m, false); });
+  if (b.isEmpty()) return;
+  const center = b.getCenter(new THREE.Vector3());
+  resetView(center);
+  camera.updateMatrixWorld();
+  const inv = camera.matrixWorldInverse.clone();
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const c0 = center.clone().applyMatrix4(inv);
+  for (let i = 0; i < 8; i++) {
+    const p = new THREE.Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(inv).sub(c0);
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  }
+  const hh = document.querySelector("header").offsetHeight + 28; // дээд мөр + шошгын зай
+  const usable = Math.max(0.3, (innerHeight - hh) / innerHeight);
+  const a = innerWidth / innerHeight;
+  const size = Math.max((maxY - minY) * 1.06 / usable, (maxX - minX) * 1.06 / a);
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+  const t = center.clone().addScaledVector(right, (minX + maxX) / 2).addScaledVector(up, (minY + maxY) / 2 + (hh / 2) * size / innerHeight);
+  resetView(t, size);
+}
+
+function applyFloor(fid, refit = true) {
   activeFloor = fid;
-  document.body.classList.toggle("overview", fid === "all");
-  for (const [id, g] of floorGroups) setVisible(g, fid === "all" || id === fid);
-  document.querySelectorAll("#floors button").forEach(b => b.classList.toggle("on", b.dataset.f === fid));
-  const s = building?.userData.size;
-  if (!s) return;
-  const a = innerWidth / innerHeight, wide = (s.W * 0.78 + s.D) / a; // өргөнөөр ч багтаана (утас)
-  if (fid === "all") resetView(new THREE.Vector3(0, s.H / 2 - 1, 0), Math.max(s.H * 1.7, s.W * 0.75, wide));
-  else resetView(new THREE.Vector3(0, FLOOR_ORDER.indexOf(fid) * LVL + 1, 0), Math.max(14, s.W * 0.7, wide));
+  updateVisibility();
+  document.querySelectorAll("#floors button[data-f]").forEach(b => b.classList.toggle("on", b.dataset.f === fid));
+  if (refit && building) fitTo(fid === "all" ? building : floorGroups.get(fid));
+}
+
+// ---------- шошго: zoom/hover/сонголт + давхцал нуух ----------
+let lastLabelPass = 0;
+function labelPass(now) {
+  if (now - lastLabelPass < 120) return;
+  lastLabelPass = now;
+  const ppu = innerHeight / (viewSize / camera.zoom); // нэг world unit = хэдэн пиксел
+  const want = [];
+  for (const it of labelItems) {
+    const el = it.obj.element;
+    if (!it.obj.visible) continue;
+    const isSel = selected && selected.type === it.kind && selected.id === it.id;
+    const isHov = hovered && hovered.type === it.kind && hovered.id === it.id;
+    const zoomOk = it.kind === "room" ? ppu > 14 : ppu > 26;
+    if (isSel || isHov || zoomOk) want.push({ el, pr: isSel || isHov ? 3 : it.kind === "agent" && it.working ? 2 : it.kind === "room" ? 1 : 0 });
+    else el.style.visibility = "hidden";
+  }
+  want.sort((x, y) => y.pr - x.pr);
+  const taken = [];
+  for (const w of want) {
+    w.el.style.visibility = "visible";
+    const r = w.el.getBoundingClientRect();
+    if (!r.width) continue;
+    const hit = w.pr < 3 && taken.some(t => r.left < t.right && r.right > t.left && r.top < t.bottom && r.bottom > t.top);
+    if (hit) w.el.style.visibility = "hidden"; else taken.push(r);
+  }
 }
 
 // ---------- UI ----------
@@ -316,6 +385,10 @@ function renderFloorButtons(floors) {
     const b = document.createElement("button"); b.textContent = f.id === "all" ? f.label : f.label.split(" · ")[0]; b.dataset.f = f.id;
     b.onclick = () => applyFloor(f.id); wrap.appendChild(b);
   }
+  const pk = document.createElement("button"); pk.id = "parked"; pk.className = "on"; pk.textContent = "Шатгүй / Зогссон";
+  pk.title = "Stage-гүй болон зогссон төслүүдийг харуулах/нуух";
+  pk.onclick = () => { showParked = !showParked; pk.classList.toggle("on", showParked); updateVisibility(); };
+  wrap.appendChild(pk);
 }
 function counts() {
   const ag = STATE?.agents || [];
@@ -324,7 +397,7 @@ function counts() {
   $("nTalk").textContent = talkCount;
 }
 function openCard(html) { $("cardBody").innerHTML = html; $("card").classList.add("show"); }
-function closeCard() { $("card").classList.remove("show"); }
+function closeCard() { $("card").classList.remove("show"); selected = null; }
 $("close").onclick = closeCard;
 addEventListener("keydown", e => { if (e.key === "Escape") closeCard(); });
 $("reset").onclick = () => applyFloor(activeFloor);
@@ -380,6 +453,7 @@ renderer.domElement.addEventListener("pointerdown", e => { downAt = [e.clientX, 
 renderer.domElement.addEventListener("pointerup", e => {
   if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
   const p = pickAt(e);
+  selected = p;
   if (!p) return closeCard();
   if (p.type === "agent") agentCard(STATE.agents.find(a => a.id === p.id));
   else roomCard(STATE.rooms.find(r => r.id === p.id));
@@ -428,7 +502,7 @@ function enqueueReal(list) {
 }
 const DEMO = [
   ["send_message", "Brief бэлэн, дизайн руу шилжүүлье"], ["🙋", "Figma-ийн эрх хэрэгтэй байна"], ["✅", "Task дууссан — шалгаад баталъя"],
-  ["Discord", "#byd-website-д тайлан орлоо"], ["send_message", "Судалгааны дүгнэлтийг атом болгосон"], ["✅", "Deploy амжилттай"],
+  ["Discord", "#project-a-д тайлан орлоо"], ["send_message", "Судалгааны дүгнэлтийг атом болгосон"], ["✅", "Deploy амжилттай"],
 ];
 let demoTimer = null;
 $("demo").onclick = () => {
@@ -456,7 +530,7 @@ async function poll() {
     const first = !STATE;
     STATE = s;
     if (first) renderFloorButtons(s.floors);
-    if (nsig !== sig) { sig = nsig; const keep = activeFloor; build(s); if (!first) applyFloor(keep); }
+    if (nsig !== sig) { sig = nsig; build(s); applyFloor(activeFloor, first); }
     enqueueReal(s.conversations || []);
     counts(); $("err").textContent = "";
   } catch (e) { $("err").textContent = "Өгөгдөл татаж чадсангүй: " + e.message; }
@@ -473,6 +547,7 @@ function loop(now) {
   }
   renderer.render(scene, camera);
   labels.render(scene, camera);
+  labelPass(now);
   requestAnimationFrame(loop);
 }
 resize();

@@ -1,0 +1,6 @@
+{
+  "_comment": "Хуулаад vault-ийн _system/fm/fm-office.json болго. Төслийн жинхэнэ нэрс зөвхөн vault-д.",
+  "aliases": { "proj-a": "Project A", "proj-b": "Project B Website" },
+  "research": ["topic-x", "topic-y"],
+  "generic": ["project", "area", "creative", "developer", "content-writer", "command-center", "resource", "finance"]
+}
