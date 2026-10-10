@@ -2259,7 +2259,8 @@ export const register: Register = (on, options) => {
         const fin = isFin(x)
         const run = isRun(x)
         const c = fin ? C.done : C.text
-        const time = x.time || (run ? clockOf(x.started ?? '') : fin ? clockOf(x.completed ?? '') : '') || '—'
+        // a finished row: «Цаг» = when work began (its end is in «Төлөв»); never claimed → no start, so the end time
+        const time = x.time || (run ? clockOf(x.started ?? '') : fin ? clockOf(x.started ?? '') || clockOf(x.completed ?? '') : '') || '—'
         const gl = roleGlyph(x)
         const press = toggleSel(x)
         return (
