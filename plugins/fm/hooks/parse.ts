@@ -126,7 +126,8 @@ export function parseTask(name: string, text: string): VaultTask | null {
   const done = status === 'completed'
   if (!OPEN.has(status) && !done) return null
   const project = projectOf(field('project'))
-  const started = status === 'in-progress' ? field('started') : ''
+  // a finished task keeps its start: the day table shows when work began, next to when it ended
+  const started = status === 'in-progress' || done ? field('started') : ''
   const claimed = status === 'in-progress' ? field('claimed') : ''
   const completed = done ? field('completed') : ''
   const owners = ownersOf(fm)
