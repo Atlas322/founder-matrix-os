@@ -7,7 +7,8 @@ Usage:
                      [--body "..."]
     fm_task.py claim <vault> "<task title or file>" --by "<Role> · <device>" [--device PC|Mac]
     fm_task.py done  <vault> "<task title or file>" --by "<Role> · <device>" --summary "..." [--device PC|Mac]
-    fm_task.py set   <vault> "<task title or file>" [--status S] [--owner O] [--priority P] [--due D]
+                     [--started "HH:MM" | "YYYY-MM-DD HH:MM"]
+    fm_task.py set  <vault> "<task title or file>" [--status S] [--owner O] [--priority P] [--due D]
                      [--device PC|Mac] [--sid <session id>]
     fm_task.py list  <vault> [--owner R] [--status S] [--open]
 
@@ -31,6 +32,11 @@ completed:. A task with an open 🙋 by someone else, or in-progress with `claim
 cannot be claimed (exit 4). Device = --device, else the `· PC` / `· Mac` suffix of --by, else
 fmconfig.DEVICE: env FMOS_DEVICE > ~/.fmos/config.json "device" (location: env FMOS_CONFIG) >
 "Mac" on macOS, else "PC".
+
+`done` on a task that was never claimed (no `started:`): the pane can show no working time for it, so
+`done` warns, still records `claimed: <device>` (who finished it), and takes the real start with
+--started (HH:MM = today; never later than the finish). A recorded `started:` is never overwritten;
+--started on an already completed task only fills an empty `started:` (backfill).
 
 Pure standard library, Python 3.9+, macOS / Windows / Linux. Writes only inside 01-GTD/Tasks/.
 """
@@ -95,7 +101,7 @@ def _opt(args: List[str], key: str, default: str = "") -> str:
 
 def _positional(args: List[str]) -> List[str]:
     flags_with_value = {"--owner", "--project", "--status", "--priority", "--due", "--context",
-                        "--body", "--by", "--summary", "--device", "--sid"}
+                        "--body", "--by", "--summary", "--device", "--sid", "--started"}
     out, skip = [], False
     for a in args:
         if skip:
@@ -323,6 +329,20 @@ def mark_completed(fm: List[str], was: Optional[str] = None) -> List[str]:
     return fm
 
 
+def parse_started(value: str, finished: str) -> str:
+    """--started "HH:MM" (today) or "YYYY-MM-DD HH:MM" -> a stamp not later than `finished`; dies on anything else."""
+    value = value.strip()
+    if re.fullmatch(r"\d{1,2}:\d{2}", value):
+        value = "%s %s" % (datetime.date.today().isoformat(), value)
+    try:
+        stamp = datetime.datetime.strptime(value, "%Y-%m-%d %H:%M").strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        _die("--started буруу: %s (HH:MM эсвэл YYYY-MM-DD HH:MM)" % value)
+    if finished and stamp > finished:
+        _die("--started (%s) дууссан цагаас (%s) хойш байна." % (stamp, finished))
+    return stamp
+
+
 def requeue(fm: List[str], status: str) -> List[str]:
     """status -> inbox | next-action | waiting | someday | cancelled: `claimed:`, `started:`, `completed:` are emptied
     (the requeued / delegated / parked task is free to be claimed again; nothing of the old run is left)."""
@@ -541,11 +561,28 @@ def cmd_done(vault: Path, args: List[str]) -> None:
     other = other_device_claim(fm, device)
     if other:
         _die("Энэ таскийг ▶ %s авсан. Түүний өмнөөс ✅ бүү тавь." % other, 4)
+    was_done = canon_status(fm_get(fm, "status")) == "completed"
+    finished = fm_get(fm, "completed") if was_done else now_stamp()
+    given = _opt(args, "--started")
+    started = parse_started(given, finished) if given.strip() else ""  # validated before anything is written
+    untracked = not fm_get(fm, "started")  # never claimed: no start, so no working time
+    backfill = was_done and untracked and bool(started)
     fm = mark_completed(fm)
+    if untracked:
+        if started:
+            fm = fm_set(fm, "started", started)
+        if not fm_get(fm, "claimed"):
+            fm = fm_set(fm, "claimed", device)
     fm = fm_set(fm, "updated", datetime.date.today().isoformat())
-    body = append_progress(body, "- %s ✅ дууслаа: %s (%s)" % (now_stamp(), summary, who))
+    if backfill:
+        body = append_progress(body, "- %s ✏️ started=%s (нөхөв, %s)" % (now_stamp(), started, who))
+    else:
+        body = append_progress(body, "- %s ✅ дууслаа: %s (%s)" % (now_stamp(), summary, who))
     write(path, join_note(fm, body))
     _out("✅ дууслаа → %s" % path.relative_to(vault).as_posix())
+    if untracked and not started:
+        _out("⚠️ started: алга - энэ таскийг claim хийлгүй дуусгасан тул ажилласан хугацаа хэмжигдээгүй. "
+             "Нөхөх: done \"%s\" --by \"%s\" --summary \"...\" --started HH:MM. Дараа: ажил эхлэхдээ claim." % (path.stem, who))
 
 
 def cmd_set(vault: Path, args: List[str]) -> None:
