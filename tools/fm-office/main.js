@@ -1,4 +1,5 @@
 // FM Office — vault = барилга, давхар = PARA, өрөө = төсөл (дотор нь stage), хүн = агент сешн.
+import { $, esc } from "/util.js";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
@@ -87,7 +88,6 @@ function label(html, cls = "lbl") {
   el.innerHTML = html;
   return new CSS2DObject(el);
 }
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const hash = s => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 
 // ---------- room interiors (stage → тавилга) ----------
@@ -383,7 +383,6 @@ function labelPass(now) {
 }
 
 // ---------- UI ----------
-const $ = id => document.getElementById(id);
 function renderFloorButtons(floors) {
   const wrap = $("floors"); wrap.innerHTML = "";
   for (const f of [{ id: "all", label: "Бүгд" }, ...floors]) {

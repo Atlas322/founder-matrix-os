@@ -1,7 +1,5 @@
 // FM Office 2.5D — батлагдсан зурагтай барилга / өрөө / оффис. /api/state-ийг (3D-тэй ижил) ашиглана.
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const STAGE_COL = { "Brief": "var(--ka-brief)", "Бэлтгэл": "var(--ka-beltgel)", "Дизайн": "var(--ka-dizain)", "Хөгжүүлэлт": "var(--ka-hugjuulelt)", "Контент": "var(--ka-kontent)" };
+import { $, esc, STAGE_COL } from "/util.js";
 const FLOOR_NUM = { projects: "03", areas: "04", resources: "05", business: "B", archive: "99" };
 const FLOOR_NAME = { projects: "Projects", areas: "Areas", resources: "Resources", business: "Business", archive: "Archive" };
 const VIEW_TXT = {

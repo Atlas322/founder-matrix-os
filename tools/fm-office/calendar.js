@@ -1,7 +1,5 @@
 // 📅 Цаглабар — хуанли (Өдөр / 7 хоног / Сар), огноогүй тавиур, чирж товлох (баталгаажуулалттай, буцаах боломжтой).
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const STAGE_COL = { "Brief": "var(--ka-brief)", "Бэлтгэл": "var(--ka-beltgel)", "Дизайн": "var(--ka-dizain)", "Хөгжүүлэлт": "var(--ka-hugjuulelt)", "Контент": "var(--ka-kontent)" };
+import { $, esc, STAGE_COL } from "/util.js";
 const DOW = ["НЯ", "ДА", "МЯ", "ЛХ", "ПҮ", "БА", "БЯ"];
 const STATUS = { "next-action": "дараагийн алхам", waiting: "хүлээж буй", inbox: "inbox", someday: "хэзээ нэгэн цагт", completed: "дууссан", done: "дууссан", cancelled: "цуцалсан", scheduled: "товлосон" };
 const H0 = 8, H1 = 21, ROW = 52;
