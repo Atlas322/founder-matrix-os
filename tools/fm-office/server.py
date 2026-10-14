@@ -19,6 +19,7 @@ STATIC = {"/": ("office2d.html", "text/html; charset=utf-8"),          # 2.5D з
           "/tokens.css": ("tokens.css", "text/css; charset=utf-8"),
           "/calendar": ("calendar.html", "text/html; charset=utf-8"),          # 📅 Цаглабар модуль
           "/calendar.js": ("calendar.js", "text/javascript; charset=utf-8"),
+          "/util.js": ("util.js", "text/javascript; charset=utf-8"),
           "/3d": ("index.html", "text/html; charset=utf-8"),             # хуучин Three.js хувилбар
           "/index.html": ("index.html", "text/html; charset=utf-8"),
           "/main.js": ("main.js", "text/javascript; charset=utf-8")}
