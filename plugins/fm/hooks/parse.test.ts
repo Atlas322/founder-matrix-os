@@ -405,3 +405,12 @@ test('planOf reads the mirrored «## Явц» steps (other device live view)', (
   expect(planOf(t)).toEqual([{ subject: 'build', done: true }, { subject: 'test', done: false }])
   expect(planOf('no block')).toEqual([])
 })
+
+test('a completed task keeps its started stamp, so the day table can show when work began', () => {
+  expect(parseTask('F.md', note('type: task\nstatus: completed\nupdated: 2026-10-10\nstarted: 2026-10-10 11:28\ncompleted: 2026-10-10 12:00'))).toEqual(
+    { title: 'F', status: 'completed', due: '', owner: '', updated: '2026-10-10', started: '2026-10-10 11:28', completed: '2026-10-10 12:00' })
+  // never claimed: no started, nothing invented
+  expect(parseTask('G.md', note('type: task\nstatus: completed\nupdated: 2026-10-10\ncompleted: 2026-10-10 12:00'))?.started).toBeUndefined()
+  // an open, not running task still carries no stale start
+  expect(parseTask('H.md', note('type: task\nstatus: next-action\nstarted: 2026-10-09 09:00'))?.started).toBeUndefined()
+})
