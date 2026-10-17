@@ -67,8 +67,10 @@ def frontmatter(text):
 class Names:
     def __init__(self, vault, cfg):
         self.titles = sidebar_titles()
-        role_map = {"portfolio": "project", "content": "creative"}
+        role_map = {"portfolio": "project", "content": "creative", "developer": "architect", "system": "architect",
+                    "area": "gtd", "resource": "wiki"}  # fm 0.9.0-ийн хуучин slug
         role_map.update(cfg.get("role_map") or {})
+        self.role_map = role_map
         self.alias = {}  # norm(old name) → current title
         for d in ROLE_NOTE_DIRS:
             base = Path(vault) / d
@@ -105,6 +107,7 @@ class Names:
     def display(self, v, room_name=None):
         """Registry-ийн нэг сешн → одоогийн харуулах нэр (төхөөрөмжгүй)."""
         role, proj = v.get("role") or "", str(v.get("project") or "")
+        role = self.role_map.get(role, role)
         if (role == "project" or (not role and v.get("group") == "projects")) and proj not in ("", "project"):
             return "📁 " + (room_name or clean(v.get("title") or v.get("name") or proj))
         if role == "research":
