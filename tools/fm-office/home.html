@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FM Office · Гэр</title>
+<!-- Мини хот = гэрийн орчмын БОДИТ гудамж (OSM, 5 км, /api/osm — cache ~/.fmos). Хэв маяг: A+B+C (архитектурын axonometric:
+     цагаан бөөн хэлбэр + нимгэн зураас, гаа ногоон цэцэрлэг, шар талбай, цагаан мод, жижиг хүмүүс, улаан accent).
+     Хурд: бүх барилга НЭГ geometry (merge), мод/хүн InstancedMesh, нэг сүүдэр. Уур амьсгал: өдөр · намар · бүрхэг · бороо · шөнө. -->
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --paper:#F3F2EE; --line:#1A1A1A; --accent:#D6453D; --muted:#7a776f; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; overflow:hidden; background:var(--paper); color:var(--line); font:400 14px/1.45 "Inter Tight", Inter, system-ui, sans-serif; -webkit-font-smoothing:antialiased; transition:background .6s; }
+  canvas { display:block; }
+  .hud { position:fixed; top:64px; left:20px; z-index:3; background:#fff; border:1px solid var(--line); padding:16px 18px; width:290px; }
+  .hud .eb { font-size:10px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+  .hud h1 { margin:4px 0 6px; font-size:22px; font-weight:500; letter-spacing:-.01em; }
+  .hud p { margin:0 0 10px; font-size:12.5px; color:var(--muted); }
+  .hud .row { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .hud .lbl2 { font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-top:12px; }
+  .hud button { font:500 12.5px "Inter Tight", Inter, system-ui, sans-serif; border:1px solid var(--line); background:#fff; padding:5px 10px; cursor:pointer; color:var(--line); }
+  .hud button:hover, .hud button.on { background:var(--line); color:#fff; }
+  .hud button.go { background:var(--accent); border-color:var(--accent); color:#fff; }
+  #load { position:fixed; inset:0; display:grid; place-items:center; z-index:6; background:var(--paper); font:500 13px "Inter Tight", sans-serif; color:var(--muted); letter-spacing:.08em; transition:opacity .5s; }
+  #fps { position:fixed; right:20px; bottom:16px; font:600 11px ui-monospace, monospace; color:var(--muted); z-index:3; }
+  .panel { position:fixed; right:20px; top:64px; z-index:3; width:min(340px, calc(100vw - 40px)); max-height:calc(100vh - 100px); overflow:auto; background:#fff; border:1px solid var(--line); padding:18px 20px; display:none; }
+  .panel.on { display:block; } .panel h2 { margin:0 0 8px; font-size:20px; font-weight:500; }
+  .panel .x { float:right; border:1px solid var(--line); background:#fff; cursor:pointer; font:inherit; font-size:12px; padding:2px 8px; }
+  .panel a { color:var(--line); text-underline-offset:3px; } .panel a:hover { color:var(--accent); }
+  .panel ul { padding-left:18px; margin:8px 0; } .panel li { margin:4px 0; } .panel small { color:var(--muted); }
+  .stat { display:inline-block; margin:2px 18px 8px 0; } .stat b { display:block; font-size:26px; font-weight:500; }
+  .attr { position:fixed; left:20px; bottom:12px; font-size:10.5px; color:var(--muted); z-index:3; }
+  body.night .attr, body.night #fps { color:#8d93b8; }
+  .clients { position:fixed; right:20px; bottom:16px; z-index:3; width:300px; max-height:46vh; overflow:auto; background:#fff; border:1px solid var(--line); padding:12px 14px; display:none; }
+  .clients.on { display:block; } .clients h2 { margin:0 0 4px; font-size:16px; font-weight:500; } .clients h3 { margin:10px 0 2px; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  .clients button { display:block; width:100%; text-align:left; background:none; border:none; border-left:3px solid var(--accent); padding:5px 9px; margin:3px 0; cursor:pointer; font:inherit; color:var(--line); }
+  .clients button:hover { background:#F3F2EE; } .clients small { display:block; color:var(--muted); font-size:11px; } .clients .un { border-left:3px dashed #bbb; padding:5px 9px; margin:3px 0; }
+  .cpin { font:600 11.5px "Inter Tight", Inter, sans-serif; color:#fff; background:var(--accent); padding:3px 8px; white-space:nowrap; pointer-events:auto; cursor:pointer; transform:translateY(-6px); }
+  .mini { position:absolute; top:8px; right:8px; width:24px; height:24px; border:1px solid var(--line); background:#fff; cursor:pointer; font:600 14px/1 "Inter Tight", sans-serif; padding:0; }
+  .hud, .panel, .clients { position:fixed; } .hud.min > :not(.eb):not(h1):not(.mini) { display:none; } .hud.min h1 { margin-bottom:0; }
+  .panel.min #pc > :not(h2) { display:none; } .clients.min > :not(h2):not(.mini) { display:none; }
+  #fade { position:fixed; inset:0; background:var(--paper); opacity:0; pointer-events:none; z-index:5; }
+  @media (max-width:700px) { .hud { width:auto; right:20px; } .hud p { display:none; } .panel { top:auto; bottom:16px; max-height:45vh; } }
+</style>
+<script type="importmap">{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+  "gsap": "https://unpkg.com/gsap@3.12.5/index.js" } }</script>
+</head>
+<body>
+<div id="load">ГУДАМЖ АЧААЛЖ БАЙНА…</div>
+<div class="hud">
+  <button class="mini" data-min title="Хураах">–</button><div class="eb">Гэр · мини хот</div>
+  <h1>Миний гудамж</h1>
+  <p>Гэрийн орчмын бодит 5 км. Чирж эргүүлж, дугуйгаар ойртуулна.</p>
+  <div class="lbl2">Байгууламж</div>
+  <div class="row"><button data-go="home">Гэр</button><button data-go="gallery">Gallery</button><button data-go="library">Номын сан</button><button data-go="park">Цэцэрлэг</button><button data-go="all">Хот</button><button id="cbtn">Харилцагч</button></div>
+  <div class="lbl2">Уур амьсгал</div>
+  <div id="wx" style="font-size:12.5px;margin-top:6px">Улаанбаатар · цаг агаар ачаалж байна…</div>
+  <div class="row" id="moods"><button data-m="live" class="on">● Бодит</button><button data-m="day">Өдөр</button><button data-m="autumn">Намар</button><button data-m="overcast">Бүрхэг</button><button data-m="rain">Бороо</button><button data-m="dusk">Үдэш</button><button data-m="snow">Цас</button><button data-m="night">Шөнө</button></div>
+  <div class="row"><button class="go" id="office">Оффис руу →</button></div>
+</div>
+<aside class="clients" id="clients"></aside>
+<aside class="panel" id="panel"><button class="x" id="px">Хаах</button><button class="mini" data-min title="Хураах" style="right:64px">–</button><div id="pc"></div></aside>
+<div class="attr">© OpenStreetMap contributors</div>
+<div id="haze" style="position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;transition:opacity 1.5s;background:radial-gradient(ellipse at 50% 40%, rgba(150,138,118,.35), rgba(120,108,92,.75))"></div>
+<div id="fps"></div><div id="fade"></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { gsap } from 'gsap';
+import { LABEL_CSS } from '/diagram.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches, MOBILE = innerWidth < 700;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+document.head.insertAdjacentHTML('beforeend', `<style>${LABEL_CSS}</style>`);
+
+// ---------- уур амьсгалын палитр (Figma «04 · Барилга» 3:1193: A+B+C · намар · бүрхэг · бороо · шөнө noir) ----------
+const MOODS = {
+  day:      { bg: 0x1d3f8f, ground: 0xefe6d6, road: 0xd8cdbb, mass: 0xf7efe2, line: 0x1a1a1a, park: 0x3f7d4a, plaza: 0xf2c230, water: 0x2d6fb3, pitch: 0xc8452c,
+              crown: [0x2f6a3b, 0x3f7d4a, 0x2a5a36, 0xd8432c], sun: 1.15, sunC: 0xfff4e6, hemi: 2.1, shadow: true, people: 0x3a3833, lit: 0 },
+  autumn:   { bg: 0x1d3f8f, ground: 0xeee2cc, road: 0xd6c8b0, mass: 0xf6ead8, line: 0x221c16, park: 0xb08a2e, plaza: 0xe8a33d, water: 0x2d6fb3, pitch: 0xc8452c,
+              crown: [0xe8a33d, 0xd9682e, 0xf2c14e, 0xb5482a, 0xe08a3a], sun: 1.35, sunC: 0xffdcae, hemi: 1.8, shadow: true, people: 0x3a2f28, lit: 0 },
+  overcast: { bg: 0xe4e7ea, ground: 0xdfe2e4, road: 0xcdd1d5, mass: 0xf6f7f7, line: 0x23272b, park: 0xa7bf9a, plaza: 0xe2d29a, water: 0x8eaab8, pitch: 0xc98670,
+              crown: [0xb8cc9c, 0xa3bd8b], sun: .25, sunC: 0xeef2f6, hemi: 2.9, shadow: false, people: 0x33373b, lit: .05 },
+  rain:     { bg: 0x7f8a99, ground: 0x6f7a88, road: 0x5d6775, mass: 0xc9ced6, line: 0x14181f, park: 0x6f8d6a, plaza: 0xb59b5c, water: 0x4f6d84, pitch: 0x9a5c4c,
+              crown: [0xc9a447, 0x7f9a5c, 0xb8642f], sun: .35, sunC: 0xdfe6f0, hemi: 1.6, shadow: false, people: 0x1b1f26, lit: .35, rain: true },
+  snow:     { bg: 0xeef1f4, ground: 0xf7f8fa, road: 0xd4d8de, mass: 0xfdfdfd, line: 0x1d2430, park: 0xf2f4f6, plaza: 0xe9e4d6, water: 0xc9d8e2, pitch: 0xe8d6d0,
+              crown: [0xffffff], bare: true, sun: .8, sunC: 0xf2f6ff, hemi: 2.4, shadow: true, people: 0x262c36, lit: .12, snowfall: true },
+  dusk:     { dusk: true, bg: 0x6c5ba8, ground: 0x5a4c98, road: 0x4a3f88, mass: 0xf3a58c, line: 0x241d55, park: 0x3f3f88, plaza: 0x7c5ba0, water: 0x2b2e78, pitch: 0xc46a6a,
+              crown: [0x2f2f74, 0x3a3a82], sun: 1.1, sunC: 0xffb48e, hemi: 1.0, shade: 0x403c96, shadow: true, people: 0x1e1a44, lit: .3, lampsOn: true, play: 0xb0606e },
+  night:    { bg: 0x161d44, ground: 0x232c63, road: 0x2e3874, mass: 0x3b4690, line: 0x0d1230, park: 0x284c4f, plaza: 0x40406a, water: 0x111d50, pitch: 0x4a2c50,
+              crown: [0x2c3a72, 0x26346a], sun: .7, sunC: 0x9fb2ff, hemi: .95, shadow: true, people: 0x0b0e1e, lit: .36, night: true, mass: 0x24306b },
+};
+let mood = 'day', baseBg = 0xf3f2ee, smog = 0;
+// Утаа (PM2.5) → манан: алсын барилгууд бүдгэрч, өнгө нь бор саарал руу. 12 мкг/м³-ээс доош бол цэвэр.
+function applySmog() {
+  const P = MOODS[mood] || MOODS.day, sc = new THREE.Color(P.night ? 0x3a3448 : 0xa39684), bg = new THREE.Color(baseBg).lerp(sc, smog * .55);
+  const d = camera.position.distanceTo(controls.target);
+  scene.fog = new THREE.Fog(new THREE.Color(baseBg).lerp(sc, smog * .9), d - 250 + (1 - smog) * 1600, d + 250 + (1 - smog) * 4200);
+  scene.background = bg; renderer.setClearColor(bg); document.body.style.background = '#' + bg.getHexString();
+  const hz = document.getElementById('haze'); if (hz) { hz.style.opacity = (smog * .55).toFixed(2); hz.style.mixBlendMode = P.night ? 'screen' : 'multiply'; }   // ойрын утаа (дэлгэц бүхэлдээ)
+}
+
+// ---------- renderer, сцен, ортографик axonometric камер ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, MOBILE ? 1.5 : 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.prepend(renderer.domElement);
+const labels = new CSS2DRenderer(); labels.setSize(innerWidth, innerHeight);
+Object.assign(labels.domElement.style, { position: 'fixed', top: 0, left: 0, pointerEvents: 'none' });
+document.body.appendChild(labels.domElement);
+const scene = new THREE.Scene();
+const SPAN = 520;                                            // эхний харагдах өргөн (м)
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -6000, 6000);
+function frustum() { const a = innerWidth / innerHeight; Object.assign(camera, { left: -SPAN * a / 2, right: SPAN * a / 2, top: SPAN / 2, bottom: -SPAN / 2 }); camera.updateProjectionMatrix(); }
+frustum(); camera.position.set(800, 640, 800);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.screenSpacePanning = false; controls.minZoom = .055; controls.maxZoom = 7;
+controls.minPolarAngle = .45; controls.maxPolarAngle = 1.1;
+controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+const hemi = new THREE.HemisphereLight(0xffffff, 0xe4e1da, 2); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.castShadow = true; sun.shadow.mapSize.set(MOBILE ? 1024 : 2048, MOBILE ? 1024 : 2048);
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = .08; scene.add(sun, sun.target);
+const SUN_DIR = new THREE.Vector3(.78, .5, -.38).normalize();   // сүүдэр камер тийш (баруун доош) унана
+
+// ---------- материал ----------
+// Poster хэв маяг: гэрлийн 3 шат (сүүдэр · дунд · гэрэлтэй), хооронд нь хатуу хил — таны лавлагаа (halftone poster) шиг.
+const TOON = new THREE.DataTexture(new Uint8Array([40, 150, 255]), 3, 1, THREE.RedFormat); TOON.minFilter = TOON.magFilter = THREE.NearestFilter; TOON.needsUpdate = true;
+const Toon = (o = {}) => new THREE.MeshToonMaterial({ gradientMap: TOON, ...o });
+const mBuild = Toon({ vertexColors: true, side: THREE.DoubleSide, shadowSide: THREE.FrontSide });
+const uRoof = { value: new THREE.Color(1, 1, 1) }, uRoofMix = { value: 0 };
+const uGlow = { value: 0 }, uWinMix = { value: .5 }, uWinCol = { value: new THREE.Color(.72, .78, .84) }, uLit = { value: new THREE.Color(1, .72, .36) };
+// Цонхны текстур (procedural, зураггүй): ханан дээр дэлхийн координатаар 3.2×3.1 м-ийн тор → өдөр шилэн цонх, шөнө зарим нь гэрэлтэнэ.
+mBuild.onBeforeCompile = sh => {
+  Object.assign(sh.uniforms, { uGlow, uWinMix, uWinCol, uLit, uRoof, uRoofMix });
+  sh.vertexShader = 'attribute float glow;\nattribute float base;\nvarying float vGlow;\nvarying float vBase;\nvarying vec3 vWP;\nvarying vec3 vWN;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+    '#include <begin_vertex>\nvGlow = glow; vBase = base; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normal;');
+  sh.fragmentShader = 'uniform vec3 uRoof; uniform float uRoofMix; uniform float uGlow; uniform float uWinMix; uniform vec3 uWinCol; uniform vec3 uLit;\nvarying float vGlow;\nvarying float vBase;\nvarying vec3 vWP;\nvarying vec3 vWN;\n' + sh.fragmentShader
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      float wall = 1.0 - step(0.5, abs(vWN.y));
+      float along = abs(vWN.x) > abs(vWN.z) ? vWP.z : vWP.x;
+      float u = fract(along / 3.2), v = fract((vWP.y - vBase) / 3.1);
+      float win = wall * step(0.26, u) * step(u, 0.74) * step(0.30, v) * step(v, 0.80) * step(2.4, vWP.y - vBase);
+      diffuseColor.rgb = mix(diffuseColor.rgb, uRoof, (1.0 - wall) * uRoofMix);
+      diffuseColor.rgb = mix(diffuseColor.rgb, uWinCol, win * uWinMix);
+      float band = wall * (1.0 - step(0.07, fract((vWP.y - vBase) / 3.1))) * step(3.0, vWP.y - vBase);
+      diffuseColor.rgb *= 1.0 - band * 0.08;`)
+    .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      float flick = step(0.45, fract(sin(dot(floor(vec2(along / 3.2, (vWP.y - vBase) / 3.1)), vec2(12.9898, 78.233))) * 43758.5453));
+      totalEmissiveRadiance += uLit * vGlow * uGlow * win * flick + diffuseColor.rgb * vGlow * uGlow * 0.12;`);
+};   // OSM-ийн эргэлтийн чиглэл холимог
+const mLine = new THREE.LineBasicMaterial({ color: 0x1a1a1a, transparent: true, opacity: .85 });
+const mFlat = k => Toon({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: -k, polygonOffsetUnits: -k * 4 });
+const mats = { ground: mFlat(0), road: mFlat(3), park: mFlat(1), plaza: mFlat(2), water: mFlat(4), pitch: mFlat(2), playground: mFlat(2) };
+const PLAY = { day: 0xe8935c, autumn: 0xd98450, overcast: 0xcf8a6a, rain: 0x9b5f48, snow: 0xe6c9bd, night: 0x5a3046 };
+const mContour = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: .12 });
+const mDash = new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 3, gapSize: 4, transparent: true, opacity: .85 });
+
+// ---------- газрын өндөр: Terrarium DEM (z12, ~30 м), /api/dem (cache) → H(x,z) метр, гэрийн өндрөөс хамааралтай ----------
+let DEM = null, H0 = 0;
+async function loadDEM(lat0, lon0, R) {
+  const Z = 12, n = 2 ** Z, kx = 111320 * Math.cos(lat0 * Math.PI / 180), kz = 110540;
+  const tx = lon => (lon + 180) / 360 * n, ty = lat => (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
+  const lonA = lon0 - (R + 600) / kx, lonB = lon0 + (R + 600) / kx, latA = lat0 + (R + 600) / kz, latB = lat0 - (R + 600) / kz;
+  const x0 = Math.floor(tx(lonA)), x1 = Math.floor(tx(lonB)), y0 = Math.floor(ty(latA)), y1 = Math.floor(ty(latB));
+  const W = (x1 - x0 + 1) * 256, Hh = (y1 - y0 + 1) * 256, cv = document.createElement('canvas'); cv.width = W; cv.height = Hh;
+  const g = cv.getContext('2d', { willReadFrequently: true });
+  await Promise.all([...Array(x1 - x0 + 1)].flatMap((_, i) => [...Array(y1 - y0 + 1)].map((_, j) => new Promise(res => {
+    const im = new Image(); im.onload = () => { g.drawImage(im, i * 256, j * 256); res(); }; im.onerror = res; im.src = `/api/dem?z=${Z}&x=${x0 + i}&y=${y0 + j}`; }))));
+  const px = g.getImageData(0, 0, W, Hh).data, e = new Float32Array(W * Hh);
+  for (let k = 0; k < e.length; k++) e[k] = px[k * 4] * 256 + px[k * 4 + 1] + px[k * 4 + 2] / 256 - 32768;
+  DEM = { e, W, Hh, f: (x, z) => { const lon = lon0 + x / kx, lat = lat0 - z / kz; return [(tx(lon) - x0) * 256, (ty(lat) - y0) * 256]; } };
+  H0 = 0; H0 = H(0, 0);
+}
+function H(x, z) {                                             // билинеар
+  if (!DEM) return 0; const [u, v] = DEM.f(x, z), i = Math.max(0, Math.min(DEM.W - 2, u | 0)), j = Math.max(0, Math.min(DEM.Hh - 2, v | 0)), a = u - i, b = v - j, E = DEM.e, W = DEM.W;
+  return (E[j * W + i] * (1 - a) * (1 - b) + E[j * W + i + 1] * a * (1 - b) + E[(j + 1) * W + i] * (1 - a) * b + E[(j + 1) * W + i + 1] * a * b) - H0;
+}
+
+// ---------- геометр үүсгэгч (бүгд merge) ----------
+function poly(arr, off) { const p = []; for (let i = off; i + 1 < arr.length; i += 2) p.push(new THREE.Vector2(arr[i], arr[i + 1]));
+  if (p.length > 2 && p[0].distanceTo(p.at(-1)) < .01) p.pop(); return p; }
+function flatGeo(list, y) {                                   // олон өнцөгтүүдийг хавтгай нэг geometry болгоно
+  const pos = [];
+  for (const arr of list) { const p = poly(arr, 0); if (p.length < 3) continue;
+    for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(p, [])) for (const v of [p[a], p[c], p[b]]) pos.push(v.x, y + H(v.x, v.y), v.y); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
+}
+function ribbonGeo(list, y, scale = 1) {                      // зам/гол: тууз (нэг geometry)
+  const pos = [];
+  for (const arr of list) { const w = arr[0] * scale / 2, p = poly(arr, 1);
+    for (let i = 0; i + 1 < p.length; i++) { const a = p[i], b = p[i + 1], d = b.clone().sub(a); const L = d.length(); if (L < .01) continue;
+      const n = new THREE.Vector2(-d.y / L * w, d.x / L * w), e = d.clone().multiplyScalar(w * .9 / L);
+      const A = a.clone().sub(e), B = b.clone().add(e);
+      const q = [A.clone().add(n), A.clone().sub(n), B.clone().sub(n), B.clone().add(n)];
+      for (const k of [0, 2, 1, 0, 3, 2]) pos.push(q[k].x, y + H(q[k].x, q[k].y), q[k].y); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
+}
+let dayCol, nightCol, bGeo, homeIdx = -1, special = {};
+function buildingsGeo(B) {
+  const pos = [], nor = [], col = [], ncol = [], lpos = [], ranges = [], bases = [];
+  const rnd = i => { const x = Math.sin(i * 12.9898) * 43758.5453; return x - Math.floor(x); };
+  B.forEach((b, i) => {
+    const h = b[0], p = poly(b, 1); if (p.length < 3) return;
+    let area = 0; for (let k = 0; k < p.length; k++) { const a = p[k], c = p[(k + 1) % p.length]; area += a.x * c.y - c.x * a.y; }
+    const s = area > 0 ? 1 : -1, start = pos.length / 3;
+    const tone = .94 + rnd(i) * .06, lit = rnd(i + 7), hb = Math.min(...p.map(v => H(v.x, v.y)));
+    const push = (x, y, z, nx, ny, nz) => { pos.push(x, y + hb - (y === 0 ? 3 : 0), z); nor.push(nx, ny, nz); col.push(tone, tone, tone * .985); ncol.push(lit, i); bases.push(hb); };
+    for (let k = 0; k < p.length; k++) {                     // хана
+      const a = p[k], c = p[(k + 1) % p.length], dx = c.x - a.x, dz = c.y - a.y, L = Math.hypot(dx, dz) || 1, nx = s * dz / L, nz = -s * dx / L;
+      push(a.x, 0, a.y, nx, 0, nz); push(c.x, 0, c.y, nx, 0, nz); push(c.x, h, c.y, nx, 0, nz);
+      push(a.x, 0, a.y, nx, 0, nz); push(c.x, h, c.y, nx, 0, nz); push(a.x, h, a.y, nx, 0, nz);
+      lpos.push(a.x, h + hb, a.y, c.x, h + hb, c.y, a.x, hb, a.y, a.x, h + hb, a.y);   // дээвэр + босоо ирмэг
+    }
+    for (const [a, b2, c] of THREE.ShapeUtils.triangulateShape(p, [])) for (const v of [p[a], p[c], p[b2]]) push(v.x, h, v.y, 0, 1, 0);   // дээвэр
+    ranges.push([i, start, pos.length / 3, p.reduce((m, v) => m.add(new THREE.Vector2(v.x, v.y)), new THREE.Vector2()).divideScalar(p.length), h, Math.abs(area) / 2, hb]);
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('glow', new THREE.Float32BufferAttribute(new Float32Array(col.length / 3), 1)); g.setAttribute('base', new THREE.Float32BufferAttribute(bases, 1));
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lpos, 3));
+  dayCol = new Float32Array(col); nightCol = new Float32Array(ncol);
+  return { g, lg, ranges };
+}
+
+// ---------- мод, хүн, бороо (InstancedMesh) ----------
+const crownGeo = new THREE.IcosahedronGeometry(3.2, 1); crownGeo.translate(0, 7.2, 0);
+const trunkGeo = new THREE.CylinderGeometry(.35, .5, 4.5, 5); trunkGeo.translate(0, 2.25, 0);
+const personGeo = new THREE.CapsuleGeometry(.32, 1.05, 2, 6); personGeo.translate(0, .85, 0);
+let crowns, trunks, crowd, walkers = [], rain, crownEdges;
+const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3();
+
+let OSM, places = {};
+// Улаанбаатарын замын ачаалал (цагаар, 0–1): 8–9, 17–19 оргил
+const TRAFFIC = [.14, .09, .07, .07, .1, .22, .5, .88, 1, .78, .62, .6, .66, .62, .6, .68, .85, 1, .96, .76, .55, .4, .3, .2];
+const carGeo = (() => { const b = new THREE.BoxGeometry(4.3, 1.3, 1.9); b.translate(0, 1, 0); const c = new THREE.BoxGeometry(2.3, 1, 1.7); c.translate(-.2, 2.1, 0);
+  const g = new THREE.BufferGeometry(), p = [], n = []; for (const x of [b.toNonIndexed(), c.toNonIndexed()]) { p.push(...x.attributes.position.array); n.push(...x.attributes.normal.array); }
+  g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3)); return g; })();
+let cars, carState = [], lights, trafficNow = .5, NODES, CARKEY, lamps, pools;
+function nextWay(c, end) {                                       // уулзвар: тухайн цэгт холбогдох өөр зам руу (байхгүй бол эргэнэ)
+  const opts = (NODES.get(CARKEY(c.pts[end ? c.pts.length - 1 : 0])) || []).filter(o => o[0] !== c.pts);
+  if (!opts.length) { c.dir *= -1; c.t = end ? 1 : 0; return; }
+  const [w, e] = opts[Math.floor(Math.random() * opts.length)];
+  c.pts = w; c.lane = w.w / 4 + .3;
+  if (e === 0) { c.i = 0; c.t = 0; c.dir = 1; } else { c.i = w.length - 2; c.t = 1; c.dir = -1; }
+}
+const CAR_COLS = [0xf4f4f2, 0xf4f4f2, 0xd9d9d6, 0xb9bcc0, 0x2d3036, 0x2d3036, 0x6d7a88, 0xd6453d];
+async function build() {
+  const r = await fetch('/api/osm'); if (!r.ok) { $('load').textContent = 'OSM өгөгдөл алга (ub-map.local.json?)'; return; }
+  OSM = await r.json(); const R = OSM.radius || 5000;
+  $('load').textContent = 'ГАЗРЫН ӨНДӨР…'; try { await loadDEM(OSM.center[0], OSM.center[1], R); } catch (e) { console.warn('DEM', e); }
+  // газар: 2R талбай, 30 м тор, DEM-ээр өргөгдсөн (уул, толгод)
+  const gg = new THREE.PlaneGeometry(2 * R + 1200, 2 * R + 1200, MOBILE ? 180 : 340, MOBILE ? 180 : 340).rotateX(-Math.PI / 2), gp = gg.attributes.position;
+  for (let i = 0; i < gp.count; i++) gp.setY(i, H(gp.getX(i), gp.getZ(i)) - .4);
+  gg.computeVertexNormals(); const ground = new THREE.Mesh(gg, mats.ground); ground.receiveShadow = true; scene.add(ground);
+  // уулын өндрийн шугам (50 м тутам) — газрын зураг шиг нимгэн зураас
+  { const lp = [], step = 40, N = Math.floor((2 * R + 1200) / step), o = -(R + 600);
+    const base = H0;
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) { const x = o + i * step, z = o + j * step, hs = [H(x, z), H(x + step, z), H(x + step, z + step), H(x, z + step)];
+      const mn = Math.min(...hs), mx = Math.max(...hs);
+      for (let lv = Math.ceil((mn + base) / 50) * 50; lv <= mx + base; lv += 50) { const L = lv - base, pts = [], P4 = [[x, z], [x + step, z], [x + step, z + step], [x, z + step]];
+        for (let k = 0; k < 4; k++) { const a = hs[k], b = hs[(k + 1) % 4]; if ((a - L) * (b - L) < 0) { const t = (L - a) / (b - a), A = P4[k], B = P4[(k + 1) % 4]; pts.push(A[0] + (B[0] - A[0]) * t, L + .6, A[1] + (B[1] - A[1]) * t); } }
+        if (pts.length >= 6) lp.push(...pts.slice(0, 6)); } }
+    const cl = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)), mContour); cl.raycast = () => {}; scene.add(cl); }
+  const A = OSM.areas || {};
+  for (const [k, y] of [['plaza', .3], ['park', .2], ['pitch', .35], ['playground', .36], ['water', .45]]) if (A[k]) { const m = new THREE.Mesh(flatGeo(A[k], y), mats[k]); m.receiveShadow = true; scene.add(m); }
+  // замын голын тасархай зураас (8 м-ээс өргөн зам)
+  { const lp = []; for (const rd of OSM.roads) { if (rd[0] < 8) continue; const p = poly(rd, 1); for (let i = 0; i + 1 < p.length; i++) lp.push(p[i].x, .7 + H(p[i].x, p[i].y), p[i].y, p[i + 1].x, .7 + H(p[i + 1].x, p[i + 1].y), p[i + 1].y); }
+    const dl = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)), mDash); dl.computeLineDistances(); dl.raycast = () => {}; scene.add(dl); }
+  const roads = new THREE.Mesh(ribbonGeo(OSM.roads, .55), mats.road); roads.receiveShadow = true; scene.add(roads);
+  if (OSM.rivers?.length) scene.add(new THREE.Mesh(ribbonGeo(OSM.rivers, .5), mats.water));
+  const { g, lg, ranges } = buildingsGeo(OSM.buildings); bGeo = g; RANGES = ranges;
+  const bm = new THREE.Mesh(g, mBuild); bm.castShadow = bm.receiveShadow = true; scene.add(bm);
+  const lines = new THREE.LineSegments(lg, mLine); lines.raycast = () => {}; scene.add(lines);
+  // гэр = төвд хамгийн ойр барилга; Gallery = ойрын хамгийн том талбайтай; Номын сан = ойрын хамгийн өндөр
+  const near = ranges.map(r => ({ r, d: r[3].length() })).sort((a, b) => a.d - b.d);
+  homeIdx = near[0].r;
+  const ring = near.filter(o => o.d > 60 && o.d < 700);
+  const gal = ring.slice().sort((a, b) => b.r[5] - a.r[5])[0]?.r, lib = ring.filter(o => o.r !== gal).sort((a, b) => b.r[4] - a.r[4])[0]?.r;
+  special = { home: homeIdx, gallery: gal, library: lib };
+  // цэцэрлэг = ойрын хамгийн том park
+  let park = null, best = 0;
+  for (const p of A.park || []) { const pts = poly(p, 0); if (pts.length < 3) continue; const c = pts.reduce((m, v) => m.add(v), new THREE.Vector2()).divideScalar(pts.length);
+    const d = c.length(); if (d > 900) continue; const a = Math.abs(THREE.ShapeUtils.area(pts)); if (a / (1 + d / 300) > best) { best = a / (1 + d / 300); park = { c, a }; } }
+  // мод: OSM мод + цэцэрлэгт санамсаргүй
+  const T = []; for (let i = 0; i < OSM.trees.length; i += 2) T.push([OSM.trees[i], OSM.trees[i + 1]]);
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (const p of A.park || []) { const pts = poly(p, 0); if (pts.length < 3) continue; const a = Math.abs(THREE.ShapeUtils.area(pts)), n = Math.min(40, Math.floor(a / 900));
+    const bb = new THREE.Box2().setFromPoints(pts);
+    for (let k = 0, tries = 0; k < n && tries < n * 6; tries++) { const x = bb.min.x + rnd() * (bb.max.x - bb.min.x), z = bb.min.y + rnd() * (bb.max.y - bb.min.y);
+      if (inside(pts, x, z)) { T.push([x, z]); k++; } } }
+  const NT = Math.min(T.length, MOBILE ? 6000 : 14000);
+  crowns = new THREE.InstancedMesh(crownGeo, Toon({ color: 0xffffff }), NT);
+  trunks = new THREE.InstancedMesh(trunkGeo, Toon({ color: 0x8a857b }), NT);
+  crowns.castShadow = trunks.castShadow = true;
+  for (let i = 0; i < NT; i++) { const [x, z] = T[i], s = .75 + rnd() * .6; M4.compose(V.set(x, H(x, z), z), Q, S.set(s, s, s)); crowns.setMatrixAt(i, M4); trunks.setMatrixAt(i, M4); crowns.setColorAt(i, new THREE.Color(0xffffff)); }
+  crowns.userData.r = Array.from({ length: NT }, rnd); scene.add(crowns, trunks);
+  // хүмүүс: гэрээс 1.2 км дотор зам дээр
+  const segs = []; for (const rd of OSM.roads) { const p = poly(rd, 1); for (let i = 0; i + 1 < p.length; i++) if (p[i].length() < 1200 && rd[0] <= 8) segs.push([p[i], p[i + 1]]); }
+  const NP = Math.min(MOBILE ? 400 : 900, segs.length * 2);
+  crowd = new THREE.InstancedMesh(personGeo, Toon({ color: 0xffffff }), NP); crowd.castShadow = true;
+  walkers = Array.from({ length: NP }, () => ({ s: segs[Math.floor(rnd() * segs.length)], t: rnd(), v: (.04 + rnd() * .05) * (rnd() < .5 ? 1 : -1), o: (rnd() - .5) * 2.4 }));
+  for (let i = 0; i < NP; i++) crowd.setColorAt(i, new THREE.Color(0x3a3833));
+  scene.add(crowd);
+  // машин: 6 м-ээс өргөн зам, гэрээс 2.5 км дотор; зам бүрийн дагуу явж, төгсгөлд эргэнэ
+  { const ways = OSM.roads.filter(r => r[0] >= 6).map(r => Object.assign(poly(r, 1), { w: r[0] })).filter(p => p.length > 1 && p.some(v => v.length() < 2500));
+    const key = v => Math.round(v.x / 2) + ',' + Math.round(v.y / 2); NODES = new Map();
+    for (const w of ways) for (const [end, v] of [[0, w[0]], [1, w.at(-1)]]) { const k = key(v); if (!NODES.has(k)) NODES.set(k, []); NODES.get(k).push([w, end]); }
+    CARKEY = key;
+    const MAXC = MOBILE ? 500 : 1400; cars = new THREE.InstancedMesh(carGeo, Toon({ color: 0xffffff }), MAXC); cars.castShadow = true;
+    for (let i = 0; i < MAXC; i++) { const pts = ways[Math.floor(rnd() * ways.length)]; carState.push({ pts, i: Math.floor(rnd() * (pts.length - 1)), t: rnd(), dir: rnd() < .5 ? 1 : -1, v: .8 + rnd() * .5, lane: pts.w / 4 + .3 });
+      cars.setColorAt(i, new THREE.Color(CAR_COLS[Math.floor(rnd() * CAR_COLS.length)])); }
+    scene.add(cars);
+    const lc = new Float32Array(MAXC * 12); for (let i = 0; i < MAXC; i++) { lc.set([1, .95, .8, 1, .95, .8], i * 12); lc.set([1, .15, .1, 1, .15, .1], i * 12 + 6); }
+    lights = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAXC * 12), 3)).setAttribute('color', new THREE.BufferAttribute(lc, 3)),
+      new THREE.PointsMaterial({ vertexColors: true, size: 2.2, sizeAttenuation: true, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending }));
+    lights.frustumCulled = false; lights.visible = false; scene.add(lights); }
+  // гудамжны гэрэл: 8 м+ замын хоёр талд 38 м тутам, гэрээс 3 км дотор; шөнө доор нь гэрлийн тойрог
+  { const pts = [];
+    for (const rd of OSM.roads) { if (rd[0] < 8) continue; const p = poly(rd, 1); let acc = 0;
+      for (let i = 0; i + 1 < p.length; i++) { const a = p[i], b = p[i + 1], L = a.distanceTo(b); if (a.length() > 3000) continue;
+        const fx = (b.x - a.x) / L, fz = (b.y - a.y) / L, off = rd[0] / 2 + 1.2;
+        for (let d = (38 - acc) % 38; d < L; d += 38) { const x = a.x + fx * d, z = a.y + fz * d, sgn = (pts.length / 2) % 2 ? 1 : -1; pts.push(x - fz * off * sgn, z + fx * off * sgn); }
+        acc = (acc + L) % 38; } }
+    const NL = Math.min(pts.length / 2, MOBILE ? 1500 : 4000), poleG = new THREE.CylinderGeometry(.12, .16, 7, 5); poleG.translate(0, 3.5, 0);
+    const headG = new THREE.BoxGeometry(1.2, .3, .5); headG.translate(.4, 7, 0);
+    lamps = new THREE.InstancedMesh(mergeG([poleG, headG]), Toon({ color: 0x2a2c33 }), NL);
+    pools = new THREE.InstancedMesh(new THREE.CircleGeometry(5, 16).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffc66e, transparent: true, opacity: .35, depthWrite: false, blending: THREE.AdditiveBlending }), NL);
+    const bulbs = new Float32Array(NL * 3);
+    for (let i = 0; i < NL; i++) { const x = pts[i * 2], z = pts[i * 2 + 1], y = H(x, z); M4.makeTranslation(x, y, z); lamps.setMatrixAt(i, M4); M4.makeTranslation(x, y + .8, z); pools.setMatrixAt(i, M4); bulbs.set([x + .4, y + 6.8, z], i * 3); }
+    LAMP_BULBS = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(bulbs, 3)),
+      new THREE.PointsMaterial({ color: 0xffd98a, size: 3.2, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    lamps.castShadow = true; pools.visible = LAMP_BULBS.visible = false; scene.add(lamps, pools, LAMP_BULBS); }
+  // бороо: камерын ойр хайрцагт
+  const rp = new Float32Array(3000 * 6); rain = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(rp, 3)),
+    new THREE.LineBasicMaterial({ color: 0xdfe8f5, transparent: true, opacity: .55 })); rain.visible = false; rain.frustumCulled = false; scene.add(rain);
+  for (let i = 0; i < 3000; i++) resetDrop(i, true);
+  // хаягууд
+  const lbl = (name, html, x, y, z) => { const d = document.createElement('div'); d.className = 'dlbl'; d.innerHTML = html; d.onclick = () => focus(name);
+    const o = new CSS2DObject(d); o.position.set(x, y, z); scene.add(o); places[name] = { o, d, x, z, h: y }; };
+  const at = r => r ? [r[3].x, r[4] + r[6] + 6, r[3].y] : [0, 20, 0];
+  lbl('home', 'Гэр<small>itge.e</small>', ...at(ranges.find(r => r === homeIdx)));
+  if (gal) lbl('gallery', 'Gallery<small>сэдвээр · reference</small>', ...at(gal));
+  if (lib) lbl('library', 'Номын сан<small>ачаалж байна…</small>', ...at(lib));
+  if (park) lbl('park', 'Цэцэрлэг<small>чөлөөт орон зай</small>', park.c.x, 12 + H(park.c.x, park.c.y), park.c.y);
+  places.all = { x: 0, z: 0, h: 0, zoom: .055 };
+  startLive();
+  controls.target.set(...(homeIdx ? [homeIdx[3].x, homeIdx[6], homeIdx[3].y] : [0, 0, 0]));
+  camera.position.copy(controls.target).add(new THREE.Vector3(800, 640, 800));
+  await addClients();
+  if (new URLSearchParams(location.search).get('view') === 'city' || location.pathname === '/map') { focus('all'); $('clients').classList.add('on'); }
+  $('load').style.opacity = 0; setTimeout(() => $('load').remove(), 600);
+  loadData(); markWorking();
+}
+let LAMP_BULBS;
+function mergeG(list) { const p = [], n = []; for (const g of list) { const x = g.toNonIndexed(); p.push(...x.attributes.position.array); n.push(...x.attributes.normal.array); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3)); return g; }
+// ---------- ХАРИЛЦАГЧ: ub-map.local.json (gitignore) → цэг + гэрээс нум + жагсаалт ----------
+let CL = [], clientArcs, clientBeams, RANGES = [], selClient = -1;
+const mArc = new THREE.LineBasicMaterial({ color: 0xd6453d, transparent: true, opacity: .9 });
+const mBeam = new THREE.MeshBasicMaterial({ color: 0xd6453d });
+async function addClients() {
+  let loc; try { const r = await fetch('/ub-map.local.json', { cache: 'no-store' }); if (!r.ok) return; loc = await r.json(); } catch { return; }
+  const [lat0, lon0] = OSM.center, kx = 111320 * Math.cos(lat0 * Math.PI / 180), kz = 110540;
+  const P = ll => [(ll[0] - lon0) * kx, -(ll[1] - lat0) * kz];
+  const hx = special.home ? special.home[3].x : 0, hz = special.home ? special.home[3].y : 0, hy = special.home ? special.home[6] + special.home[4] : 30;
+  const arcPos = [];
+  CL = (loc.clients || []).map((c, i) => {
+    const [x, z] = P(c.lngLat), y = H(x, z);
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 90, 8), mBeam); beam.position.set(x, y + 45, z); scene.add(beam);
+    const d = document.createElement('div'); d.className = 'cpin'; d.textContent = c.name; d.onclick = () => goClient(i);
+    const o = new CSS2DObject(d); o.position.set(x, y + 96, z); scene.add(o);
+    // нум: гэрээс тэр цэг рүү, дээшээ муруй
+    const a = new THREE.Vector3(hx, hy, hz), b = new THREE.Vector3(x, y + 90, z), m = a.clone().add(b).multiplyScalar(.5); m.y += a.distanceTo(b) * .22;
+    const pts = new THREE.QuadraticBezierCurve3(a, m, b).getPoints(48);
+    for (let k = 0; k + 1 < pts.length; k++) arcPos.push(pts[k].x, pts[k].y, pts[k].z, pts[k + 1].x, pts[k + 1].y, pts[k + 1].z);
+    // хамгийн ойрын барилга (60 м дотор) = харилцагчийн барилга
+    let bd = null, best = 60; for (const r of RANGES) { const d = Math.hypot(r[3].x - x, r[3].y - z); if (d < best) { best = d; bd = r; } }
+    // OSM-д өндөр алга бол (жишээ нь Galaxy Tower) ub-map.local.json-ийн "levels" давхраар сунгана
+    if (bd && c.levels) { const hNew = c.levels * 3.1 + 1, hOld = bd[4], hb = bd[6], pa = bGeo.attributes.position.array;
+      for (let v = bd[1]; v < bd[2]; v++) { const y = pa[v * 3 + 1]; if (y > hb + .5) pa[v * 3 + 1] = hb + (y - hb) * hNew / hOld; }
+      bGeo.attributes.position.needsUpdate = true; bGeo.computeBoundingSphere(); bd[4] = hNew; o.position.y = hb + hNew + 20; beam.position.y = hb + hNew + 45; }
+    return { ...c, x: bd ? bd[3].x : x, z: bd ? bd[3].y : z, o, beam, bd };
+  });
+  clientArcs = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(arcPos, 3)), mArc); clientArcs.raycast = () => {}; scene.add(clientArcs);
+  const byOrg = {}; CL.forEach((c, i) => (byOrg[c.org || c.name] ??= []).push([c, i]));
+  $('clients').innerHTML = '<button class="mini" data-min title="Хураах">–</button><h2>Идэвхтэй харилцагч</h2>' + Object.entries(byOrg).map(([org, l]) => `<h3>${esc(org)}</h3>` + l.map(([c, i]) =>
+    `<button data-c="${i}"><b>${esc(c.name)}</b><small>${esc(c.project || '')}${c.approx ? ' · ойролцоо' : ''}</small><small>${esc(c.addr || '')}</small></button>`).join('')).join('')
+    + ((loc.unplaced || []).length ? '<h3>Газрын зурагт ороогүй</h3>' + loc.unplaced.map(u => `<div class="un"><b>${esc(u.name)}</b><small>${esc(u.why)}</small></div>`).join('') : '');
+  if ($('clients').classList.contains('min')) $('clients').querySelector('[data-min]').textContent = '+';
+  $('clients').onclick = e => { const b = e.target.closest('[data-c]'); if (b) goClient(+b.dataset.c); };
+}
+// харилцагч → тэдний барилга руу ойртож, барилгыг тодруулж, самбар нээнэ
+function goClient(i) {
+  const c = CL[i]; selClient = i; if (live) liveTick(); else applyMood(mood);
+  flyTo(c.x, c.z, 2.6); CL.forEach((q, k) => q.beam.visible = k !== i);   // сонгосон барилгыг цацраг халхлахгүй
+  document.querySelectorAll('.clients [data-c]').forEach(b => b.style.background = +b.dataset.c === i ? '#F3F2EE' : '');
+  $('pc').innerHTML = `<h2>${esc(c.name)}</h2><p><b>${esc(c.org || '')}</b></p><p>${esc(c.project || '')}</p><p><small>${esc(c.addr || '')}${c.approx ? ' · ойролцоо байршил' : ''}</small></p>`
+    + (c.bd ? `<p><small>Барилга: ${Math.round(c.bd[4])} м өндөр · ${Math.round(c.bd[5])} м² суурь</small></p>` : '<p><small>Барилга OSM-д олдсонгүй</small></p>');
+  $('panel').classList.add('on');
+}
+function flyTo(x, z, zoom) {
+  const dur = REDUCED ? 0 : 1.4;
+  gsap.to(controls.target, { x, y: H(x, z), z, duration: dur, ease: 'power2.inOut' });
+  gsap.to(camera, { zoom, duration: dur, ease: 'power2.inOut', onUpdate: () => camera.updateProjectionMatrix() });
+}
+// хураах / дэлгэх (төлөв хадгална)
+document.addEventListener('click', e => { const b = e.target.closest('[data-min]'); if (!b) return; e.stopPropagation();
+  const box = b.parentElement, on = box.classList.toggle('min'); b.textContent = on ? '+' : '–'; b.title = on ? 'Дэлгэх' : 'Хураах';
+  try { localStorage.setItem('min:' + (box.id || 'hud'), on ? 1 : 0); } catch {} }, true);
+for (const id of ['hud', 'panel', 'clients']) { try { if (localStorage.getItem('min:' + id) === '1') { const el = id === 'hud' ? document.querySelector('.hud') : $(id); el?.classList.add('min'); const b = el?.querySelector('[data-min]'); if (b) b.textContent = '+'; } } catch {} }
+$('cbtn').onclick = () => $('clients').classList.toggle('on');
+function inside(p, x, z) { let c = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) if ((p[i].y > z) !== (p[j].y > z) && x < (p[j].x - p[i].x) * (z - p[i].y) / (p[j].y - p[i].y) + p[i].x) c = !c; return c; }
+function resetDrop(i, any) {
+  const a = rain.geometry.attributes.position.array, t = controls.target, x = t.x + (Math.random() - .5) * 700, z = t.z + (Math.random() - .5) * 700, y = t.y + (any ? Math.random() * 160 : 160);
+  a.set([x, y, z, x - .8, y - 6, z + .4], i * 6);
+}
+
+// ---------- уур амьсгал солих ----------
+function setColorRange(r, rgb) { const c = bGeo.attributes.color.array; for (let v = r[1]; v < r[2]; v++) c.set(rgb, v * 3); }
+function applyMood(m, instant, P = MOODS[m]) {
+  mood = m;
+  if (!live) document.querySelectorAll('#moods button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  document.body.classList.toggle('night', !!P.night);
+  const bg = new THREE.Color(P.bg); scene.background = bg; renderer.setClearColor(bg); document.body.style.background = '#' + bg.getHexString();
+  baseBg = P.bg; applySmog();
+  mats.ground.color.set(P.ground); mats.road.color.set(P.road); mats.park.color.set(P.park); mats.plaza.color.set(P.plaza); mats.water.color.set(P.water); mats.pitch.color.set(P.pitch); mats.playground.color.set(P.play ?? PLAY[m] ?? PLAY.day);
+  mDash.color.set(P.night ? 0xe8c46a : 0xffffff); mDash.opacity = P.night ? .6 : .85;
+  mLine.color.set(P.line); hemi.intensity = P.hemi * .62; hemi.color.set(P.shade ?? (P.night ? 0x5262c9 : 0x9fb0dc)); hemi.groundColor.set(P.night ? 0x10142e : 0x7f8db8);
+  uInk.value.set(P.night ? 0x0a0e2a : 0x2b2f5a); uDot.value = P.night ? 0 : .12; if (typeof poster !== "undefined") poster.enabled = !P.night; sun.shadow.bias = P.night ? -.0015 : -.0004; sun.shadow.normalBias = P.night ? .6 : .08;   // шөнө: grain, halftone, сүүдрийн толбо байхгүй 
+  sun.intensity = P.sun * 1.9; sun.color.set(P.sunC); sun.castShadow = P.shadow && !P.night;   // шөнө сарны сүүдэр толбо үүсгэдэг тул унтраана
+  // барилгын өнгө: суурь масс × (шөнө: зарим нь дотроосоо гэрэлтэнэ)
+  const c = bGeo.attributes.color.array, gl = bGeo.attributes.glow.array, base = new THREE.Color(P.mass);
+  const BL = (P.dusk ? [0xf6b59a, 0xe98f78, 0xffc79a] : P.night ? [0x1b2457, 0x26306e, 0x3a2350, 0x14183a] : P.rain ? [0x8a4a3c, 0x5a6478, 0xb39a4e, 0x2a2e38] : P.snowfall ? [0xd9cfc4, 0xc9d3dc, 0xe6c7bd]
+    : [0xe8442c, 0xf2c230, 0xf06aa8, 0x1c1c22, 0x2d4fb3, 0xe9763a]).map(x => new THREE.Color(x)), SAND = [base, new THREE.Color(base).lerp(new THREE.Color(0xe7d3b0), .45), new THREE.Color(base).lerp(new THREE.Color(0xd9b88f), .55)];
+  const h = i => { const x = Math.sin(i * 91.17) * 43758.5453; return x - Math.floor(x); };
+  for (let v = 0; v < c.length / 3; v++) { const id = nightCol[v * 2 + 1], r = h(id), col = r < .22 ? BL[Math.floor(h(id + 3) * BL.length)] : SAND[Math.floor(h(id + 5) * 3)];
+    c[v * 3] = col.r; c[v * 3 + 1] = col.g; c[v * 3 + 2] = col.b; gl[v] = nightCol[v * 2] < P.lit ? 1 : 0; }
+  uGlow.value = P.night ? 1.6 : P.rain ? .9 : P.lampsOn ? .9 : 0;
+  uRoof.value.set(P.night ? 0xe9edf6 : 0xffffff); uRoofMix.value = (P.night && (P.bare || P.snowfall)) || P.snowfall ? .9 : 0;
+  uWinCol.value.set(P.dusk ? 0x2b2a6e : P.night ? 0x10163a : P.rain ? 0x3a4656 : m === 'autumn' ? 0xb9c4c8 : 0xb7c6d3); uWinMix.value = P.night ? .95 : .22;
+  const coral = P.night ? [.62, .26, .24] : [.86, .33, .27];
+  for (const k of ['gallery', 'library']) if (special[k]) setColorRange(special[k], coral);
+  for (const [i, c] of CL.entries()) if (c.bd) setColorRange(c.bd, i === selClient ? [.84, .27, .24] : P.night ? [1, .7, .36] : [.95, .55, .45]);   // харилцагчийн барилга
+  if (special.home) setColorRange(special.home, P.night ? [.7, .25, .22] : [.84, .27, .24]);
+  for (const k of ['home', 'gallery', 'library']) if (special[k]) for (let v = special[k][1]; v < special[k][2]; v++) gl[v] = P.night || P.rain ? 1 : 0;
+  bGeo.attributes.color.needsUpdate = true; bGeo.attributes.glow.needsUpdate = true;
+  const cr = P.crown.map(x => new THREE.Color(x));
+  for (let i = 0; i < crowns.count; i++) crowns.setColorAt(i, cr[Math.floor(crowns.userData.r[i] * cr.length)]);
+  crowns.instanceColor.needsUpdate = true; crowns.visible = !P.bare;                // өвөл: навчгүй мод
+  for (let i = 0; i < crowd.count; i++) if (i >= working) crowd.setColorAt(i, new THREE.Color(P.people)); crowd.instanceColor.needsUpdate = true;
+  const dark = !!(P.night || P.rain || P.lampsOn);
+  const pin = P.night ? 0xffb35c : P.dusk ? 0xffd27a : 0xd6453d; mArc.color.set(pin); mBeam.color.set(pin);
+  if (lights) lights.visible = dark; if (pools) { pools.visible = LAMP_BULBS.visible = dark; pools.material.opacity = P.night ? .22 : .1; }
+  rain.visible = !!(P.rain || P.snowfall); rain.userData.snow = !!P.snowfall;
+  rain.material.color.set(P.snowfall ? 0xffffff : 0xdfe8f5); rain.material.opacity = P.snowfall ? .9 : .55;
+}
+document.querySelectorAll('#moods button').forEach(b => b.onclick = () => { if (b.dataset.m === 'live') return startLive(); live = false; applyMood(b.dataset.m); setSun(null); });
+
+// ---------- БОДИТ ЦАГ: Улаанбаатарын цаг + нарны байрлал + одоогийн цаг агаар (Open-Meteo) ----------
+let live = true, WX = null;
+function sunPos(date, lat, lon) {                              // NOAA-ийн хялбаршуулсан томьёо → өндөр, азимут (градус)
+  const rad = Math.PI / 180, d = (date - Date.UTC(date.getUTCFullYear(), 0, 0)) / 864e5, g = 2 * Math.PI / 365 * (d - 1 + (date.getUTCHours() - 12) / 24);
+  const eq = 229.18 * (.000075 + .001868 * Math.cos(g) - .032077 * Math.sin(g) - .014615 * Math.cos(2 * g) - .040849 * Math.sin(2 * g));
+  const decl = .006918 - .399912 * Math.cos(g) + .070257 * Math.sin(g) - .006758 * Math.cos(2 * g) + .000907 * Math.sin(2 * g) - .002697 * Math.cos(3 * g) + .00148 * Math.sin(3 * g);
+  const tst = date.getUTCHours() * 60 + date.getUTCMinutes() + date.getUTCSeconds() / 60 + eq + 4 * lon, ha = (tst / 4 - 180) * rad;
+  const cz = Math.sin(lat * rad) * Math.sin(decl) + Math.cos(lat * rad) * Math.cos(decl) * Math.cos(ha);
+  const e = -Math.cos(decl) * Math.sin(ha), n = Math.cos(lat * rad) * Math.sin(decl) - Math.sin(lat * rad) * Math.cos(decl) * Math.cos(ha);   // зүүн, хойд
+  return { elev: Math.asin(Math.min(1, Math.max(-1, cz))) / rad, e, n };
+}
+function setSun(sp) {                                          // нар (эсвэл шөнө сар) → гэрлийн чиглэл; null = загварын үндсэн
+  if (!sp) { SUN_DIR.set(.78, .5, -.38).normalize(); return; }   // баруун талын хана гэрэлтэй, зүүн тал индиго сүүдэр (poster 2 тон)
+  const h = Math.hypot(sp.e, sp.n) || 1, el = Math.max(sp.elev, 8) * Math.PI / 180;      // нам нарны сүүдэр хэт урт болохгүй
+  SUN_DIR.set(sp.e / h * Math.cos(el), Math.sin(el), -sp.n / h * Math.cos(el)).normalize();
+  if (sp.elev < -4) SUN_DIR.set(.35, .7, .45).normalize();     // шөнө: сарны гэрэл
+}
+const lerpC = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t).getHex();
+function blend(A, B, t) {                                      // хоёр уур амьсгалын палитрыг холино (үдэш, үүр)
+  const o = { ...A }; for (const k of ['bg', 'ground', 'road', 'mass', 'line', 'park', 'plaza', 'water', 'pitch', 'people', 'sunC']) o[k] = lerpC(A[k], B[k], t);
+  for (const k of ['sun', 'hemi', 'lit']) o[k] = A[k] + (B[k] - A[k]) * t;
+  o.night = t > .5; o.shadow = A.shadow && t < .7; o.shade = t > .5 ? B.shade : A.shade; return o;
+}
+async function liveTick() {
+  if (!live || !OSM) return;
+  try { WX = await (await fetch('/api/weather')).json(); } catch {}
+  const now = new Date(), c = OSM.center || [47.9, 106.9], sp = sunPos(now, c[0], c[1]), month = new Date(now.getTime() + 8 * 36e5).getUTCMonth() + 1;
+  const k = WX?.kind || 'clear';
+  let base = k === 'snow' ? 'snow' : (k === 'rain' || k === 'storm') ? 'rain' : (k === 'overcast' || k === 'fog') ? 'overcast'
+    : (month === 9 || month === 10) ? 'autumn' : 'day';
+  let P = { ...MOODS[base] };
+  if (month >= 11 || month <= 3) { P.bare = true; if (base !== 'snow' && (WX?.temp ?? 0) < 0) { P = { ...MOODS.snow, snowfall: false }; base = 'snow'; } }
+  if (k === 'cloudy') P.sun *= .7;
+  // үдэш/үүр: нар −6°..+6° хооронд өдөр → шөнө холино, нар нам үед алтлаг
+  const t = THREE.MathUtils.smoothstep(-sp.elev, 4, 10);   // нар −4°-оос доош шөнө рүү
+  if (sp.elev < 10 && sp.elev > -4) P.sunC = 0xffb070;
+  if (sp.elev < 10 && sp.elev > -6) { const D = { ...MOODS.dusk, rain: P.rain, snowfall: P.snowfall, bare: P.bare }; P = blend(P, D, THREE.MathUtils.smoothstep(10 - sp.elev, 0, 8)); P.dusk = sp.elev < 6; P.lampsOn = true; }
+  if (t > 0) { const N = { ...MOODS.night, rain: P.rain, snowfall: P.snowfall, bare: P.bare, crown: P.bare ? MOODS.night.crown : MOODS.night.crown }; P = t >= 1 ? N : blend(P, N, t); }
+  smog = WX?.pm25 != null ? THREE.MathUtils.clamp((WX.pm25 - 12) / 200, 0, 1) : 0;
+  P.lampsOn = P.lampsOn || sp.elev < -2; applyMood(t >= .5 ? 'night' : P.dusk ? 'dusk' : base, true, P); setSun(sp);
+  const hr = new Date(now.getTime() + 8 * 36e5).getUTCHours(), mn = new Date(now.getTime() + 8 * 36e5).getUTCMinutes();
+  trafficNow = TRAFFIC[hr] + (TRAFFIC[(hr + 1) % 24] - TRAFFIC[hr]) * mn / 60;
+  const hh = new Date(now.getTime() + 8 * 36e5), tm = String(hh.getUTCHours()).padStart(2, '0') + ':' + String(hh.getUTCMinutes()).padStart(2, '0');
+  const aqBad = (WX?.aqi ?? 0) > 100, jam = trafficNow > .85 ? 'түгжрэлтэй' : trafficNow > .55 ? 'дунд' : 'сул';
+  $('wx').innerHTML = `Улаанбаатар ${tm} · ${WX ? Math.round(WX.temp) + '° · ' + WX.label : '—'} · ${sp.elev < -6 ? 'шөнө' : sp.elev < 6 ? (hh.getUTCHours() < 12 ? 'үүр' : 'үдэш') : 'өдөр'}<br>`
+    + `<span style="color:${aqBad ? '#D6453D' : 'inherit'}">● PM2.5 ${WX?.pm25 != null ? Math.round(WX.pm25) : '—'} · ${WX?.aq_label || '—'}</span> · зам ${jam}`;
+}
+function startLive() { live = true; document.querySelectorAll('#moods button').forEach(b => b.classList.toggle('on', b.dataset.m === 'live')); liveTick(); }
+setInterval(liveTick, 60000);
+let working = 0;
+async function markWorking() {
+  try { const st = await (await fetch('/api/state')).json(); working = Math.min(crowd.count, st.agents.filter(a => a.state === 'working').length * 12);
+    for (let i = 0; i < working; i++) crowd.setColorAt(i, new THREE.Color(0xd6453d)); crowd.instanceColor.needsUpdate = true; } catch {}
+}
+
+// ---------- өгөгдөл ба самбар ----------
+let HOME = { library: null, topics: [] };
+async function loadData() {
+  try { HOME = await (await fetch('/api/home')).json(); } catch {}
+  try { HOME.topics = (await (await fetch('/api/hall?topics=1')).json()).topics; } catch { HOME.topics = []; }
+  if (HOME.library && places.library) places.library.d.innerHTML = `Номын сан<small>${HOME.library.atoms} атом · ${HOME.library.research} судалгаа</small>`;
+}
+function focus(name) {
+  if (name === 'office') return goOffice();
+  const p = places[name]; if (!p) return;
+  Object.entries(places).forEach(([n, q]) => q.d?.classList.toggle('on', n === name));
+  document.querySelectorAll('[data-go]').forEach(b => b.classList.toggle('on', b.dataset.go === name));
+  const zoom = p.zoom ?? 2.4, dur = REDUCED ? 0 : 1.3;
+  gsap.to(controls.target, { x: p.x, y: H(p.x, p.z), z: p.z, duration: dur, ease: 'power2.inOut' });
+  gsap.to(camera, { zoom, duration: dur, ease: 'power2.inOut', onUpdate: () => camera.updateProjectionMatrix() });
+  showPanel(name);
+}
+function showPanel(name) {
+  const L = HOME.library, pc = $('pc');
+  if (name === 'gallery') pc.innerHTML = `<h2>Gallery</h2><p><a href="/gallery">Тор харах →</a> · <a href="/fpv">Алхаж үзэх</a></p><ul>` +
+    HOME.topics.map(t => `<li><a href="/gallery?topic=${encodeURIComponent(t.name)}">${esc(t.name)}</a> <small>${t.count}</small></li>`).join('') + '</ul>';
+  else if (name === 'library') pc.innerHTML = L ? `<h2>Номын сан</h2><span class="stat"><b>${L.atoms}</b><small>атом</small></span><span class="stat"><b>${L.decisions}</b><small>шийдвэр</small></span>
+    <span class="stat"><b>${L.research}</b><small>судалгаа</small></span><p><small>Сүүлд нэмэгдсэн</small></p><ul>${L.recent.map(t => `<li>${esc(t.replace(/^\d{4}-\d\d-\d\d - /, ''))}</li>`).join('')}</ul><p><a href="/spiral">Өдрийн спираль →</a></p>` : '<h2>Номын сан</h2>';
+  else if (name === 'park') pc.innerHTML = '<h2>Цэцэрлэг</h2><p>Гэрийн ойрын хамгийн том ногоон байгууламж — амрах, бодох орон зай.</p>';
+  else if (name === 'home') pc.innerHTML = '<h2>Гэр</h2><p>Миний байр. Эндээс бүх зүйл эхэлнэ.</p><p><a href="/">Нүүр хуудас →</a></p>';
+  else { $('panel').classList.remove('on'); return; }
+  $('panel').classList.add('on');
+}
+$('px').onclick = () => $('panel').classList.remove('on');
+document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => focus(b.dataset.go));
+function goOffice() { gsap.timeline({ onComplete: () => location.href = '/campus' }).to(camera, { zoom: camera.zoom * .3, duration: REDUCED ? 0 : .9, ease: 'power2.in', onUpdate: () => camera.updateProjectionMatrix() }).to('#fade', { opacity: 1, duration: .35 }, REDUCED ? 0 : .6); }
+$('office').onclick = goOffice;
+
+const uDot = { value: .35 }, uInk = { value: new THREE.Color(0x2b2f5a) };
+const composer = new EffectComposer(renderer); composer.addPass(new RenderPass(scene, camera));
+const poster = new ShaderPass({ uniforms: { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2() }, uDot, uInk, uT: { value: 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uDot; uniform vec3 uInk; uniform float uT; varying vec2 vUv;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
+    void main(){ vec4 c = texture2D(tDiffuse, vUv); float l = dot(c.rgb, vec3(.299,.587,.114));
+      vec2 px = vUv * uRes; mat2 r = mat2(.7071,-.7071,.7071,.7071); vec2 g = r * px / 5.0; vec2 cell = fract(g) - .5;
+      float rad = (1.0 - smoothstep(.05, .62, l)) * .55;                     // бараан газар том цэг
+      float dot_ = 1.0 - smoothstep(rad - .08, rad, length(cell));
+      c.rgb = mix(c.rgb, uInk, dot_ * uDot * (1.0 - smoothstep(.35, .7, l)));
+      c.rgb += (hash(px + uT) - .5) * (uDot > .1 ? .025 : 0.0);                                  // grain
+      gl_FragColor = c; }` });
+composer.addPass(poster); composer.addPass(new OutputPass());
+function sizeAll() { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); labels.setSize(innerWidth, innerHeight); frustum();
+  poster.uniforms.uRes.value.set(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio()); }
+sizeAll(); addEventListener('resize', sizeAll);
+const clock = new THREE.Clock(); let fr = 0, last = performance.now(); window.__fps = 0;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), .05);
+  controls.update();
+  if (crowd) {
+    // сүүдрийн камер харагдах хэсгийг дагана (zoom-оос хамаарч)
+    const t = controls.target, ext = Math.min(2400, SPAN / camera.zoom * .9);
+    sun.target.position.copy(t); sun.position.copy(t).addScaledVector(SUN_DIR, 1500);
+    Object.assign(sun.shadow.camera, { left: -ext, right: ext, top: ext, bottom: -ext, near: 10, far: 4000 }); sun.shadow.camera.updateProjectionMatrix();
+    mLine.opacity = THREE.MathUtils.clamp((camera.zoom - .12) * 1.6, 0, .85); mLine.visible = mLine.opacity > .02;   // холоос зураас бүдгэрнэ
+    Object.values(places).forEach(p => { if (p.o) p.o.visible = camera.zoom > .16 || p === places.home; });
+    for (const c of CL) c.beam.scale.set(Math.max(1, .25 / camera.zoom), 1, Math.max(1, .25 / camera.zoom));   // холоос ч харагдана
+    if (!REDUCED) { walkers.forEach((w, i) => { w.t += w.v * dt * 6 / Math.max(5, w.s[0].distanceTo(w.s[1])) * 10; if (w.t > 1 || w.t < 0) w.v *= -1, w.t = THREE.MathUtils.clamp(w.t, 0, 1);
+        const a = w.s[0], b = w.s[1], px = a.x + (b.x - a.x) * w.t + w.o, pz = a.y + (b.y - a.y) * w.t + w.o; M4.makeTranslation(px, H(px, pz), pz); crowd.setMatrixAt(i, M4); });
+      crowd.instanceMatrix.needsUpdate = true; }
+    if (cars && !REDUCED) {
+      const N = Math.round(cars.count * Math.max(.06, trafficNow)), slow = 1 - .6 * THREE.MathUtils.smoothstep(trafficNow, .7, 1), la = lights.geometry.attributes.position.array;
+      for (let k = 0; k < cars.count; k++) {
+        const c = carState[k];
+        if (k >= N) { M4.makeScale(0, 0, 0); cars.setMatrixAt(k, M4); la.fill(-9999, k * 12, k * 12 + 12); continue; }
+        let a = c.pts[c.i], b = c.pts[c.i + 1]; const L = Math.max(1, a.distanceTo(b));
+        c.t += c.dir * c.v * 13 * slow * dt / L;
+        if (c.t > 1) { if (c.i < c.pts.length - 2) { c.i++; c.t = 0; } else nextWay(c, 1); }
+        else if (c.t < 0) { if (c.i > 0) { c.i--; c.t = 1; } else nextWay(c, 0); }
+        a = c.pts[c.i]; b = c.pts[c.i + 1];
+        const dx = (b.x - a.x) * c.dir, dz = (b.y - a.y) * c.dir, l = Math.hypot(dx, dz) || 1, fx = dx / l, fz = dz / l, rx = -fz, rz = fx;   // урд, баруун (баруун гар талын хөдөлгөөн)
+        const x = a.x + (b.x - a.x) * c.t + rx * c.lane, z = a.y + (b.y - a.y) * c.t + rz * c.lane, y = H(x, z) + .4;
+        Q.setFromAxisAngle(V.set(0, 1, 0), Math.atan2(-fz, fx)); M4.compose(V.set(x, y, z), Q, S.set(1, 1, 1)); cars.setMatrixAt(k, M4);
+        la.set([x + fx * 2.3 + rx * .6, y + 1, z + fz * 2.3 + rz * .6, x + fx * 2.3 - rx * .6, y + 1, z + fz * 2.3 - rz * .6], k * 12);
+        la.set([x - fx * 2.3 + rx * .6, y + 1.1, z - fz * 2.3 + rz * .6, x - fx * 2.3 - rx * .6, y + 1.1, z - fz * 2.3 - rz * .6], k * 12 + 6);
+      }
+      cars.instanceMatrix.needsUpdate = true; if (lights.visible) lights.geometry.attributes.position.needsUpdate = true;
+    }
+    if (rain.visible) { const a = rain.geometry.attributes.position.array, sn = rain.userData.snow, vy = (sn ? 22 : 260) * dt, tt = clock.elapsedTime;
+      for (let i = 0; i < 3000; i++) { const dx = sn ? Math.sin(tt + i) * .05 : 0; a[i * 6 + 1] -= vy; a[i * 6 + 4] -= vy; a[i * 6] += dx; a[i * 6 + 3] += dx;
+        if (sn) { a[i * 6 + 3] = a[i * 6] + .5; a[i * 6 + 4] = a[i * 6 + 1] - .5; a[i * 6 + 5] = a[i * 6 + 2]; }
+        if (a[i * 6 + 4] < controls.target.y - 20) resetDrop(i); } rain.geometry.attributes.position.needsUpdate = true; }
+  }
+  poster.uniforms.uT.value = (clock.elapsedTime * 24 | 0) % 97; composer.render(); labels.render(scene, camera);
+  fr++; const now = performance.now();
+  if (now - last >= 1000) { window.__fps = Math.round(fr * 1000 / (now - last)); $('fps').textContent = window.__fps + ' fps'; fr = 0; last = now; }
+});
+build().catch(e => { $('load').textContent = 'Алдаа: ' + e.message; console.error(e); });
+window.city = { goClient: i => goClient(i), applyMood, focus, camera, controls, get poster() { return poster; }, renderer, sim: (o = {}) => { live = false; if (o.smog != null) smog = o.smog; if (o.traffic != null) trafficNow = o.traffic; applyMood(o.mood || mood); } };   // турших: city.sim({smog:.8, traffic:1, mood:'day'})
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FM Office · Gallery hall</title>
+<!-- Gallery hall (desktop): дээр нь хавтсуудын танхим (Three.js — таныг тойрсон самбарууд), доор нь кино өрөө:
+     YouTube embed + цагтай highlight → «Атом болгох» (POST /api/atom, шинэ файл л үүсгэнэ). Өгөгдөл: /api/hall. -->
+<style>
+  :root { --ink:#1a1714; --paper:#f4efe4; --card:#fffdf8; --acc:#d9732e; --muted:#6b645b; --dark:#1c1814; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--dark); color:var(--paper); font:14px/1.45 Inter, system-ui, sans-serif; }
+  #hall { position:relative; height:44vh; min-height:280px; }
+  #hall canvas { display:block; }
+  .top { position:absolute; top:12px; left:14px; right:14px; z-index:2; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .top a, .top button { font:600 13px Inter, system-ui, sans-serif; color:var(--paper); background:#1c1814cc; border:1.5px solid #f4efe466; border-radius:16px; padding:4px 12px; text-decoration:none; cursor:pointer; }
+  .crumb { font-weight:700; background:#1c1814cc; border-radius:10px; padding:4px 10px; }
+  .crumb span { cursor:pointer; text-decoration:underline; text-underline-offset:3px; } .crumb i { font-style:normal; color:#cfc6b8; margin:0 6px; }
+  .hint { position:absolute; bottom:8px; left:0; right:0; text-align:center; font-size:12px; color:#cfc6b8; pointer-events:none; }
+  #fps { margin-left:auto; background:var(--paper); color:var(--dark); border-radius:8px; padding:3px 8px; font:600 12px ui-monospace, monospace; }
+
+  .work { display:grid; grid-template-columns:minmax(0, 1.35fr) minmax(320px, 1fr); gap:14px; padding:14px; height:56vh; min-height:420px; background:var(--paper); color:var(--ink); border-top:4px solid var(--acc); }
+  .pane { background:var(--card); border:2px solid var(--ink); border-radius:14px; padding:12px; display:flex; flex-direction:column; min-height:0; }
+  .row { display:flex; gap:8px; margin-bottom:8px; }
+  input, textarea { font:inherit; border:2px solid var(--ink); border-radius:10px; padding:7px 10px; background:#fff; color:var(--ink); width:100%; }
+  textarea { resize:vertical; }
+  button.b { font:600 13px Inter, system-ui, sans-serif; border:2px solid var(--ink); background:#fff; color:var(--ink); border-radius:16px; padding:6px 12px; cursor:pointer; white-space:nowrap; }
+  button.b.go { background:var(--acc); color:#fff; } button.b:disabled { opacity:.5; cursor:not-allowed; }
+  .video { flex:1; min-height:0; background:#000; border-radius:10px; overflow:hidden; display:grid; place-items:center; color:#cfc6b8; }
+  .video > div, .video iframe { width:100%; height:100%; }
+  .vids { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; } .vids button { font-size:12px; }
+  h3 { margin:0 0 8px; font-size:15px; } .muted { color:var(--muted); font-size:12px; }
+  .hl { flex:1; min-height:60px; overflow:auto; margin:8px 0; border-top:1px dashed #cbbfa9; padding-top:6px; }
+  .hl div { display:flex; gap:8px; align-items:baseline; padding:3px 0; }
+  .hl button.t { font:600 12px ui-monospace, monospace; border:1.5px solid var(--acc); color:var(--acc); background:#fff; border-radius:8px; padding:1px 6px; cursor:pointer; }
+  .hl span { flex:1; } .hl .x { border:none; background:none; color:var(--muted); cursor:pointer; }
+  #status { font-size:12px; margin-top:6px; min-height:18px; } #status.ok { color:#2f8f52; } #status.err { color:#c8382c; }
+  kbd { font:600 11px ui-monospace, monospace; border:1px solid #cbbfa9; border-radius:4px; padding:0 4px; }
+  .viewer { flex:1; min-height:0; overflow:auto; background:#fff; border:2px solid var(--ink); border-radius:10px; padding:14px 16px; color:var(--ink); }
+  .viewer iframe { width:100%; height:100%; border:0; display:block; } .viewer.frame { padding:0; overflow:hidden; }
+  .viewer .meta { color:var(--muted); font-size:12px; margin:4px 0 10px; }
+  .viewer .blk { padding:4px 6px; border-radius:6px; cursor:pointer; margin:2px 0; } .viewer .blk:hover { background:#fff3df; }
+  .viewer .blk.on { background:#ffe2bf; } .viewer h3.blk { margin:12px 0 4px; font-size:15px; }
+  .viewer .imgs { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:10px; }
+  .viewer .imgs img { width:100%; border-radius:8px; border:2px solid var(--ink); cursor:pointer; }
+  .viewer .cover { width:100%; max-height:240px; object-fit:cover; border-radius:8px; border:2px solid var(--ink); margin:6px 0; }
+  .kind { display:inline-block; font:700 11px Inter, system-ui, sans-serif; border-radius:8px; padding:1px 8px; color:#fff; margin-right:6px; }
+  @media (max-width: 900px) { .work { grid-template-columns:1fr; height:auto; } .video { min-height:240px; } }
+</style>
+<script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }</script>
+</head>
+<body>
+<section id="hall">
+  <div class="top"><a href="/home">← Гэр</a><button id="up">↑ Дээш</button><div class="crumb" id="crumb"></div><span id="fps">— fps</span></div>
+  <div class="hint">POV: <b>WASD</b> алхах · <b>чирэх</b> эргэж харах · самбар дээр дарвал доор төрлөөр нь нээгдэнэ (▶ бичлэг · вэб · унших · зураг · repo)</div>
+</section>
+<section class="work">
+  <div class="pane">
+    <div class="row"><input id="url" placeholder="YouTube холбоос буулгах…"><button class="b" id="load">Тоглуулах</button></div>
+    <div class="video" id="video"><span>Бичлэг сонгоогүй байна</span></div>
+    <div class="vids" id="vids"></div>
+  </div>
+  <div class="pane">
+    <h3>Highlight → атом</h3>
+    <div class="row"><input id="title" placeholder="Атомын гарчиг (≤60 тэмдэгт)"></div>
+    <div class="row"><input id="hltext" placeholder="Энэ мөчид юу чухал вэ? (Enter = highlight)"><button class="b" id="mark">＋ <span id="now">0:00</span></button></div>
+    <div class="hl" id="hl"><span class="muted">Highlight алга. Бичлэг үзэнгээ <kbd>Enter</kbd> дар — одоогийн цагтай хадгална.</span></div>
+    <textarea id="body" rows="3" placeholder="Нэмэлт бодол (заавал биш)"></textarea>
+    <div class="row" style="margin:8px 0 0"><button class="b go" id="save" disabled>Атом болгох</button><span class="muted" id="home" style="align-self:center"></span></div>
+    <div id="status"></div>
+  </div>
+</section>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script type="module">
+import * as THREE from 'three';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const ts = s => { s = Math.max(0, Math.floor(s)); return s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const VAULT = 'Second Brain 2.0';
+let cwd = '', video = '', srcUrl = '', highlights = [], player = null;
+
+// ---------- танхим (Three.js): таныг тойрсон нумд самбарууд ----------
+const host = $('hall');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+host.prepend(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1c1814); scene.fog = new THREE.Fog(0x1c1814, 6, 14);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 50); camera.position.set(0, 1.6, 0);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(8, 64), new THREE.MeshBasicMaterial({ color: 0x2a2420 }));
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const ring = new THREE.Mesh(new THREE.RingGeometry(3.38, 3.42, 120), new THREE.MeshBasicMaterial({ color: 0xd9732e }));
+ring.rotation.x = -Math.PI / 2; ring.position.y = 0.01; scene.add(ring);
+const R = 3.4, PW = 1.0, PH = 0.7;
+const KIND = { video: ['▶ БИЧЛЭГ', '#d9732e', 'дарвал доор тоглоно'], web: ['ВЭБ', '#3f7a8c', 'сайтыг доор нээнэ'], read: ['УНШИХ', '#6f8f4e', 'унших горим · догол мөр = highlight'],
+  image: ['ЗУРАГ', '#b5527a', 'зургийн тор'], post: ['ПОСТ', '#8c5a9a', 'постын текст'], repo: ['REPO', '#2a2420', 'README унших'], note: ['NOTE', '#9a8f80', 'Obsidian-д нээгдэнэ'] };
+const PARA = { '01-GTD': '#c9573a', '02-Projects': '#3f7a8c', '03-Areas': '#6f8f4e', '04-Resources': '#8c5a9a', '99-Archive': '#6b645b' };
+let panels = [], yaw = 0, yawTo = 0, pitch = 0, pitchTo = 0, hovered = null;
+const keys = new Set(), pos = new THREE.Vector3(0, 1.6, 0);   // POV: өөрөө танхимд алхана
+
+// Самбар: дээд хэсэг = thumbnail (байвал) эсвэл төрлийн өнгө, доор нь нэр. Зураг ирэхэд дахин зурна.
+function drawCard(g, it, img) {
+  g.clearRect(0, 0, 700, 490);
+  g.fillStyle = '#fffdf8'; g.beginPath(); g.roundRect(0, 0, 700, 490, 30); g.fill();
+  g.save(); g.beginPath(); g.roundRect(22, 22, 656, 300, 20); g.clip();
+  g.fillStyle = it.color; g.fillRect(22, 22, 656, 300);
+  if (img) {                                                     // cover-fit
+    const k = Math.max(656 / img.width, 300 / img.height), w = img.width * k, h = img.height * k;
+    g.drawImage(img, 22 + (656 - w) / 2, 22 + (300 - h) / 2, w, h);
+    const gr = g.createLinearGradient(0, 22, 0, 120); gr.addColorStop(0, 'rgba(20,16,12,.55)'); gr.addColorStop(1, 'rgba(20,16,12,0)');
+    g.fillStyle = gr; g.fillRect(22, 22, 656, 100);
+  }
+  g.restore();
+  g.fillStyle = it.color; g.beginPath(); g.roundRect(40, 40, g.measureText ? Math.min(360, 40 + it.kind.length * 22) : 200, 46, 12); g.fill();
+  g.fillStyle = '#fff'; g.font = '700 28px Inter, system-ui, sans-serif'; g.fillText(it.kind, 58, 73);
+  if (!img) { g.font = '700 44px Inter, system-ui, sans-serif'; wrap(g, it.name, 50, 170, 600, 52, 2); }
+  g.fillStyle = '#1a1714'; g.font = `700 ${img ? 36 : 28}px Inter, system-ui, sans-serif`;
+  wrap(g, img ? it.name : it.sub, 40, 372, 620, img ? 42 : 36, 2);
+  if (img) { g.fillStyle = '#6b645b'; g.font = '500 24px Inter, system-ui, sans-serif'; g.fillText(it.sub.slice(0, 48), 40, 462); }
+}
+function cardTex(it) {
+  const c = document.createElement('canvas'); c.width = 700; c.height = 490; const g = c.getContext('2d');
+  drawCard(g, it, null);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.userData = { g, it }; return t;
+}
+// thumbnail-ыг зэрэг 6-аар ачаална; ирсэн бүрт самбарын texture шинэчлэгдэнэ
+let thumbGen = 0;
+function loadThumbs(list) {
+  const gen = ++thumbGen, queue = list.filter(p => p.userData.note && p.userData.note.kind !== 'note');
+  const next = () => {
+    const p = queue.shift(); if (!p || gen !== thumbGen) return;
+    const img = new Image();
+    img.onload = () => { if (gen === thumbGen) { const t = p.material.map; drawCard(t.userData.g, t.userData.it, img); t.needsUpdate = true; } next(); };
+    img.onerror = next;
+    img.src = '/api/thumb?path=' + encodeURIComponent(p.userData.note.path);
+  };
+  for (let i = 0; i < 6; i++) next();
+}
+function wrap(g, text, x, y, w, lh, max) {
+  const words = String(text).split(/\s+/); let line = '', n = 0;
+  for (const wd of words) { const t = line ? line + ' ' + wd : wd;
+    if (g.measureText(t).width > w && line) { g.fillText(line, x, y + n * lh); line = wd; if (++n >= max) return; } else line = t; }
+  g.fillText(line, x, y + n * lh);
+}
+function build(items) {
+  panels.forEach(p => { scene.remove(p); p.material.map.dispose(); p.material.dispose(); }); panels = [];
+  // олон бол хэд хэдэн эгнээ (нэг эгнээнд ≤16, нум 360°-ээс хэтрэхгүй)
+  const per = 16, rows = Math.ceil(items.length / per), step = 0.34;
+  items.forEach((it, i) => {
+    const row = Math.floor(i / per), col = i % per, n = Math.min(per, items.length - row * per);
+    const a = -step * (n - 1) / 2 + col * step, y = 1.6 + ((rows - 1) / 2 - row) * 0.8;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), new THREE.MeshBasicMaterial({ map: cardTex(it), transparent: true }));
+    m.position.set(Math.sin(a) * R, y, -Math.cos(a) * R); m.lookAt(0, y, 0);
+    m.userData = { ...it, a, s: 0 }; scene.add(m); panels.push(m);
+  });
+  yaw = yawTo = 0;
+  loadThumbs(panels);
+}
+
+// ---------- Gallery: сэдвийн өрөөнүүд ----------
+const TOPIC_C = ['#d9732e', '#3f7a8c', '#6f8f4e', '#8c5a9a', '#b5527a', '#c9573a', '#2a2420', '#e0b46a', '#5f8a4a', '#7a6a9a', '#9a6b4a', '#6b645b'];
+const KN = { video: 'бичлэг', web: 'вэб', repo: 'repo', read: 'унших', image: 'зураг', post: 'пост', note: 'note' };
+let mode = 'path', topic = '';
+async function openTopics() {
+  mode = 'topics'; topic = ''; cwd = '04-Resources/references';
+  const d = await (await fetch('/api/hall?topics=1')).json();
+  build(d.topics.map((t, i) => ({ kind: 'СЭДЭВ · ' + t.count, name: t.name, color: TOPIC_C[i % TOPIC_C.length],
+    sub: Object.entries(t.kinds).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${KN[k] || k}`).join(' · '),
+    topic: t.name, note: t.sample ? { path: t.sample, kind: 'thumb' } : null })));
+  $('crumb').innerHTML = `<span data-p="">Vault</span><i>›</i><b>Gallery · ${d.total} ref, ${d.topics.length} сэдэв</b>`;
+  $('vids').innerHTML = ''; $('home').textContent = 'гэр: 04-Resources/references';
+  history.replaceState(null, '', '/hall?topics=1');
+}
+async function openTopic(name, openPath) {
+  mode = 'topic'; topic = name; cwd = '04-Resources/Topics/' + name;
+  const d = await (await fetch('/api/hall?topic=' + encodeURIComponent(name))).json();
+  showNotes(d.notes);
+  const n = openPath && d.notes.find(x => x.path === openPath);       // Gallery-аас дарж ирсэн ref-ийг шууд нээнэ
+  if (n) { const k = n.kind === 'note' && n.videos.length ? 'video' : n.kind;
+    if (k === 'video' && n.videos.length) play(n.videos[0], n.name); else if (k !== 'note' && n.url) openRef({ ...n, kind: k }); }
+  $('crumb').innerHTML = `<span data-t="1">Gallery</span><i>›</i><b>${esc(name)}</b> <small style="font-weight:400">· ${d.notes.length} ref, төрлөөр эгнээлсэн</small>`;
+  $('home').textContent = 'гэр: ' + cwd;
+  history.replaceState(null, '', '/hall?topic=' + encodeURIComponent(name));
+  $('crumb').insertAdjacentHTML('beforeend', ` <a href="/gallery?topic=${encodeURIComponent(name)}" style="margin-left:8px">▦ Gallery тор</a>`);
+}
+function showNotes(notes) {
+  build(notes.map(n => { const k = n.kind === 'note' && n.videos.length ? 'video' : n.kind, K = KIND[k] || KIND.note;
+    return { kind: K[0], name: n.name, sub: (n.domain ? n.domain + ' · ' : '') + K[2], color: K[1], note: { ...n, kind: k } }; }));
+  $('vids').innerHTML = notes.filter(n => n.videos.length).slice(0, 12).flatMap(n => n.videos.slice(0, 1).map(v =>
+    `<button class="b" data-v="${v}" title="${esc(n.name)}">▶ ${esc(n.name.slice(0, 28))}</button>`)).join('');
+}
+
+async function open(rel) {
+  mode = 'path';
+  const r = await fetch('/api/hall?path=' + encodeURIComponent(rel));
+  const d = await r.json(); if (!r.ok) return setStatus(d.error || 'алдаа', 'err');
+  cwd = d.path; $('home').textContent = cwd ? 'гэр: ' + cwd : '';
+  const top = cwd.split('/')[0];
+  const items = [
+    ...d.folders.map(f => ({ kind: 'ХАВТАС', name: f.name, sub: `${f.count} note`, color: PARA[f.name] || PARA[top] || '#2a2420', folder: f.path })),
+    ...d.notes.map(n => { const k = n.kind === 'note' && n.videos.length ? 'video' : n.kind, K = KIND[k] || KIND.note;
+      return { kind: K[0], name: n.name, sub: (n.domain ? n.domain + ' · ' : '') + K[2], color: K[1], note: { ...n, kind: k } }; }),
+  ].slice(0, 60);
+  build(items);
+  const parts = cwd ? cwd.split('/') : [];
+  $('crumb').innerHTML = `<span data-p="">Vault</span>` + parts.map((p, i) => `<i>›</i><span data-p="${esc(parts.slice(0, i + 1).join('/'))}">${esc(p)}</span>`).join('');
+  $('vids').innerHTML = d.notes.filter(n => n.videos.length).slice(0, 12).flatMap(n => n.videos.map(v =>
+    `<button class="b" data-v="${v}" title="${esc(n.name)}">▶ ${esc(n.name.slice(0, 28))}</button>`)).join('');
+}
+$('crumb').onclick = e => { if (e.target.closest('[data-t]')) return openTopics(); const s = e.target.closest('[data-p]'); if (s) open(s.dataset.p); };
+$('up').onclick = () => mode === 'topic' ? openTopics() : mode === 'topics' ? open('04-Resources') : open(cwd.split('/').slice(0, -1).join('/'));
+$('vids').onclick = e => { const b = e.target.closest('[data-v]'); if (b) play(b.dataset.v, b.title); };
+
+function activate(p) {
+  const u = p.userData;
+  if (u.topic) return openTopic(u.topic);
+  if (u.folder) return open(u.folder);
+  if (u.note.kind === 'video' && u.note.videos.length) return play(u.note.videos[0], u.note.name);
+  if (u.note.kind !== 'note' && u.note.url) return openRef(u.note);
+  location.href = `obsidian://open?vault=${encodeURIComponent(VAULT)}&file=${encodeURIComponent(u.note.path.replace(/\.md$/, ''))}`;
+}
+
+// чирж эргүүлэх, дарж сонгох
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let drag = null;
+const el = renderer.domElement;
+el.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, yaw: yawTo, pitch: pitchTo, moved: false }; el.setPointerCapture(e.pointerId); });
+el.addEventListener('pointermove', e => {
+  const r = el.getBoundingClientRect(); ptr.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ptr, camera); hovered = ray.intersectObjects(panels, false)[0]?.object || null;
+  el.style.cursor = hovered ? 'pointer' : 'grab';
+  if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 5) drag.moved = true;
+    yawTo = drag.yaw - dx * 0.004; pitchTo = Math.max(-0.6, Math.min(0.6, drag.pitch + dy * 0.003)); }
+});
+el.addEventListener('pointerup', () => { if (drag && !drag.moved && hovered) activate(hovered); drag = null; });
+el.addEventListener('wheel', e => { yawTo += e.deltaY * 0.0012; e.preventDefault(); }, { passive: false });
+
+const typing = () => /INPUT|TEXTAREA/.test(document.activeElement?.tagName);
+addEventListener('keydown', e => { if (!typing()) { keys.add(e.key.toLowerCase()); if (e.key.startsWith('Arrow')) e.preventDefault(); } });
+addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => keys.clear());
+function size() { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', size); size();
+let frames = 0, last = performance.now(); window.__fps = 0;
+renderer.setAnimationLoop(() => {
+  yaw += (yawTo - yaw) * 0.12; pitch += (pitchTo - pitch) * 0.12;
+  // WASD / сум: харж буй чиглэл рүү алхана, танхимаас гарахгүй
+  const f = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0);
+  const st = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0), tr = (keys.has('arrowright') ? 1 : 0) - (keys.has('arrowleft') ? 1 : 0);
+  yawTo += tr * 0.025;
+  pos.x += (Math.sin(yaw) * f + Math.cos(yaw) * st) * 0.045; pos.z += (-Math.cos(yaw) * f + Math.sin(yaw) * st) * 0.045;
+  const r = Math.hypot(pos.x, pos.z), max = R - 0.7; if (r > max) { pos.x *= max / r; pos.z *= max / r; }
+  camera.position.copy(pos);
+  camera.lookAt(pos.x + Math.sin(yaw) * Math.cos(pitch), pos.y - Math.sin(pitch), pos.z - Math.cos(yaw) * Math.cos(pitch));
+  for (const p of panels) { const u = p.userData; u.s += ((p === hovered ? 1 : 0) - u.s) * 0.2; p.scale.setScalar(1 + u.s * 0.08); }
+  renderer.render(scene, camera);
+  frames++; const now = performance.now();
+  if (now - last >= 1000) { window.__fps = Math.round(frames * 1000 / (now - last)); $('fps').textContent = window.__fps + ' fps'; frames = 0; last = now; }
+});
+
+// ---------- YouTube ----------
+const ytId = s => (String(s).match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/) || [])[1] || (/^[\w-]{11}$/.test(s) ? s : '');
+function play(id, title) {
+  if (!id) return setStatus('YouTube холбоос танигдсангүй', 'err');
+  if (video !== id) { highlights = []; renderHl(); }
+  video = id; srcUrl = ''; $('url').value = 'https://youtu.be/' + id;
+  if (title && !$('title').value) $('title').value = title.replace(/^\d{4}-\d\d-\d\d - /, '').slice(0, 60);
+  if (player && player.loadVideoById && $('yt')) player.loadVideoById(id);
+  else {
+    $('video').className = 'video'; $('video').innerHTML = '<div id="yt"></div>';
+    const make = () => player = new YT.Player('yt', { videoId: id, playerVars: { rel: 0, modestbranding: 1 } });
+    window.YT && YT.Player ? make() : (window.onYouTubeIframeAPIReady = make);
+  }
+  refresh();
+}
+$('load').onclick = () => play(ytId($('url').value));
+$('url').onkeydown = e => { if (e.key === 'Enter') play(ytId($('url').value)); };
+const now = () => (player && player.getCurrentTime ? player.getCurrentTime() : 0);
+setInterval(() => { $('now').textContent = ts(now()); }, 500);
+
+// ---------- highlight ----------
+function mark() {
+  const text = $('hltext').value.trim(); if (!text) return $('hltext').focus();
+  highlights.push({ t: video ? Math.floor(now()) : null, text }); if (video) highlights.sort((a, b) => a.t - b.t);
+  $('hltext').value = ''; renderHl(); refresh();
+}
+$('mark').onclick = mark;
+$('hltext').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); mark(); } };
+function renderHl() {
+  $('hl').innerHTML = highlights.length ? highlights.map((h, i) =>
+    `<div>${h.t == null ? '<button class="t" disabled>❝</button>' : `<button class="t" data-t="${h.t}">${ts(h.t)}</button>`}<span>${esc(h.text)}</span><button class="x" data-i="${i}" title="Устгах">✕</button></div>`).join('')
+    : '<span class="muted">Highlight алга. Бичлэг үзэнгээ <kbd>Enter</kbd> дар — одоогийн цагтай хадгална.</span>';
+}
+$('hl').onclick = e => {
+  const t = e.target.closest('[data-t]'); if (t && player?.seekTo) player.seekTo(+t.dataset.t, true);
+  const x = e.target.closest('[data-i]'); if (x) { highlights.splice(+x.dataset.i, 1); renderHl(); refresh(); }
+};
+function refresh() { $('save').disabled = !$('title').value.trim() || (!highlights.length && !$('body').value.trim()); }
+$('title').oninput = refresh; $('body').oninput = refresh;
+function setStatus(t, cls = '') { $('status').textContent = t; $('status').className = cls; }
+
+// ---------- атом болгох ----------
+$('save').onclick = async () => {
+  $('save').disabled = true; setStatus('Бичиж байна…');
+  try {
+    const r = await fetch('/api/atom', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: true, title: $('title').value, video, url: srcUrl, highlights, body: $('body').value, home: cwd }) });
+    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    setStatus('✓ Хадгаллаа: ' + d.path, 'ok');
+    highlights = []; renderHl(); $('body').value = ''; $('title').value = '';
+  } catch (e) { setStatus('Хадгалсангүй: ' + e.message, 'err'); }
+  refresh();
+};
+
+
+// ---------- төрөл бүрийн үзэгч (/api/ref) ----------
+async function openRef(n) {
+  video = ''; player = null; srcUrl = n.url; highlights = []; renderHl();
+  if (!$('title').value || $('title').dataset.auto) { $('title').value = n.name.replace(/^\d{4}-\d\d-\d\d - /, '').slice(0, 60); $('title').dataset.auto = 1; }
+  const V = $('video'); V.className = 'viewer'; V.innerHTML = '<p class="muted">Ачаалж байна…</p>'; $('url').value = n.url;
+  let d; try { const r = await fetch('/api/ref?path=' + encodeURIComponent(n.path)); d = await r.json(); if (!r.ok) throw new Error(d.error); }
+  catch (e) { V.innerHTML = `<p>Ачаалсангүй: ${esc(e.message)}</p>`; return; }
+  const K = KIND[d.kind] || KIND.note, pg = d.page || {};
+  const head = `<span class="kind" style="background:${K[1]}">${K[0]}</span><b>${esc(pg.title || d.name)}</b>
+    <div class="meta">${esc(d.domain)} · <a href="${esc(d.url)}" target="_blank" rel="noopener">шинэ табд нээх ↗</a>${d.error ? ' · татаж чадсангүй (' + esc(d.error) + ')' : ''}</div>`;
+  const blocks = (d.blocks || []).map((b, i) => { const h = b.tag.startsWith('h') ? 'h3' : 'p'; return `<${h} class="blk" data-b="${i}">${esc(b.text)}</${h}>`; }).join('');
+  if (d.kind === 'web' && d.frameable) { V.className = 'viewer frame'; V.innerHTML = `<iframe src="${esc(d.url)}" sandbox="allow-scripts allow-same-origin allow-popups" loading="lazy"></iframe>`; }
+  else if (d.kind === 'image') {
+    const imgs = [...new Set([d.image, pg.image].filter(Boolean))];
+    V.innerHTML = head + (imgs.length ? `<div class="imgs">${imgs.map(u => `<img src="${esc(u)}" referrerpolicy="no-referrer" data-img="${esc(u)}" alt="">`).join('')}</div>` : '<p class="muted">Зураг олдсонгүй — шинэ табд нээж үзнэ үү.</p>')
+      + (pg.desc ? `<p>${esc(pg.desc)}</p>` : '');
+  } else {
+    const repo = d.repo ? `<div class="meta">★ ${d.repo.stars ?? '—'} · ${esc(d.repo.lang || '')} · сүүлд ${esc(d.repo.pushed || '')}<br>${esc(d.repo.desc || '')}</div>` : '';
+    const img = pg.image || d.image, cover = img ? `<img class="cover" src="${esc(img)}" referrerpolicy="no-referrer" alt="">` : '';
+    V.innerHTML = head + repo + cover + (pg.desc && d.kind !== 'repo' ? `<p><i>${esc(pg.desc)}</i></p>` : '')
+      + (blocks || '<p class="muted">Текст олдсонгүй — сайт өөрөө embed, татахыг хориглосон байж магадгүй.</p>');
+  }
+  V.onclick = e => {
+    const b = e.target.closest('[data-b]');
+    if (b) { b.classList.add('on'); highlights.push({ t: null, text: b.textContent.slice(0, 500) }); renderHl(); refresh(); }
+    const im = e.target.closest('[data-img]');
+    if (im) { highlights.push({ t: null, text: 'зураг: ' + im.dataset.img }); renderHl(); refresh(); }
+  };
+  refresh();
+}
+$('title').addEventListener('input', () => delete $('title').dataset.auto);
+window.hall = { open, openRef, play };                       // консол, тестэд
+window.hall.openTopics = openTopics; window.hall.openTopic = openTopic;
+{ const q = new URLSearchParams(location.search);
+  if (q.get('embed')) {                                              // FPV-ийн «шил» HUD дотор: зөвхөн үзэгч
+    $('hall').style.display = 'none'; document.querySelector('.work').style.height = '100vh'; renderer.setAnimationLoop(null);
+    const p = q.get('open') || '', dir = p.split('/').slice(0, -1).join('/');
+    fetch('/api/hall?path=' + encodeURIComponent(dir)).then(r => r.json()).then(d => {
+      cwd = d.path; $('home').textContent = 'гэр: ' + cwd;
+      const n = (d.notes || []).find(x => x.path === p); if (!n) return;
+      const k = n.kind === 'note' && n.videos.length ? 'video' : n.kind;
+      if (k === 'video' && n.videos.length) play(n.videos[0], n.name); else if (n.url) openRef({ ...n, kind: k });
+    });
+  } else if (q.get('topic')) openTopic(q.get('topic'), q.get('open')); else if (q.get('topics') || !q.get('path')) openTopics(); else open(q.get('path')); }
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>

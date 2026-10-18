@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FM Office · Gallery FPV</title>
+<!-- Gallery-г нэгдүгээр биеийн (FPV) орон зайд: урт коридор, сэдэв бүр нэг «bay» (зүүн/баруун ээлжилнэ),
+     bay-ийн ханан дээр дэд сэдвээр ref-ийн хүрээ өлгөөтэй. Хулгана түгжинэ (pointer lock) + WASD, Shift = гүйх.
+     Төв дэх цэгээр хүрээ онилж дарвал «шил» HUD дотор үзэгч (/hall?embed=1) нээгдэнэ. Өгөгдөл: /api/hall, /api/thumb. -->
+<style>
+  :root { --glass:rgba(22,22,26,.55); --edge:rgba(255,255,255,.14); --text:#ecebe6; --muted:#9a9aa0; --acc:#a9b4ff; }
+  html,body { margin:0; height:100%; overflow:hidden; background:#070708; color:var(--text); font:14px/1.45 Inter, system-ui, sans-serif; }
+  canvas { display:block; }
+  .glass { background:var(--glass); border:1px solid var(--edge); border-radius:14px; backdrop-filter:blur(18px) saturate(1.2); -webkit-backdrop-filter:blur(18px) saturate(1.2); box-shadow:0 20px 60px rgba(0,0,0,.45); }
+  .mono { font:500 11px/1.4 ui-monospace, monospace; letter-spacing:.14em; text-transform:uppercase; }
+  #cross { position:fixed; left:50%; top:50%; width:8px; height:8px; margin:-4px; border-radius:50%; border:2px solid rgba(255,255,255,.85); pointer-events:none; transition:transform .15s; }
+  #cross.hot { transform:scale(1.9); border-color:var(--acc); }
+  #aim { position:fixed; left:50%; top:calc(50% + 22px); transform:translateX(-50%); padding:6px 12px; pointer-events:none; white-space:nowrap; max-width:60vw; overflow:hidden; text-overflow:ellipsis; display:none; }
+  #nav { position:fixed; left:16px; top:16px; width:250px; max-height:calc(100vh - 32px); overflow:auto; padding:16px; }
+  #nav h1 { margin:6px 0 10px; font-size:18px; font-weight:500; }
+  #nav button { display:flex; justify-content:space-between; width:100%; border:none; background:none; color:#d6d5cf; font:inherit; padding:6px 8px; border-radius:8px; cursor:pointer; text-align:left; }
+  #nav button:hover { background:rgba(255,255,255,.08); } #nav button span { color:var(--muted); font:500 12px ui-monospace, monospace; }
+  #nav a { color:var(--muted); text-decoration:none; margin-right:10px; }
+  #help { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); padding:10px 16px; text-align:center; }
+  #start { position:fixed; inset:0; display:grid; place-items:center; background:rgba(7,7,8,.55); cursor:pointer; }
+  #start div { padding:26px 30px; text-align:center; max-width:420px; } #start b { font-size:22px; font-weight:500; display:block; margin:8px 0; }
+  #viewer { position:fixed; inset:5vh 6vw; display:none; flex-direction:column; overflow:hidden; }
+  #viewer.on { display:flex; }
+  #viewer header { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; border-bottom:1px solid var(--edge); }
+  #viewer header button { background:rgba(255,255,255,.1); color:var(--text); border:1px solid var(--edge); border-radius:999px; padding:4px 12px; cursor:pointer; font:inherit; }
+  #viewer iframe { flex:1; border:0; width:100%; background:#f4efe4; }
+  #fps { position:fixed; right:16px; bottom:16px; padding:5px 12px; border-radius:999px; }
+  @media (max-width:800px) { #nav { width:auto; right:16px; max-height:40vh; } }
+</style>
+<script type="importmap">{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<div id="cross"></div>
+<div id="aim" class="glass"></div>
+<aside id="nav" class="glass"><div class="mono" style="color:var(--acc)">Gallery · FPV</div><h1>Сэдэв рүү очих</h1><div id="topics"></div>
+  <p class="mono" style="margin:14px 0 0"><a href="/gallery">▦ Тор</a><a href="/home">← Гэр</a></p></aside>
+<div id="help" class="glass mono">Click = хулгана түгжих · WASD алхах · Shift гүйх · онилж дарах = нээх · Esc = чөлөөлөх · Tab = сэдэв</div>
+<div id="start"><div class="glass"><span class="mono" style="color:var(--acc)">Gallery · FPV</span><b>Дарж орох</b><span style="color:var(--muted)">Хулгана чөлөөтэй эргэнэ. WASD-аар алхаж, хүрээ рүү онилоод дарна.</span></div></div>
+<section id="viewer" class="glass"><header><span class="mono" id="vt"></span><span><button id="vo">Тор дээр нээх</button> <button id="vx">Хаах (Esc)</button></span></header><iframe id="vf"></iframe></section>
+<div id="fps" class="glass mono">— FPS</div>
+<script type="module">
+import * as THREE from 'three';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const KN = { video: '▶ Бичлэг', web: 'Вэб', repo: 'Repo', read: 'Унших', image: 'Зураг', post: 'Пост', note: 'Note' };
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x070708); scene.fog = new THREE.Fog(0x070708, 14, 46);
+const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.05, 200); camera.position.set(0, 1.65, 4);
+const controls = new PointerLockControls(camera, document.body); scene.add(controls.getObject());
+scene.add(new THREE.HemisphereLight(0x9aa4ff, 0x111114, 0.55));
+
+// ---------- орон зай: коридор + сэдэв бүрт bay ----------
+const BAY_W = 9, BAY_D = 7, GAP = 1.2, CORR = 4, H = 3.6;
+const wallM = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: .95 });
+const floorM = new THREE.MeshStandardMaterial({ color: 0x0e0e10, roughness: .35, metalness: .2 });
+const pickables = [], walls = [], bays = [];
+function box(w, h, d, x, y, z, m = wallM) { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); scene.add(o); return o; }
+function textTex(lines, w = 1024, h = 256, bg = null) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  if (bg) { g.fillStyle = bg; g.fillRect(0, 0, w, h); }
+  lines.forEach(([t, size, color, y, weight = 500]) => { g.fillStyle = color; g.font = `${weight} ${size}px Inter, system-ui, sans-serif`; g.fillText(t, 24, y); });
+  const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; return tx;
+}
+const loader = new THREE.TextureLoader();
+function frame(n, x, y, z, ry, w, h) {
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; scene.add(g);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(w + .08, h + .08, .05), new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: .6 })); g.add(back);
+  const pic = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: 0x1d1d22 }));
+  pic.position.z = .03; g.add(pic);
+  loader.load('/api/thumb?path=' + encodeURIComponent(n.path), t => { t.colorSpace = THREE.SRGBColorSpace; pic.material = new THREE.MeshBasicMaterial({ map: t }); pic.material.needsUpdate = true; });
+  const cap = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), new THREE.MeshBasicMaterial({ map: textTex([[KN[n.kind] || n.kind, 36, '#a9b4ff', 60], [n.name.slice(0, 42), 46, '#ecebe6', 130], [n.domain || '', 32, '#8a8a90', 190]]), transparent: true }));
+  cap.position.set(0, -h / 2 - w / 8 - .06, .03); g.add(cap);
+  const spot = new THREE.Mesh(new THREE.PlaneGeometry(w + .6, h + .9), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .035 }));
+  spot.position.z = .005; g.add(spot);                                       // хүрээний ард зөөлөн гэрлийн толбо
+  pic.userData.ref = n; pic.userData.group = g; pickables.push(pic);
+}
+function hang(list, origin, dir, len, y0) {           // ханын дагуу хүрээ өлгөнө (dir = ханын чиглэл, нүүр нь normal)
+  let s = .6;
+  for (const n of list) {
+    const k = n.kind === 'note' && n.videos?.length ? 'video' : n.kind, w = k === 'video' ? 1.9 : k === 'image' ? 1.1 : 1.5, h = k === 'image' ? 1.5 : 1.05;
+    if (s + w > len - .4) break;
+    const p = origin.clone().addScaledVector(dir.v, s + w / 2);
+    frame({ ...n, kind: k }, p.x, y0, p.z, dir.ry, w, h); s += w + .55;
+  }
+}
+async function build() {
+  const d = await (await fetch('/api/hall?topics=1')).json();
+  const topics = d.topics;
+  const len = Math.ceil(topics.length / 2) * (BAY_W + GAP) + 6;
+  box(CORR + 2 * BAY_D + 2, .1, len, 0, -.05, -len / 2 + 4, floorM);                   // шал
+  box(CORR + 2 * BAY_D + 2, .1, len, 0, H, -len / 2 + 4, new THREE.MeshStandardMaterial({ color: 0x0b0b0d }));
+  for (let i = 0; i < len / 3; i++) {                                                 // таазны гэрлийн зурвас
+    const l = new THREE.Mesh(new THREE.BoxGeometry(.25, .03, 1.6), new THREE.MeshBasicMaterial({ color: 0xcfd4ff })); l.position.set(0, H - .03, 2 - i * 3); scene.add(l);
+  }
+  box(CORR + 2 * BAY_D + 2, H, .2, 0, H / 2, 6);                                     // эхний хана
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), new THREE.MeshBasicMaterial({ map: textTex([['SECOND BRAIN · GALLERY', 40, '#a9b4ff', 80], [`${d.total} ref · ${topics.length} сэдэв`, 64, '#ecebe6', 170, 600]]), transparent: true }));
+  sign.position.set(0, 2.2, 5.88); sign.rotation.y = Math.PI; scene.add(sign);
+  for (let i = 0; i < topics.length; i++) {
+    const t = topics[i], side = i % 2 ? 1 : -1, z0 = 2 - Math.floor(i / 2) * (BAY_W + GAP);
+    const xIn = side * CORR / 2, xOut = side * (CORR / 2 + BAY_D), zA = z0, zB = z0 - BAY_W;
+    box(.2, H, BAY_W, xOut, H / 2, (zA + zB) / 2);                                  // арын хана
+    box(BAY_D, H, .2, (xIn + xOut) / 2, H / 2, zA); box(BAY_D, H, .2, (xIn + xOut) / 2, H / 2, zB);   // хажуугийн хана
+    if (i % 2 === 0 || i === topics.length - 1) { box(.2, H, GAP, xIn - side * 0, H / 2, zB - GAP / 2); box(.2, H, GAP, -xIn, H / 2, zB - GAP / 2); }
+    // сэдвийн нэр — коридорын талын хаалганы дээр
+    const lab = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.05), new THREE.MeshBasicMaterial({ map: textTex([[`${String(i + 1).padStart(2, '0')} · ${t.count} REF`, 40, '#a9b4ff', 70], [t.name, 70, '#ecebe6', 170, 600]]), transparent: true }));
+    lab.position.set(xOut - side * .12, 3.0, (zA + zB) / 2); lab.rotation.y = -side * Math.PI / 2; scene.add(lab);
+    const lamp = new THREE.PointLight(0xffe2c0, 6, 9, 1.6); lamp.position.set((xIn + xOut) / 2, H - .4, (zA + zB) / 2); scene.add(lamp);
+    bays.push({ t, spawn: new THREE.Vector3(side * (CORR / 2 + 1.2), 1.65, (zA + zB) / 2), look: new THREE.Vector3(xOut, 1.65, (zA + zB) / 2) });
+    const notes = (await (await fetch('/api/hall?topic=' + encodeURIComponent(t.name))).json()).notes;
+    // дэд сэдвээр хана хуваарилна: арын хана → эхний (том) хэсэг, хажуугийн 2 хана → дараагийнх
+    const groups = Object.values(notes.reduce((m, n) => ((m[n.sub || ''] ??= []).push(n), m), {}));
+    const back = groups[0] || [], rest = groups.slice(1).flat();
+    const backList = groups.length > 1 ? back : notes.slice(0, Math.ceil(notes.length / 2)), sideList = groups.length > 1 ? rest : notes.slice(backList.length);
+    hang(backList.slice(0, 5), new THREE.Vector3(xOut - side * .14, 0, zA), { v: new THREE.Vector3(0, 0, -1), ry: -side * Math.PI / 2 }, BAY_W, 1.75);
+    hang(backList.slice(5, 10), new THREE.Vector3(xOut - side * .14, 0, zA), { v: new THREE.Vector3(0, 0, -1), ry: -side * Math.PI / 2 }, BAY_W, .62);
+    hang(sideList.slice(0, 4), new THREE.Vector3(xOut, 0, zA - .14), { v: new THREE.Vector3(-side, 0, 0), ry: Math.PI }, BAY_D, 1.75);
+    hang(sideList.slice(4, 8), new THREE.Vector3(xOut, 0, zB + .14), { v: new THREE.Vector3(-side, 0, 0), ry: 0 }, BAY_D, 1.75);
+    walls.push({ xIn, xOut, zA, zB, side });
+  }
+  $('topics').innerHTML = bays.map((b, i) => `<button data-i="${i}">${esc(b.t.name)}<span>${b.t.count}</span></button>`).join('');
+  walls.len = len;
+}
+$('topics').onclick = e => { const b = e.target.closest('[data-i]'); if (b) teleport(+b.dataset.i); };
+function teleport(i) {
+  const b = bays[i]; camera.position.copy(b.spawn); camera.lookAt(b.look);
+}
+
+// ---------- хөдөлгөөн ----------
+const keys = new Set();
+addEventListener('keydown', e => {
+  if (viewerOpen()) { if (e.key === 'Escape') closeViewer(); return; }
+  keys.add(e.code);
+  if (e.code === 'Tab') { e.preventDefault(); controls.unlock(); }
+});
+addEventListener('keyup', e => keys.delete(e.code));
+$('start').onclick = () => controls.lock();
+renderer.domElement.addEventListener('click', () => { if (!controls.isLocked && !viewerOpen()) controls.lock(); });
+controls.addEventListener('lock', () => { $('start').style.display = 'none'; });
+controls.addEventListener('unlock', () => { keys.clear(); if (!viewerOpen()) $('start').style.display = 'grid'; });
+const vel = new THREE.Vector3();
+function move(dt) {
+  if (!controls.isLocked) return;
+  const sp = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 7 : 3.2) * dt;
+  const f = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0);
+  const r = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
+  vel.lerp(new THREE.Vector3(r, 0, f), Math.min(1, dt * 10));
+  controls.moveRight(vel.x * sp); controls.moveForward(vel.z * sp);
+  // хана нэвтлэхгүй: коридор эсвэл bay дотор л
+  const p = camera.position, half = CORR / 2 - .3;
+  p.z = Math.min(5.4, Math.max(-walls.len + 4.6, p.z));
+  const bay = walls.find(w => p.z < w.zA - .3 && p.z > w.zB + .3);
+  const lim = bay ? Math.abs(bay.xOut) - .45 : half;
+  if (Math.abs(p.x) > half) { const inSide = bay && Math.sign(p.x) === bay.side; p.x = Math.sign(p.x) * Math.min(Math.abs(p.x), inSide ? lim : half); }
+  p.y = 1.65;
+}
+
+// ---------- онилох, нээх ----------
+const ray = new THREE.Raycaster(); ray.far = 7; let aimed = null;
+function aim() {
+  ray.setFromCamera(new THREE.Vector2(0, 0), camera);
+  const hit = controls.isLocked ? ray.intersectObjects(pickables, false)[0]?.object : null;
+  if (hit !== aimed) {
+    aimed?.userData.group.scale.setScalar(1); aimed = hit;
+    $('cross').classList.toggle('hot', !!hit);
+    $('aim').style.display = hit ? 'block' : 'none';
+    if (hit) { hit.userData.group.scale.setScalar(1.05); $('aim').textContent = `${KN[hit.userData.ref.kind] || ''} · ${hit.userData.ref.name}`; }
+  }
+}
+document.addEventListener('mousedown', e => { if (controls.isLocked && aimed && e.button === 0) openViewer(aimed.userData.ref); });
+const viewerOpen = () => $('viewer').classList.contains('on');
+let curRef = null;
+function openViewer(n) {
+  curRef = n; controls.unlock(); $('start').style.display = 'none';
+  $('vt').textContent = `${KN[n.kind] || ''} · ${n.name}`;
+  const topic = bays.find(b => b.t.name)?.t.name;                 // hall-ийн topic параметр заавал биш: open-оор шууд нээгдэнэ
+  $('vf').src = `/hall?embed=1&path=${encodeURIComponent(n.path.split('/').slice(0, -1).join('/'))}&open=${encodeURIComponent(n.path)}`;
+  $('viewer').classList.add('on');
+}
+function closeViewer() { $('viewer').classList.remove('on'); $('vf').src = 'about:blank'; controls.lock(); }
+$('vx').onclick = closeViewer;
+$('vo').onclick = () => { if (curRef) location.href = '/gallery'; };
+
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+const clock = new THREE.Clock(); let fr = 0, last = performance.now(); window.__fps = 0;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), .05); move(dt); aim(); renderer.render(scene, camera);
+  fr++; const now = performance.now();
+  if (now - last >= 1000) { window.__fps = Math.round(fr * 1000 / (now - last)); $('fps').textContent = window.__fps + ' FPS'; fr = 0; last = now; }
+});
+window.fpv = { teleport, openViewer, camera, controls, pickables };
+build();
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>

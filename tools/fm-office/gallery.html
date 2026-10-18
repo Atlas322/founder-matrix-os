@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FM Office · Gallery</title>
+<!-- Gallery (Neuform маягийн bento тор): зүүн талд тайлбар + сэдвүүд, баруун талд reference-ийн том нүднүүд.
+     Нүдэн дээр хулгана тогтооход вэб/бичлэг амьдаар preview болно. Дарвал Gallery hall-ийн үзэгчид нээгдэнэ.
+     Өгөгдөл: /api/hall?topics=1, /api/hall?topic=, /api/thumb, /api/ref. -->
+<style>
+  :root { --bg:#0b0b0d; --panel:#141416; --line:#26262a; --text:#ecebe6; --muted:#8a8a90; --acc:#a9b4ff; --warm:#d9732e; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 Inter, system-ui, sans-serif; }
+  .mono { font:500 11px/1.4 ui-monospace, "IBM Plex Mono", monospace; letter-spacing:.14em; text-transform:uppercase; }
+  .wrap { display:grid; grid-template-columns:340px 1fr; gap:10px; padding:10px; min-height:100vh; }
+  aside { position:sticky; top:10px; align-self:start; height:calc(100vh - 20px); overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:26px 24px; display:flex; flex-direction:column; }
+  .brand { display:flex; gap:10px; align-items:center; color:var(--muted); }
+  .eyebrow { color:var(--acc); margin:26px 0 10px; }
+  h1 { margin:0; font-size:38px; line-height:1.05; font-weight:500; letter-spacing:-.02em; }
+  h1 i { font-family:Georgia, "Spectral", serif; color:var(--acc); font-weight:400; }
+  .lead { color:#b9b8b2; margin:14px 0 22px; }
+  .stats { display:flex; gap:18px; margin-bottom:22px; } .stats b { display:block; font-size:22px; font-weight:600; }
+  input.search { width:100%; background:#0e0e10; border:1px solid var(--line); border-radius:999px; color:var(--text); padding:11px 16px; font:inherit; margin-bottom:16px; }
+  nav button { display:flex; justify-content:space-between; width:100%; background:none; border:none; color:#cfcec8; font:inherit; padding:7px 10px; border-radius:8px; cursor:pointer; text-align:left; }
+  nav button:hover { background:#1c1c1f; } nav button.on { background:#f1ede4; color:#111; }
+  nav button span { color:var(--muted); font:500 12px ui-monospace, monospace; } nav button.on span { color:#555; }
+  nav .sub { padding-left:22px; font-size:13px; }
+  .foot { margin-top:auto; padding-top:18px; border-top:1px solid var(--line); display:flex; gap:14px; flex-wrap:wrap; color:var(--muted); }
+  .foot a { color:var(--muted); text-decoration:none; } .foot a:hover { color:var(--text); }
+
+  main { min-width:0; }
+  .sec { grid-column:1 / -1; color:var(--muted); padding:18px 4px 4px; display:flex; gap:12px; align-items:baseline; }
+  .sec b { color:var(--text); font:500 20px Inter, system-ui, sans-serif; letter-spacing:-.01em; text-transform:none; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); grid-auto-rows:190px; grid-auto-flow:dense; gap:10px; }
+  .tile { position:relative; overflow:hidden; border:1px solid var(--line); border-radius:10px; background:#08080a; cursor:pointer; padding:0; color:inherit; text-align:left; }
+  .tile.w { grid-column:span 2; } .tile.t { grid-row:span 2; } .tile.big { grid-column:span 2; grid-row:span 2; }
+  .tile img, .tile iframe { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border:0; transition:transform .5s ease, opacity .4s; }
+  .tile:hover img { transform:scale(1.04); }
+  .tile iframe { pointer-events:none; background:#fff; opacity:0; } .tile iframe.on { opacity:1; }
+  .tile .ph { position:absolute; inset:0; display:grid; place-items:center; color:#3a3a40; }
+  .tile .cap { position:absolute; left:0; right:0; bottom:0; padding:40px 14px 12px; background:linear-gradient(transparent, rgba(0,0,0,.86)); }
+  .tile .cap b { display:block; font-weight:500; font-size:15px; line-height:1.25; }
+  .tile .cap small { color:#a8a7a2; }
+  .tile .k { position:absolute; top:10px; left:10px; padding:3px 8px; border-radius:6px; background:rgba(0,0,0,.6); backdrop-filter:blur(6px); color:#ddd; }
+  .tile:focus-visible { outline:2px solid var(--acc); }
+  #fps { position:fixed; right:16px; bottom:14px; background:#2a0e0e; color:#f3c3c3; border:1px solid #5a2020; border-radius:999px; padding:5px 12px; font:600 12px ui-monospace, monospace; }
+  #fps.ok { background:#0e1a12; color:#a8e0b8; border-color:#1f4a2c; }
+  @media (max-width: 900px) { .wrap { grid-template-columns:1fr; } aside { position:static; height:auto; } h1 { font-size:30px; } .tile.big, .tile.w { grid-column:span 1; } }
+  @media (prefers-reduced-motion: reduce) { .tile img, .tile iframe { transition:none; } .tile:hover img { transform:none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside>
+    <div class="brand mono">✳ Second Brain · Gallery</div>
+    <div class="eyebrow mono">Reference → Highlight → Atom</div>
+    <h1>Миний хадгалсан бүх зүйл, <i>сэдвээр</i></h1>
+    <p class="lead">Нүдэн дээр хулганаа тогтооход амьд preview, дарвал үзэгч нээгдэж highlight-аа атом болгоно.</p>
+    <div class="stats"><div><b id="sTotal">—</b><span class="mono">ref</span></div><div><b id="sTopics">—</b><span class="mono">сэдэв</span></div><div><b id="sShown">—</b><span class="mono">харагдаж буй</span></div></div>
+    <input class="search" id="q" placeholder="Хайх: нэр, домэйн…">
+    <nav id="nav"></nav>
+    <div class="foot mono"><a href="/home">← Гэр</a><a href="/fpv">◉ FPV орох</a><a href="/hall?topics=1">POV танхим</a><a href="/campus">Оффис</a></div>
+  </aside>
+  <main id="main"></main>
+</div>
+<div id="fps">— FPS</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const KN = { video: '▶ Бичлэг', web: 'Вэб', repo: 'Repo', read: 'Унших', image: 'Зураг', post: 'Пост', note: 'Note' };
+const SIZE = { video: 'w', image: 't' };                     // bento: бичлэг өргөн, зураг өндөр, хааяа том вэб
+let TOPICS = [], current = '', notes = [], all = {};
+
+async function init() {
+  const d = await (await fetch('/api/hall?topics=1')).json();
+  TOPICS = d.topics; $('sTotal').textContent = d.total; $('sTopics').textContent = d.topics.length;
+  const q = new URLSearchParams(location.search);
+  select(q.get('topic') || TOPICS[0]?.name || '');
+}
+function renderNav() {
+  $('nav').innerHTML = TOPICS.map(t => `<button data-t="${esc(t.name)}" class="${t.name === current ? 'on' : ''}">${esc(t.name)}<span>${t.count}</span></button>` +
+    (t.name === current ? Object.entries(t.subs || {}).map(([s, n]) => `<button class="sub" data-s="${esc(s)}">${esc(s)}<span>${n}</span></button>`).join('') : '')).join('');
+}
+$('nav').onclick = e => {
+  const s = e.target.closest('[data-s]'); if (s) return document.getElementById('sec-' + s.dataset.s)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const t = e.target.closest('[data-t]'); if (t) select(t.dataset.t);
+};
+async function select(name) {
+  current = name; renderNav(); history.replaceState(null, '', '/gallery?topic=' + encodeURIComponent(name));
+  all[name] ??= (await (await fetch('/api/hall?topic=' + encodeURIComponent(name))).json()).notes;
+  notes = all[name]; render(); scrollTo({ top: 0 });
+}
+function render() {
+  const q = $('q').value.trim().toLowerCase();
+  const list = notes.filter(n => !q || (n.name + ' ' + n.domain).toLowerCase().includes(q));
+  $('sShown').textContent = list.length;
+  const groups = {};
+  list.forEach(n => (groups[n.sub || ''] ??= []).push(n));
+  let i = 0;
+  $('main').innerHTML = Object.entries(groups).map(([sub, ns]) => `<div class="grid">${(sub || Object.keys(groups).length > 1)
+    ? `<div class="sec" id="sec-${esc(sub)}"><b>${esc(sub || 'Бусад')}</b><span class="mono">${ns.length} ref</span></div>` : ''}` +
+    ns.map(n => { const k = n.kind === 'note' && n.videos.length ? 'video' : n.kind;
+      const size = (k === 'web' && i % 7 === 0) ? 'big' : SIZE[k] || ''; i++;
+      return `<button class="tile ${size}" data-p="${esc(n.path)}" data-k="${k}" data-v="${n.videos[0] || ''}" data-u="${esc(n.url)}">
+        <div class="ph mono">${esc(KN[k] || k)}</div>
+        <img loading="lazy" src="/api/thumb?path=${encodeURIComponent(n.path)}" alt="" onerror="this.remove()">
+        <span class="k mono">${esc(KN[k] || k)}</span>
+        <div class="cap"><b>${esc(n.name)}</b><small>${esc(n.domain || '')}</small></div></button>`; }).join('') + '</div>').join('')
+    || '<p class="mono" style="color:var(--muted);padding:20px">Илэрц алга</p>';
+}
+$('q').oninput = render;
+
+// хулгана тогтооход амьд preview: вэб (embed зөвшөөрвөл) ба бичлэг (дуугүй)
+let hoverT = null, live = null;
+const frameOK = {};
+document.addEventListener('pointerover', e => {
+  const t = e.target.closest('.tile'); if (!t || t === live) return;
+  clearTimeout(hoverT); stopLive();
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  hoverT = setTimeout(async () => {
+    let src = '';
+    if (t.dataset.k === 'video' && t.dataset.v) src = `https://www.youtube.com/embed/${t.dataset.v}?autoplay=1&mute=1&controls=0&loop=1&playlist=${t.dataset.v}`;
+    else if (t.dataset.k === 'web') {
+      const p = t.dataset.p;
+      if (frameOK[p] === undefined) { try { frameOK[p] = !!(await (await fetch('/api/ref?path=' + encodeURIComponent(p))).json()).frameable; } catch { frameOK[p] = false; } }
+      if (frameOK[p]) src = t.dataset.u;
+    }
+    if (!src || !t.matches(':hover')) return;
+    const f = document.createElement('iframe'); f.src = src; f.loading = 'lazy'; f.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+    f.allow = 'autoplay'; f.onload = () => f.classList.add('on'); t.insertBefore(f, t.querySelector('.k')); live = t;
+  }, 650);
+});
+document.addEventListener('pointerout', e => { const t = e.target.closest('.tile'); if (t && !t.contains(e.relatedTarget)) { clearTimeout(hoverT); if (t === live) stopLive(); } });
+function stopLive() { live?.querySelector('iframe')?.remove(); live = null; }
+$('main').onclick = e => { const t = e.target.closest('.tile'); if (t) location.href = `/hall?topic=${encodeURIComponent(current)}&open=${encodeURIComponent(t.dataset.p)}`; };
+
+// FPS (Neuform шиг баруун доор)
+let fr = 0, last = performance.now(); window.__fps = 0;
+(function tick(now) { fr++; if (now - last >= 1000) { window.__fps = Math.round(fr * 1000 / (now - last)); $('fps').textContent = window.__fps + ' FPS'; $('fps').className = window.__fps >= 50 ? 'ok' : ''; fr = 0; last = now; } requestAnimationFrame(tick); })(performance.now());
+init();
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>

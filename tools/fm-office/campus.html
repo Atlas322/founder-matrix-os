@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FM Office · Кампус</title>
+<!-- Барилгын түвшин (wireframe v02, Figma «04 · Барилга» 3:963): Area жигүүр · талбай · хэвтээ төслийн гудамж
+     (төсөл = арал, 5 станц) · лаб / «+» төгсгөлд · alert самбар. Өгөгдөл: /api/state, /api/room (зөвхөн уншина). -->
+<style>
+  :root {
+    --ink:#1a1714; --body:#3d3934; --muted:#6b645b; --paper:#f4efe4; --card:#fffdf8; --line:#1a1714;
+    --grass:#dfe6cc; --grass-2:#cbd7ad; --street:#e9dfcc; --acc:#d9732e; --green:#2f8f52; --amber:#e3a21a; --red:#c8382c;
+    --shadow:0 10px 0 -2px rgba(60,40,20,.18), 0 18px 28px rgba(60,40,20,.12);
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--paper); color:var(--ink); font:14px/1.45 Inter, system-ui, sans-serif; }
+  button { font:inherit; cursor:pointer; }
+  /* HUD: agent мөр */
+  .bar { position:sticky; top:0; z-index:5; display:flex; gap:18px; align-items:center; padding:12px 20px; background:var(--ink); color:#f4efe4; overflow-x:auto; }
+  .bar .lbl { font:700 11px Inter, system-ui, sans-serif; letter-spacing:.08em; color:#cfc6b8; white-space:nowrap; }
+  .chip { display:flex; gap:9px; align-items:center; white-space:nowrap; }
+  .chip b { display:block; font-size:13px; } .chip small { font-size:11px; color:#cfc6b8; }
+  .chip small.working { color:#8fdca8; } .chip small.waiting { color:var(--amber); }
+  .bar .upd { margin-left:auto; font-size:11px; color:#cfc6b8; white-space:nowrap; }
+  .tok { width:30px; height:30px; flex:none; border-radius:50%; display:grid; place-items:center; background:var(--ink); color:#f4efe4;
+         font:700 11px Inter, system-ui, sans-serif; box-shadow:0 0 0 3px #a9a196; }
+  .tok.working { box-shadow:0 0 0 3px var(--green); } .tok.waiting { box-shadow:0 0 0 3px var(--amber); }
+  .bar .tok { box-shadow:0 0 0 3px #6b645b; } .bar .tok.working { box-shadow:0 0 0 3px var(--green); } .bar .tok.waiting { box-shadow:0 0 0 3px var(--amber); }
+  .crumb { padding:14px 20px 0; font-weight:700; } .crumb a { color:var(--ink); } .crumb span { font-weight:400; color:var(--muted); margin-left:12px; font-size:12px; }
+
+  .wrap { display:grid; grid-template-columns:1fr 260px; gap:20px; padding:16px 20px 28px; align-items:start; }
+  /* кампусын суурь — хөвөгч арал */
+  .campus { background:var(--grass); border:5px solid var(--line); border-radius:36px; padding:18px; box-shadow:var(--shadow);
+            display:grid; grid-template-columns:190px 150px 1fr; gap:14px; }
+  .zone-t { font:700 11px Inter, system-ui, sans-serif; letter-spacing:.08em; color:var(--acc); margin:0 0 8px; }
+  .room { background:var(--card); border:3px solid var(--line); border-radius:10px; padding:10px 12px; position:relative; margin-bottom:10px; }
+  .room h3 { margin:0; font-size:15px; } .room p { margin:2px 0 0; font-size:12px; color:var(--muted); }
+  .room .toks { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .room.vault { background:#38332d; color:#f4efe4; } .room.vault p { color:#d8cfc2; }
+  .room.dashed { background:transparent; border-style:dashed; }
+  .plaza { background:var(--street); border-radius:16px; padding:10px; }
+  .table { height:30px; border-radius:16px; background:#e2d4b8; border:2px solid var(--line); margin:8px 0 6px; }
+  .say { font-size:11px; color:var(--body); border-top:1px dashed #cbbfa9; padding-top:4px; margin-top:4px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .tl { height:5px; background:var(--acc); border-radius:3px; margin:10px 0 4px; }
+  .fountain { width:70px; height:70px; border-radius:50%; background:#bcd6dc; border:2px solid var(--line); margin:14px auto 4px; }
+  .center { text-align:center; font-size:11px; color:var(--muted); }
+
+  /* гудамж + арлууд */
+  .street-zone { display:block; }
+  #z-lab { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px; }
+  .row { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; }
+  .street { background:var(--street); border-radius:8px; padding:10px 14px; margin:12px 0; font:700 11px Inter, system-ui, sans-serif; letter-spacing:.06em; color:var(--acc); }
+  .island { background:var(--grass-2); border:3px solid var(--line); border-radius:20px; padding:10px; text-align:left; box-shadow:0 6px 0 -1px rgba(60,40,20,.2);
+            transition:transform .15s; color:inherit; }
+  .island:hover, .island:focus-visible { transform:translateY(-3px); outline:none; }
+  .island.wait { border-color:var(--amber); box-shadow:0 0 0 3px var(--amber), 0 6px 0 -1px rgba(60,40,20,.2); }
+  .island h4 { margin:0 0 6px; font-size:13px; line-height:1.25; min-height:2.5em; }
+  .floor { background:var(--card); border:2px solid var(--line); border-radius:8px; padding:8px; }
+  .st { display:flex; gap:4px; } .st i { flex:1; height:16px; border:1.5px solid var(--line); border-radius:3px; background:var(--card); }
+  .st i.done { background:var(--ink); } .st i.cur { background:var(--acc); }
+  .stage { font:700 11px Inter, system-ui, sans-serif; color:var(--acc); margin:5px 0; }
+  .pile { display:flex; align-items:center; gap:3px; font-size:11px; color:var(--muted); margin-top:6px; min-height:16px; }
+  .pile u { width:9px; height:9px; background:#dccaa0; border:1px solid var(--line); text-decoration:none; }
+  .island .toks { display:flex; gap:4px; min-height:30px; margin-top:6px; }
+  .old { margin-top:12px; border:1.5px dashed #a9a196; border-radius:10px; padding:8px 10px; font-size:12px; color:var(--muted); }
+  .old span { display:inline-block; margin:2px 6px 2px 0; padding:1px 8px; border-radius:10px; background:#ece6d8; }
+
+  /* alert самбар */
+  .side { background:#fff; border:2px solid var(--line); border-radius:12px; padding:14px; position:sticky; top:70px; }
+  .side h5 { margin:0 0 10px; font:700 11px Inter, system-ui, sans-serif; letter-spacing:.08em; color:var(--red); }
+  .side h5.o { color:var(--acc); margin-top:18px; } .side h5.m { color:var(--muted); margin-top:18px; }
+  .alert { display:block; width:100%; text-align:left; border:2px solid #a9a196; background:var(--paper); border-radius:8px; padding:9px 10px; margin-bottom:8px; color:inherit; }
+  .alert.hot { border-color:var(--amber); background:#fff3df; }
+  .alert b { display:block; font-size:13px; } .alert small { color:var(--muted); font-size:12px; }
+  .alert em { display:block; font-style:normal; font:600 11px Inter, system-ui, sans-serif; color:var(--acc); margin-top:4px; }
+  .leg { display:flex; gap:8px; align-items:center; font-size:12px; margin:5px 0; }
+  .jump { display:flex; flex-wrap:wrap; gap:6px; } .jump button, .jump a { border:2px solid var(--line); background:var(--card); border-radius:16px; padding:3px 11px; font-weight:600; font-size:12px; color:var(--ink); text-decoration:none; }
+  .empty { font-size:12px; color:var(--muted); }
+
+  /* өрөөний drawer */
+  dialog { border:3px solid var(--line); border-radius:16px; padding:0; width:min(560px, 92vw); background:var(--card); color:var(--ink); }
+  dialog::backdrop { background:rgba(26,23,20,.35); }
+  .dh { padding:16px 18px; background:var(--grass-2); border-bottom:3px solid var(--line); display:flex; justify-content:space-between; gap:10px; }
+  .dh h2 { margin:0; font-size:18px; } .dh button { border:2px solid var(--line); background:#fff; border-radius:14px; padding:2px 10px; }
+  .db { padding:14px 18px 18px; max-height:70vh; overflow:auto; }
+  .stations { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:12px; }
+  .stations div { border:2px solid var(--line); border-radius:6px; padding:6px; font-size:11px; text-align:center; background:#fff; }
+  .stations div.cur { background:var(--acc); color:#fff; font-weight:700; } .stations div.done { background:var(--ink); color:#f4efe4; }
+  .grp { font:700 11px Inter, system-ui, sans-serif; letter-spacing:.06em; color:var(--muted); margin:12px 0 4px; text-transform:uppercase; }
+  .task { display:flex; gap:8px; align-items:baseline; padding:5px 0; border-bottom:1px solid #eee4d3; font-size:13px; }
+  .task a { color:var(--ink); } .task small { color:var(--muted); margin-left:auto; white-space:nowrap; }
+
+  @media (max-width: 1100px) { .wrap { grid-template-columns:1fr; } .side { position:static; } }
+  @media (max-width: 760px) {
+    .campus { grid-template-columns:1fr; border-radius:22px; } .street-zone { grid-template-columns:1fr; }
+    .row { grid-template-columns:1fr 1fr; } .crumb span { display:block; margin:2px 0 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .island { transition:none; } }
+</style>
+</head>
+<body>
+<header class="bar" id="bar"><span class="lbl">AGENT-УУД</span></header>
+<div class="crumb"><a href="/map">Хот</a> › Оффисын барилга <span>арал дээр дарвал төслийн өрөө нээгдэнэ</span></div>
+<div class="wrap">
+  <main class="campus" id="campus">
+    <section id="z-area">
+      <p class="zone-t">AREA ЖИГҮҮР</p>
+      <div id="area"></div>
+      <div class="room vault"><h3>Сейф</h3><p>гудамжаас хол · зөвхөн цоож</p></div>
+    </section>
+    <section id="z-plaza">
+      <p class="zone-t">ТАЛБАЙ</p>
+      <div class="plaza">
+        <div class="room"><h3>Хурлын өрөө</h3><p>сүүлийн яриа</p><div class="table"></div><div id="talk"></div></div>
+        <div class="room"><h3>Тайлангийн танхим</h3><p>өнөөдрийн дүгнэлт</p><div class="tl"></div><div id="report" class="say"></div></div>
+        <div class="fountain"></div><div class="center">уулзах цэг</div>
+      </div>
+    </section>
+    <section id="z-street">
+      <p class="zone-t">ТӨСЛИЙН ГУДАМЖ</p>
+      <div class="street-zone">
+        <div>
+          <div class="row" id="row-top"></div>
+          <div class="street">ГУДАМЖ → Brief · Бэлтгэл · Дизайн · Хөгжүүлэлт · Контент станцууд зүүнээс баруун тийш</div>
+          <div class="row" id="row-bot"></div>
+          <div class="old" id="old"></div>
+        </div>
+        <div id="z-lab">
+          <div class="room dashed" id="lab"><h3>Судалгааны лаб</h3><p>төлөвлөсөн</p><div class="toks"></div></div>
+          <div class="room dashed"><h3>+ шинэ төсөл</h3><p>гудамжны төгсгөлд шинэ арал нэмэгдэнэ</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <aside class="side">
+    <h5>НАМАЙГ ХҮЛЭЭЖ БАЙНА</h5><div id="alerts"></div>
+    <h5 class="o">ДАМЖЛАГЫН ГАЦАА</h5><div id="jam" class="empty"></div>
+    <h5 class="m">БҮС РҮҮ ҮСРЭХ</h5>
+    <div class="jump"><button data-z="z-area">Area</button><button data-z="z-plaza">Талбай</button><button data-z="z-street">Гудамж</button><button data-z="z-lab">Лаб</button><a href="/map">Хот</a></div>
+    <h5 class="m">ТАЙЛБАР</h5>
+    <div class="leg"><span class="tok working" style="width:14px;height:14px"></span>ажиллаж байна</div>
+    <div class="leg"><span class="tok waiting" style="width:14px;height:14px"></span>чамайг хүлээж байна</div>
+    <div class="leg"><span class="tok" style="width:14px;height:14px"></span>сул</div>
+  </aside>
+</div>
+<dialog id="dlg"><div class="dh"><h2 id="dt"></h2><button onclick="dlg.close()">Хаах</button></div><div class="db" id="db"></div></dialog>
+
+<script>
+const STAGES = ['Brief', 'Бэлтгэл', 'Дизайн', 'Хөгжүүлэлт', 'Контент'];
+const VAULT = 'Second Brain 2.0';
+const RANK = { working: 0, waiting: 1, idle: 2 };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const strip = s => String(s).replace(/^[^\p{L}\p{N}<]+/u, '').trim();       // emoji толгойг авна
+const ini = s => { const w = strip(s).split(/\s+/); return (w.length > 1 ? w[0][0] + w[1][0] : w[0].slice(0, 2)).replace(/^./, c => c.toUpperCase()); };
+const tok = (a, title) => `<span class="tok ${a.state}" title="${esc(title || strip(a.name))} · ${a.state}">${esc(ini(a.name))}</span>`;
+const obs = p => `obsidian://open?vault=${encodeURIComponent(VAULT)}&file=${encodeURIComponent(p.replace(/\.md$/, ''))}`;
+
+// PC/Mac давхар сешнийг нэг agent болгоно (хамгийн идэвхтэй төлөвийг авна)
+function mergeAgents(list) {
+  const m = new Map();
+  for (const a of list) {
+    if (a.name.includes('<')) continue;
+    const k = strip(a.name), cur = m.get(k);
+    if (!cur || RANK[a.state] < RANK[cur.state]) m.set(k, { ...a, devices: new Set([...(cur?.devices || []), a.device_name].filter(Boolean)) });
+    else cur.devices.add(a.device_name);
+  }
+  return [...m.values()];
+}
+
+const rooms = {};                                 // /api/room cache (30 с)
+async function room(id) { const r = await fetch('/api/room?id=' + encodeURIComponent(id)); return r.ok ? r.json() : null; }
+
+async function load() {
+  const st = await (await fetch('/api/state')).json();
+  const agents = mergeAgents(st.agents);
+  const byId = Object.fromEntries(st.agents.map(a => [a.id, a]));
+  const lastSay = {};
+  for (const c of st.conversations) lastSay[strip(byId[c.from]?.name || c.from_label || '')] = c.text;
+
+  // agent мөр
+  const top = agents.filter(a => a.state !== 'idle' || /Architect|GTD|Creative|Wiki|itge/.test(a.name))
+    .sort((a, b) => RANK[a.state] - RANK[b.state]);
+  $('bar').innerHTML = '<span class="lbl">AGENT-УУД</span>' + top.map(a =>
+    `<span class="chip">${tok(a)}<span><b>${esc(strip(a.name))}</b><small class="${a.state}">${({ working: 'ажиллаж', waiting: 'хүлээж', idle: 'сул' })[a.state]} · ${[...a.devices].join('/') || '—'}</small></span></span>`).join('')
+    + `<span class="upd">шинэчилсэн ${esc(st.generated?.slice(11, 16) || '')} · vault + Discord</span>`;
+
+  // Area жигүүр
+  const AREA = [['Architect', 'код, skill агуулах · дотоод төсөл'], ['GTD', 'Inbox · task · өдрийн тэмдэглэл'], ['Creative', 'брэнд · Figma · пост'], ['Wiki', 'номын сан · атом · glossary']];
+  $('area').innerHTML = AREA.map(([n, d]) => {
+    const as = agents.filter(a => a.name.includes(n));
+    const say = as.map(a => lastSay[strip(a.name)]).find(Boolean);
+    return `<div class="room"><h3>${n}</h3><p>${d}</p><div class="toks">${as.map(a => tok(a)).join('')}${n === 'GTD' ? agents.filter(a => a.name === 'itge.e').map(a => tok(a, 'itge.e')).join('') : ''}</div>${say ? `<div class="say">${esc(say)}</div>` : ''}</div>`;
+  }).join('');
+
+  // Хурал, тайлан
+  const conv = st.conversations.slice(-3).reverse();
+  $('talk').innerHTML = conv.length ? conv.map(c => `<div class="say"><b>${esc(c.from_label || '')}</b> ${esc(c.text)}</div>`).join('') : '<div class="say">яриа алга</div>';
+  $('report').textContent = `${st.rooms.filter(r => r.kind === 'project' && !r.parked).length} идэвхтэй арал · ${agents.filter(a => a.state === 'working').length} agent ажиллаж байна`;
+
+  // Төслийн арлууд: шатаар эрэмбэлж, хоёр талд хуваана
+  const projects = st.rooms.filter(r => r.kind === 'project' && !r.parked && STAGES.includes(r.stage))
+    .sort((a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage) || a.project.localeCompare(b.project));
+  await Promise.all(projects.map(async p => { rooms[p.id] = await room(p.id); }));
+  const alerts = [], piles = [];
+  const html = p => {
+    const info = rooms[p.id] || {}, g = info.tasks?.groups || {};
+    const pile = (g['next-action']?.length || 0) + (g.inbox?.length || 0);
+    const waiting = g.waiting || [];
+    waiting.forEach(t => alerts.push({ p, t }));
+    piles.push({ p, pile });
+    const cur = STAGES.indexOf(p.stage);
+    const as = agents.filter(a => a.room === p.id);
+    return `<button class="island ${waiting.length ? 'wait' : ''}" data-id="${esc(p.id)}" title="${esc(p.project)}">
+      <h4>${esc(p.project)}</h4><div class="floor">
+      <div class="st">${STAGES.map((s, i) => `<i class="${i < cur ? 'done' : i === cur ? 'cur' : ''}" title="${s}"></i>`).join('')}</div>
+      <div class="stage">${esc(p.stage)} · станц ${cur + 1}/5</div>
+      <div class="toks">${as.map(a => tok(a)).join('')}</div>
+      <div class="pile">${'<u></u>'.repeat(Math.min(pile, 5))} ${pile} хүлээгдэж</div></div></button>`;
+  };
+  const half = Math.ceil(projects.length / 2);
+  $('row-top').innerHTML = projects.slice(0, half).map(html).join('');
+  $('row-bot').innerHTML = projects.slice(half).map(html).join('');
+  const old = st.rooms.filter(r => (r.kind === 'project' && (r.parked || !r.stage)) || r.kind === 'archive');
+  $('old').innerHTML = `<b>Хуучин хороолол</b> · шатгүй, зогссон, архив: ` + old.map(r => `<span>${esc(r.project || r.id.slice(2))}</span>`).join('');
+  $('lab').querySelector('.toks').innerHTML = agents.filter(a => a.room === 'research').map(a => tok(a)).join('');
+
+  // Alert: waiting task + хүлээж буй agent
+  agents.filter(a => a.state === 'waiting').forEach(a => alerts.unshift({ a }));
+  $('alerts').innerHTML = alerts.length ? alerts.map((x, i) => x.a
+    ? `<div class="alert hot"><b>${esc(strip(x.a.name))}</b><small>хариу хүлээж байна</small></div>`
+    : `<button class="alert ${i === 0 ? 'hot' : ''}" data-id="${esc(x.p.id)}"><b>${esc(x.p.project)}</b><small>${esc(x.t.title)}${x.t.due ? ' · ' + esc(x.t.due) : ''}</small><em>[станц руу үсрэх]</em></button>`).join('')
+    : '<div class="empty">Одоогоор чамайг хүлээж буй зүйл алга.</div>';
+  const jam = piles.sort((a, b) => b.pile - a.pile)[0];
+  $('jam').textContent = jam && jam.pile ? `${jam.p.stage} станцад ${jam.pile} task овоорсон (${jam.p.project})` : 'Гацаа алга.';
+}
+
+// Өрөө (L3-ийн түр хувилбар): станц, agent, task
+function openRoom(id) {
+  const info = rooms[id]; if (!info) return;
+  const r = info.room, cur = STAGES.indexOf(r.stage), g = info.tasks?.groups || {};
+  $('dt').textContent = r.project + ' · ' + r.stage;
+  const groups = Object.entries(g).filter(([, v]) => v?.length);
+  $('db').innerHTML = `<div class="stations">${STAGES.map((s, i) => `<div class="${i < cur ? 'done' : i === cur ? 'cur' : ''}">${s}</div>`).join('')}</div>`
+    + (info.due ? `<p>Хугацаа: <b>${esc(info.due)}</b></p>` : '')
+    + (groups.length ? groups.map(([k, v]) => `<div class="grp">${esc(k)} · ${v.length}</div>` + v.map(t =>
+      `<div class="task"><a href="${obs(t.path)}">${esc(t.title)}</a><small>${esc(t.owner || '')}${t.due ? ' · ' + esc(t.due) : ''}</small></div>`).join('')).join('')
+      : '<p class="empty">Task алга.</p>');
+  $('dlg').showModal();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-id]'); if (b) return openRoom(b.dataset.id);
+  const z = e.target.closest('[data-z]'); if (z) $(z.dataset.z).scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+load().catch(err => { $('alerts').innerHTML = `<div class="empty">Өгөгдөл ачаалсангүй: ${esc(err.message)}</div>`; });
+setInterval(() => load().catch(() => {}), 30000);
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>

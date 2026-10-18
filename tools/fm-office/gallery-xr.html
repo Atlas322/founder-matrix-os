@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FM Office · Spatial Gallery</title>
+<!-- Шил зүүгээд ажиллах Gallery (WebXR). Хэрэглэгчийг тойрсон нумын дагуу нүдний түвшинд хөвөх самбарууд:
+     Gallery-ийн сайтууд + Номын сан. Самбарыг заагаад (pinch / trigger / click) сонгоход урагш ойртож, дэлгэрэнгүй гарна.
+     Vision Pro (Safari) ба Quest browser → «Шилээр орох»; бусад үед desktop горим (хулганаар эргэж харна).
+     Өгөгдөл: /api/home. -->
+<style>
+  html,body { margin:0; height:100%; overflow:hidden; background:#1c1814; color:#f4efe4; font:14px/1.45 Inter, system-ui, sans-serif; }
+  .hud { position:fixed; top:14px; left:14px; z-index:3; background:#1c1814dd; border:1.5px solid #f4efe455; border-radius:14px; padding:12px 14px; max-width:320px; }
+  .hud h1 { margin:0; font-size:16px; } .hud p { margin:4px 0 10px; font-size:12px; color:#cfc6b8; }
+  .hud button, .hud a { font:600 13px Inter, system-ui, sans-serif; border:1.5px solid #f4efe4; background:transparent; color:#f4efe4; border-radius:16px; padding:5px 12px; margin:0 4px 6px 0; cursor:pointer; text-decoration:none; display:inline-block; }
+  .hud button.xr { background:#d9732e; border-color:#d9732e; } .hud button:disabled { opacity:.45; cursor:not-allowed; }
+  #fps { position:fixed; top:14px; right:14px; z-index:3; background:#f4efe4; color:#1c1814; border-radius:8px; padding:6px 10px; font:600 12px ui-monospace, monospace; }
+</style>
+<script type="importmap">{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<div class="hud">
+  <h1>Spatial Gallery</h1>
+  <p id="msg">Самбарууд таныг тойрон хөвнө. Самбар дээр дарвал ойртож дэлгэрэнгүй гарна. Шилэн дээр: харж, хуруугаараа чимхэнэ.</p>
+  <button class="xr" id="ar" disabled>Шилээр орох (AR)</button><button id="vr" disabled>VR</button><a href="/home">← Гэр</a>
+</div>
+<div id="fps">— fps</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const EYE = 1.6, R = 2.6;                              // нүдний өндөр, нумын радиус (метр)
+const $ = id => document.getElementById(id);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 100);
+camera.position.set(0, EYE, 0.01);
+const controls = new OrbitControls(camera, renderer.domElement);   // desktop: төвөөс эргэж харна
+controls.target.set(0, EYE, -0.01); controls.enableZoom = false; controls.enablePan = false; controls.rotateSpeed = -0.35;
+
+// VR-д л харагдах орчин (AR-д passthrough бодит өрөө)
+const env = new THREE.Group(); scene.add(env);
+const sky = new THREE.Mesh(new THREE.SphereGeometry(40, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false,
+  vertexShader: 'varying vec3 p; void main(){ p = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: 'varying vec3 p; void main(){ float h = normalize(p).y; gl_FragColor = vec4(mix(vec3(.11,.09,.08), vec3(.95,.72,.5), smoothstep(-.1,.6,h)*.55), 1.); }' }));
+env.add(sky);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(6, 64), new THREE.MeshStandardMaterial({ color: 0x2a2420, roughness: 1 }));
+floor.rotation.x = -Math.PI / 2; env.add(floor);
+const ring = new THREE.Mesh(new THREE.RingGeometry(R - 0.02, R + 0.02, 96), new THREE.MeshBasicMaterial({ color: 0xd9732e, transparent: true, opacity: 0.5 }));
+ring.rotation.x = -Math.PI / 2; ring.position.y = 0.01; env.add(ring);
+scene.add(new THREE.HemisphereLight(0xfff0dc, 0x3a2e26, 1.2));
+
+// ---------- самбар: canvas texture ----------
+const PW = 0.9, PH = 0.62, CW = 900, CH = 620;
+function card(draw) {
+  const c = document.createElement('canvas'); c.width = CW; c.height = CH; const g = c.getContext('2d');
+  g.fillStyle = '#fffdf8'; round(g, 0, 0, CW, CH, 36); g.fill(); draw(g);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+function round(g, x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
+function text(g, s, x, y, size, w, weight = 400, color = '#1a1714', maxLines = 3) {
+  g.font = `${weight} ${size}px Inter, system-ui, sans-serif`; g.fillStyle = color;
+  const words = String(s).split(/\s+/); let line = '', n = 0;
+  for (const wd of words) { const t = line ? line + ' ' + wd : wd;
+    if (g.measureText(t).width > w && line) { g.fillText(line, x, y + n * size * 1.3); line = wd; if (++n >= maxLines) return; } else line = t; }
+  g.fillText(line, x, y + n * size * 1.3);
+}
+const COLORS = ['#3f7a8c', '#c9573a', '#6f8f4e', '#8c5a9a', '#e0b46a', '#2a2420'];
+function siteCard(r, i) {
+  return card(g => {
+    g.fillStyle = COLORS[i % COLORS.length]; round(g, 28, 28, CW - 56, 300, 22); g.fill();
+    text(g, r.name, 64, 150, 58, CW - 128, 700, '#fff', 2);
+    text(g, new URL(r.url).hostname, 64, 290, 28, CW - 128, 500, '#ffffffcc', 1);
+    text(g, r.learn, 40, 390, 30, CW - 80, 400, '#3d3934', 3);
+    text(g, r.tech.replace(/\[.*?\]/g, ''), 40, 560, 24, CW - 80, 600, '#d9732e', 1);
+  });
+}
+function libraryCard(L) {
+  return card(g => {
+    text(g, 'Номын сан', 40, 90, 54, CW, 700);
+    [['атом', L.atoms], ['шийдвэр', L.decisions], ['судалгаа', L.research], ['нэр томьёо', L.glossary]].forEach(([k, v], i) => {
+      text(g, String(v), 40 + i * 215, 200, 64, 200, 700, '#d9732e'); text(g, k, 40 + i * 215, 250, 26, 200, 500, '#6b645b'); });
+    text(g, 'Сүүлд нэмэгдсэн', 40, 330, 26, CW, 700, '#6b645b');
+    L.recent.slice(0, 4).forEach((t, i) => text(g, '· ' + t.replace(/^\d{4}-\d\d-\d\d - /, ''), 40, 380 + i * 52, 28, CW - 80, 400, '#1a1714', 1));
+  });
+}
+
+// ---------- нумын байрлал ----------
+const panels = [];
+function addPanel(tex, angle, data) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  const home = new THREE.Vector3(Math.sin(angle) * R, EYE, -Math.cos(angle) * R);
+  m.position.copy(home); m.lookAt(0, EYE, 0);
+  m.userData = { ...data, home, homeQ: m.quaternion.clone(), hover: 0, open: 0 };
+  scene.add(m); panels.push(m); return m;
+}
+async function load() {
+  let H = { gallery: [], library: null };
+  try { H = await (await fetch('/api/home')).json(); } catch { $('msg').textContent = 'Өгөгдөл ачаалсангүй (/api/home).'; }
+  const items = H.gallery.map((r, i) => ({ tex: siteCard(r, i), data: { url: r.url, name: r.name } }));
+  if (H.library) items.push({ tex: libraryCard(H.library), data: { name: 'Номын сан' } });
+  const span = Math.min(Math.PI * 1.1, items.length * 0.42);       // ~24° самбар тутам, урд талд төвлөрнө
+  items.forEach((it, i) => addPanel(it.tex, -span / 2 + span * (i + 0.5) / items.length, it.data));
+}
+
+// ---------- сонголт: хулгана / XR controller / гар (pinch) ----------
+const ray = new THREE.Raycaster(); let hovered = null, opened = null;
+function pick(origin, dir) { ray.set(origin, dir); return ray.intersectObjects(panels, false)[0]?.object || null; }
+function activate(p) {
+  if (!p) { opened = null; return; }
+  if (opened === p && p.userData.url) {                                   // 2 дахь удаа = сайтыг нээх
+    if (renderer.xr.isPresenting) renderer.xr.getSession().end();
+    return window.open(p.userData.url, '_blank', 'noopener');
+  }
+  opened = p;
+}
+const ptr = new THREE.Vector2();
+renderer.domElement.addEventListener('pointermove', e => {
+  ptr.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
+  hovered = ray.intersectObjects(panels, false)[0]?.object || null;
+});
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', e => downAt = [e.clientX, e.clientY]);
+renderer.domElement.addEventListener('pointerup', e => { if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < 6) activate(hovered); });
+
+const tmpM = new THREE.Matrix4(), xrHover = new Map();
+for (let i = 0; i < 2; i++) {                                              // controller эсвэл transient-pointer (Vision Pro pinch)
+  const c = renderer.xr.getController(i); scene.add(c);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]),
+    new THREE.LineBasicMaterial({ color: 0xd9732e })); line.scale.z = 3; c.add(line);
+  c.addEventListener('select', () => activate(xrHover.get(c) || null));
+  c.userData.line = line; c.userData.i = i;
+}
+function xrRays() {
+  for (let i = 0; i < 2; i++) {
+    const c = renderer.xr.getController(i);
+    tmpM.identity().extractRotation(c.matrixWorld);
+    const dir = new THREE.Vector3(0, 0, -1).applyMatrix4(tmpM), o = new THREE.Vector3().setFromMatrixPosition(c.matrixWorld);
+    const p = pick(o, dir); xrHover.set(c, p); if (p) hovered = p;
+  }
+}
+
+// ---------- WebXR товч ----------
+async function setupXR() {
+  if (!navigator.xr) { $('msg').textContent += ' (Энэ browser WebXR-гүй — desktop горим.)'; return; }
+  const start = mode => async () => {
+    const s = await navigator.xr.requestSession(mode, { optionalFeatures: ['local-floor', 'hand-tracking'] });
+    renderer.xr.setReferenceSpaceType('local-floor'); await renderer.xr.setSession(s);
+    env.visible = mode !== 'immersive-ar';
+    s.addEventListener('end', () => { env.visible = true; });
+  };
+  if (await navigator.xr.isSessionSupported('immersive-ar').catch(() => false)) { $('ar').disabled = false; $('ar').onclick = start('immersive-ar'); }
+  if (await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)) { $('vr').disabled = false; $('vr').onclick = start('immersive-vr'); }
+}
+
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+// ---------- loop: hover томрох, сонгосон самбар 1.2 м-т ирнэ ----------
+const camPos = new THREE.Vector3(), fwd = new THREE.Vector3(), target = new THREE.Vector3(), q = new THREE.Quaternion();
+let frames = 0, last = performance.now(); window.__fps = 0;
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05), k = 1 - Math.pow(0.001, dt);
+  if (renderer.xr.isPresenting) xrRays(); else controls.update();
+  const xrCam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+  xrCam.getWorldPosition(camPos); xrCam.getWorldDirection(fwd);
+  for (const p of panels) {
+    const u = p.userData;
+    u.hover += ((p === hovered ? 1 : 0) - u.hover) * k * 2; u.open += ((p === opened ? 1 : 0) - u.open) * k * 1.5;
+    target.copy(camPos).addScaledVector(fwd.setY(0).normalize(), 1.2); target.y = camPos.y - 0.05;   // нүдний өмнө 1.2 м
+    p.position.lerpVectors(u.home, target, u.open);
+    p.lookAt(camPos.x, p.position.y, camPos.z); q.copy(p.quaternion); p.quaternion.slerpQuaternions(u.homeQ, q, Math.max(u.open, 0.0001));
+    if (u.open < 0.01) p.quaternion.copy(u.homeQ);
+    p.scale.setScalar(1 + u.hover * 0.06 + u.open * 0.15);
+    p.material.opacity = opened && p !== opened ? 0.35 : 1;
+  }
+  renderer.render(scene, camera);
+  frames++; const now = performance.now();
+  if (now - last >= 1000) { window.__fps = Math.round(frames * 1000 / (now - last)); $('fps').textContent = window.__fps + ' fps'; frames = 0; last = now; }
+});
+load(); setupXR();
+</script>
+</body>
+</html>
