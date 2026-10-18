@@ -12,7 +12,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from office_state import build_state, load_config  # noqa: E402
-import room_info, sender, calendar_data, home_data, hall_data, ref_data, days_data, osm_data, weather_data  # noqa: E402
+import room_info, sender, calendar_data, home_data, hall_data, ref_data, days_data, osm_data, weather_data, map_data  # noqa: E402
 
 STATIC = {"/": ("landing.html", "text/html; charset=utf-8"),           # нүүр хуудас (Second Brain)
           "/office2d": ("office2d.html", "text/html; charset=utf-8"),   # 2.5D зурагт оффис (хуучин үндсэн)
@@ -40,6 +40,10 @@ LOCAL_MAP = "ub-map.local.json"   # бодит байршил: vault/_system/fm/
 
 
 def local_map(vault):
+    """Байршил: vault-ийн note-уудаас (map_data: гэр = people/is-vault-owner `home:`, харилцагч = companies `locations:`); хоосон бол хуучин JSON файл."""
+    d = map_data.build(vault)
+    if d.get("office"):
+        return d
     for f in (Path(vault) / "_system" / "fm" / LOCAL_MAP, HERE / LOCAL_MAP):
         if f.exists():
             return json.loads(f.read_text(encoding="utf-8"))
