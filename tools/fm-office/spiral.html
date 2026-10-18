@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FM Office · Өдрийн спираль</title>
+<!-- Өдөр бүр = спиралийн нэг блок (Ross Spiral Curriculum маягаар). Нэг эргэлт = 7 хоног, шинэ нь дээр.
+     Блок доторх өнгөт зурвас = тухайн өдрийн домэйн (дүр, атом, task) бүрийн идэвх. Чирж эргүүлнэ, wheel = ойртох,
+     блок дээр дарвал баруун самбарт тухайн өдөр. Өгөгдөл: /api/days, /api/day. -->
+<style>
+  :root { --bg:#f2efe8; --ink:#2a2622; --muted:#7c766d; --panel:#fbfaf6; --line:#ddd6c8; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; overflow:hidden; background:var(--bg); color:var(--ink); font:14px/1.5 Inter, system-ui, sans-serif; }
+  #scene { position:fixed; inset:0 400px 0 0; }
+  aside { position:fixed; top:0; right:0; bottom:0; width:400px; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; }
+  aside header { padding:22px 24px 10px; } aside h1 { margin:0; font:300 26px Inter, system-ui, sans-serif; letter-spacing:-.01em; }
+  .tabs { display:flex; gap:2px; padding:0 24px; border-bottom:1px solid var(--line); }
+  .tabs button { border:1px solid transparent; border-bottom:none; background:none; padding:8px 12px; color:var(--muted); font:inherit; cursor:pointer; border-radius:6px 6px 0 0; }
+  .tabs button.on { border-color:var(--line); background:#fff; color:var(--ink); margin-bottom:-1px; }
+  .body { flex:1; overflow:auto; padding:18px 24px; background:#fff; }
+  .muted { color:var(--muted); font-size:12px; }
+  .dom { display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; cursor:pointer; user-select:none; }
+  .dom:hover { background:#f4f1ea; } .dom.off { opacity:.35; } .dom i { width:14px; height:14px; border-radius:3px; flex:none; } .dom b { margin-left:auto; font-weight:500; color:var(--muted); }
+  .bar { display:flex; height:8px; border-radius:4px; overflow:hidden; margin:8px 0 14px; } .bar span { display:block; }
+  h3 { margin:16px 0 6px; font-size:13px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+  ul { margin:0; padding-left:18px; } li { margin:3px 0; }
+  .log { font-size:13px; padding:3px 0; border-bottom:1px solid #f1ede4; } .log t { font:12px ui-monospace, monospace; color:var(--muted); margin-right:6px; }
+  .tag { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:6px; }
+  .week { display:flex; gap:4px; margin:6px 0; align-items:center; cursor:pointer; } .week span { flex:1; height:22px; border-radius:3px; }
+  .hud { position:fixed; left:16px; top:16px; display:flex; gap:6px; }
+  .hud a, .hud button { font:inherit; font-size:13px; background:#fff; border:1px solid var(--line); border-radius:999px; padding:5px 12px; color:var(--ink); text-decoration:none; cursor:pointer; }
+  #tip { position:fixed; pointer-events:none; background:#2a2622; color:#fff; padding:6px 10px; border-radius:8px; font-size:12px; display:none; }
+  #fps { position:fixed; left:16px; bottom:14px; font:600 12px ui-monospace, monospace; color:var(--muted); }
+  @media (max-width: 900px) { #scene { inset:0 0 45vh 0; } aside { top:auto; height:45vh; width:100%; border-left:none; border-top:1px solid var(--line); } }
+</style>
+<script type="importmap">{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<div id="scene"></div>
+<div class="hud"><a href="/home">← Гэр</a><button id="top">Өнөөдөр</button><button id="all">Бүгд</button></div>
+<aside>
+  <header><h1>Миний өдрийн спираль</h1><div class="muted" id="sum"></div></header>
+  <div class="tabs"><button class="on" data-tab="day">Өдөр</button><button data-tab="dom">Домэйн</button><button data-tab="week">7 хоног</button></div>
+  <div class="body" id="body"></div>
+</aside>
+<div id="tip"></div><div id="fps"></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { gsap } from 'https://unpkg.com/gsap@3.12.5/index.js';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const DOM = { architect: ['Architect', '#5b8fa3'], gtd: ['GTD', '#d27c5f'], creative: ['Creative', '#c46f95'], wiki: ['Wiki · судалгаа', '#7fa267'],
+  project: ['Төсөл', '#e0b65a'], atom: ['Атом', '#9a7dbd'], task: ['Дууссан task', '#e3955a'], other: ['Бусад', '#a9a297'] };
+const WD = ['Ня', 'Да', 'Мя', 'Лх', 'Пү', 'Ба', 'Бя'];
+let DAYS = [], ORDER = [], hidden = new Set(), selected = null, tab = 'day';
+
+// ---------- scene ----------
+const host = $('scene');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); host.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, .1, 400);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.minDistance = 8; controls.maxDistance = 120; controls.enablePan = false;
+scene.add(new THREE.HemisphereLight(0xffffff, 0xcfc6b6, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.2); sun.position.set(20, 40, 30); scene.add(sun);
+const R = 7, PER = 7, STEP = 2 * Math.PI / PER, PITCH = 2.2, BH = 1.9;      // радиус, нэг эргэлтэд 7 өдөр, эргэлтийн өндөр
+const spiral = new THREE.Group(); scene.add(spiral);
+const blocks = [];
+const blockW = 2 * R * Math.sin(STEP / 2) * .92;
+
+function dayPos(i) {               // i = 0 эхний өдөр (доор), сүүлийнх дээр
+  const a = i * STEP, y = i * PITCH / PER;
+  return { a, y };
+}
+function labelTex(top, sub, color = '#2a2622') {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = color; g.font = '600 54px Inter, system-ui, sans-serif'; g.textAlign = 'center'; g.fillText(top, 128, 62);
+  g.fillStyle = '#7c766d'; g.font = '500 30px Inter, system-ui, sans-serif'; g.fillText(sub, 128, 104);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function build() {
+  spiral.clear(); blocks.length = 0;
+  const max = Math.max(1, ...DAYS.map(d => d.total));
+  DAYS.forEach((d, i) => {
+    const { a, y } = dayPos(i), g = new THREE.Group();
+    g.position.set(Math.sin(a) * R, y, Math.cos(a) * R); g.rotation.y = a; g.userData = { day: d, i };
+    const dt = new Date(d.date + 'T00:00');
+    const base = new THREE.Mesh(new THREE.BoxGeometry(blockW, BH, .5), new THREE.MeshStandardMaterial({ color: d.total ? 0xf7f4ee : 0xe6e1d6, roughness: .9 }));
+    base.userData.g = g; g.add(base);
+    // домэйн зурвас: босоо багана (Ross-ийн өнгөт баганууд шиг), өндөр = идэвх
+    const keys = Object.keys(DOM), colW = blockW * .86 / keys.length;
+    keys.forEach((k, j) => {
+      const n = d.counts[k] || 0; if (!n || hidden.has(k)) return;
+      const h = Math.max(.12, Math.min(1, Math.sqrt(n / max) * 1.6) * (BH * .62));
+      const m = new THREE.Mesh(new THREE.BoxGeometry(colW * .82, h, .12), new THREE.MeshStandardMaterial({ color: DOM[k][1], roughness: .7 }));
+      m.position.set(-blockW * .43 + colW * (j + .5), -BH / 2 + .14 + h / 2, .3); m.userData.g = g; g.add(m);
+    });
+    const lab = new THREE.Mesh(new THREE.PlaneGeometry(blockW * .6, blockW * .3), new THREE.MeshBasicMaterial({ map: labelTex(String(dt.getDate()), `${WD[dt.getDay()]} · ${dt.getMonth() + 1}-р сар`), transparent: true }));
+    lab.position.set(0, BH / 2 - .38, .26); lab.userData.g = g; g.add(lab);
+    if (d.daily) { const dot = new THREE.Mesh(new THREE.SphereGeometry(.09, 12, 8), new THREE.MeshBasicMaterial({ color: 0x2a2622 })); dot.position.set(blockW * .4, BH / 2 - .16, .27); g.add(dot); }
+    spiral.add(g); blocks.push(g);
+  });
+  // тэнхлэг ба долоо хоног бүрийн шугам
+  const top = dayPos(DAYS.length).y;
+  const axis = new THREE.Mesh(new THREE.CylinderGeometry(.08, .08, top + 4, 8), new THREE.MeshBasicMaterial({ color: 0xcfc6b6 }));
+  axis.position.y = top / 2; spiral.add(axis);
+  const pts = []; for (let i = 0; i <= DAYS.length * 8; i++) { const t = i / 8, a = t * STEP; pts.push(new THREE.Vector3(Math.sin(a) * (R - .45), t * PITCH / PER - BH / 2, Math.cos(a) * (R - .45))); }
+  spiral.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xbdb3a2 })));
+  highlight();
+}
+function highlight() {
+  blocks.forEach(g => { const on = selected && g.userData.day.date === selected; g.scale.setScalar(on ? 1.12 : 1); g.children[0].material.emissive?.setHex(on ? 0x332211 : 0); });
+}
+function focusDay(i, dur = 1.2) {
+  const { a, y } = dayPos(i), dist = 26;
+  gsap.to(controls.target, { x: 0, y, z: 0, duration: dur, ease: 'power2.inOut' });
+  gsap.to(camera.position, { x: Math.sin(a) * dist, y: y + 6, z: Math.cos(a) * dist, duration: dur, ease: 'power2.inOut' });
+}
+function overview() {
+  const top = dayPos(DAYS.length).y;
+  gsap.to(controls.target, { x: 0, y: top / 2, z: 0, duration: 1.2 });
+  gsap.to(camera.position, { x: 60, y: top / 2 + 30, z: 60, duration: 1.2 });
+}
+
+// ---------- сонголт ----------
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let down = null;
+const pick = e => { const r = renderer.domElement.getBoundingClientRect(); ptr.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(spiral.children, true).find(h => h.object.userData.g)?.object.userData.g; };
+renderer.domElement.addEventListener('pointerdown', e => down = [e.clientX, e.clientY]);
+renderer.domElement.addEventListener('pointerup', e => { if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) < 5) { const g = pick(e); if (g) openDay(g.userData.day.date, g.userData.i); } });
+renderer.domElement.addEventListener('pointermove', e => {
+  const g = pick(e), t = $('tip');
+  if (!g) { t.style.display = 'none'; renderer.domElement.style.cursor = 'grab'; return; }
+  const d = g.userData.day; renderer.domElement.style.cursor = 'pointer';
+  t.innerHTML = `<b>${d.date}</b> · ${d.total} үйлдэл`; t.style.display = 'block'; t.style.left = e.clientX + 14 + 'px'; t.style.top = e.clientY + 14 + 'px';
+});
+
+// ---------- самбар ----------
+async function openDay(ds, i) {
+  selected = ds; highlight(); if (i != null) focusDay(i); setTab('day');
+  $('body').innerHTML = '<p class="muted">Ачаалж байна…</p>';
+  const d = await (await fetch('/api/day?d=' + ds)).json(), sum = DAYS.find(x => x.date === ds);
+  const dt = new Date(ds + 'T00:00');
+  const bar = Object.entries(sum.counts).filter(([, n]) => n).map(([k, n]) => `<span title="${DOM[k][0]} ${n}" style="flex:${n};background:${DOM[k][1]}"></span>`).join('');
+  $('body').innerHTML = `<h2 style="margin:0;font-weight:400">${dt.getFullYear()}.${dt.getMonth() + 1}.${dt.getDate()} · ${WD[dt.getDay()]}</h2>
+    <div class="muted">${sum.total} үйлдэл · ${d.atoms.length} атом · ${d.tasks.length} task дууссан</div><div class="bar">${bar}</div>
+    ${d.daily ? `<h3>Өдрийн тэмдэглэл</h3><b>${esc(d.daily.title)}</b><ul>${d.daily.lines.slice(0, 12).map(l => `<li>${esc(l.replace(/^[-*]\s*/, ''))}</li>`).join('')}</ul>` : ''}
+    ${d.tasks.length ? `<h3>Дууссан task</h3><ul>${d.tasks.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
+    ${d.atoms.length ? `<h3>Шинэ атом</h3><ul>${d.atoms.map(t => `<li>${esc(t.replace(/^\d{4}-\d\d-\d\d - /, ''))}</li>`).join('')}</ul>` : ''}
+    ${d.log.length ? `<h3>Лог</h3>${d.log.map(l => `<div class="log"><span class="tag" style="background:${DOM[l.domain][1]}"></span><t>${l.t}</t>${esc(l.actor)} → ${esc(l.text.replace(/\[\[([^\]|]+\/)?([^\]|]+)\]\]/g, '$2'))}</div>`).join('')}` : ''}
+    ${!sum.total && !d.daily ? '<p class="muted">Энэ өдөр бүртгэл алга.</p>' : ''}`;
+}
+function setTab(t) {
+  tab = t; document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  if (t === 'dom') renderDomains(); if (t === 'week') renderWeeks();
+}
+document.querySelector('.tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (!b) return; if (b.dataset.tab === 'day') { selected ? openDay(selected) : setTab('day'); } else setTab(b.dataset.tab); };
+function renderDomains() {
+  const tot = {}; DAYS.forEach(d => Object.entries(d.counts).forEach(([k, n]) => tot[k] = (tot[k] || 0) + n));
+  $('body').innerHTML = '<p class="muted">Дарж нууж/харуулна. Блок доторх баганын өндөр = тухайн өдрийн идэвх.</p>' + Object.entries(DOM).map(([k, [n, c]]) =>
+    `<div class="dom ${hidden.has(k) ? 'off' : ''}" data-k="${k}"><i style="background:${c}"></i>${n}<b>${tot[k] || 0}</b></div>`).join('');
+}
+$('body').onclick = e => {
+  const d = e.target.closest('[data-k]'); if (d) { hidden.has(d.dataset.k) ? hidden.delete(d.dataset.k) : hidden.add(d.dataset.k); build(); renderDomains(); }
+  const w = e.target.closest('[data-i]'); if (w) openDay(DAYS[+w.dataset.i].date, +w.dataset.i);
+};
+function renderWeeks() {
+  const max = Math.max(1, ...DAYS.map(d => d.total)); let html = '<p class="muted">Нэг мөр = 7 хоног (спиралийн нэг эргэлт), шинэ нь дээр.</p>';
+  for (let s = Math.floor((DAYS.length - 1) / PER) * PER; s >= 0; s -= PER) {
+    html += `<div class="muted">${DAYS[s].date}</div><div class="week">` + DAYS.slice(s, s + PER).map((d, j) =>
+      `<span data-i="${s + j}" title="${d.date} · ${d.total}" style="background:rgba(217,115,46,${(.08 + .92 * Math.sqrt(d.total / max)).toFixed(2)})"></span>`).join('') + '</div>';
+  }
+  $('body').innerHTML = html;
+}
+
+function size() { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', size); size();
+$('top').onclick = () => openDay(DAYS.at(-1).date, DAYS.length - 1);
+$('all').onclick = overview;
+let fr = 0, last = performance.now(); window.__fps = 0;
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); fr++; const n = performance.now(); if (n - last >= 1000) { window.__fps = Math.round(fr * 1000 / (n - last)); $('fps').textContent = window.__fps + ' fps'; fr = 0; last = n; } });
+
+(async () => {
+  const d = await (await fetch('/api/days')).json(); DAYS = d.days;
+  const act = DAYS.filter(x => x.total).length;
+  $('sum').textContent = `${DAYS[0].date} → ${DAYS.at(-1).date} · ${DAYS.length} өдөр · ${act} идэвхтэй`;
+  build(); camera.position.set(60, 60, 60); overview();
+  setTimeout(() => openDay(DAYS.at(-1).date, DAYS.length - 1), 900);
+  window.spiralApp = { openDay, overview, DAYS };
+})();
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>

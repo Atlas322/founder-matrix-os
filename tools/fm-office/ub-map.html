@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FM Office · Хотын газрын зураг</title>
+<!-- FM Office — хотын түвшний prototype: MapLibre GL JS + OpenFreeMap (OSM) + three.js custom layer.
+     Нэг файл, build алхамгүй. Байгууллагын өгөгдөл (оффис, partner) нь доорх ORGS-д — жишээ. -->
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+<style>
+  :root { --ink:#1a1714; --paper:#f7f4ec; --acc:#d9732e; --muted:#615b54; }
+  html, body { margin:0; height:100%; background:var(--paper); font:14px/1.4 Inter, system-ui, sans-serif; color:var(--ink); }
+  #map { position:absolute; inset:0; }
+  .hud { position:absolute; top:12px; left:12px; background:#fffdf8ee; border:2px solid var(--ink); border-radius:10px; padding:10px 12px; max-width:280px; }
+  .hud h1 { font-size:15px; margin:0 0 4px; }
+  .hud p { margin:0 0 8px; color:var(--muted); font-size:12px; }
+  .hud button { font:600 13px Inter, system-ui, sans-serif; border:2px solid var(--ink); background:#fff; border-radius:16px; padding:5px 12px; margin:0 4px 4px 0; cursor:pointer; }
+  .hud button.on { background:#1A1A1A; color:#fff; }
+  #fps { position:absolute; top:12px; right:12px; background:var(--ink); color:#f7f4ec; border-radius:8px; padding:6px 10px; font:600 12px ui-monospace, monospace; }
+  .clients { position:absolute; top:64px; right:12px; width:330px; max-height:calc(100vh - 90px); overflow:auto; background:#fff; border:1px solid #1A1A1A; padding:14px 16px; font-family:"Inter Tight", Inter, system-ui, sans-serif; }
+  .clients h2 { margin:0 0 6px; font-size:18px; font-weight:500; } .clients h3 { margin:12px 0 4px; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7a776f; }
+  .clients button { display:block; width:100%; text-align:left; background:none; border:none; border-left:3px solid #D6453D; padding:6px 10px; margin:4px 0; cursor:pointer; font:inherit; color:#1A1A1A; }
+  .clients button:hover { background:#F3F2EE; } .clients small { display:block; color:#7a776f; font-size:11.5px; } .clients .un { border-left:3px dashed #bbb; padding:6px 10px; margin:4px 0; }
+  .hud { top:64px !important; border-radius:0 !important; border-width:1px !important; }
+  .maplibregl-popup-content { font:13px Inter, system-ui, sans-serif; border-radius:10px; }
+</style>
+<script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }</script>
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+</head>
+<body>
+<div id="map"></div>
+<div class="hud">
+  <h1>Хот › Улаанбаатар</h1>
+  <p>Гэр (Home) ба идэвхтэй төслийн харилцагчдын салбар. Улаан цэг = салбар, тасархай нум = холбоо.</p>
+  <button id="globe">Globe</button><button id="office">Оффис руу</button><button id="spin">Эргүүлэх</button><button onclick="location.href='/campus'">Оффис руу орох</button><br><button data-ph="day" onclick="setPh('day')">Өдөр</button><button data-ph="dusk" onclick="setPh('dusk')">Үдэш</button><button data-ph="night" onclick="setPh('night')">Шөнө</button>
+</div>
+<div id="fps">— fps</div>
+<script type="module">
+import * as THREE from 'three';
+
+// Оффис — түр байршил (Сүхбаатарын талбай). Бодит хаягаар солино.
+const ORGS = {
+  office: { name: 'Оффис', lngLat: [106.9176, 47.9188] },
+  unplaced: [], partners: [
+    { name: 'Partner A', lngLat: [106.8840, 47.9135] },
+    { name: 'Partner B', lngLat: [106.9420, 47.9240] },
+    { name: 'Partner C', lngLat: [106.9330, 47.9050] },
+    { name: 'Partner D', lngLat: [106.8990, 47.9320] },
+    { name: 'Partner E', lngLat: [106.9600, 47.9130] },
+  ],
+};
+
+// Бодит байршил repo-д бичигдэхгүй: git-д ордоггүй ub-map.local.json ({"office":[lng,lat]}) байвал түүнийг ашиглана
+try { const r = await fetch('ub-map.local.json', { cache: 'no-store' });
+  if (r.ok) { const loc = await r.json(); if (loc.office) ORGS.office.lngLat = loc.office; if (loc.name) ORGS.office.name = loc.name;
+    if (loc.clients?.length) ORGS.partners = loc.clients; ORGS.unplaced = loc.unplaced || []; } } catch {}
+// Харилцагчийн самбар (жагсаалт → дарвал тэр цэг рүү нисэнэ)
+{ const el = document.createElement('aside'); el.className = 'clients';
+  const byOrg = {}; ORGS.partners.forEach((p, i) => (byOrg[p.org || p.name] ??= []).push([p, i]));
+  el.innerHTML = '<h2>Идэвхтэй харилцагч</h2>' + Object.entries(byOrg).map(([org, list]) => `<h3>${org}</h3>` + list.map(([p, i]) =>
+    `<button data-i="${i}"><b>${p.name}</b><small>${p.project || ''}${p.approx ? ' · ойролцоо байршил' : ''}</small><small>${p.addr || ''}</small></button>`).join('')).join('')
+    + (ORGS.unplaced?.length ? '<h3>Газрын зурагт ороогүй</h3>' + ORGS.unplaced.map(u => `<div class="un"><b>${u.name}</b><small>${u.why}</small></div>`).join('') : '');
+  document.body.appendChild(el);
+  el.onclick = e => { const b = e.target.closest('[data-i]'); if (b) map.flyTo({ center: ORGS.partners[+b.dataset.i].lngLat, zoom: 16.5, pitch: 55, duration: 1800 }); }; }
+
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/liberty',
+  center: ORGS.office.lngLat, zoom: 15.2, pitch: 58, bearing: -24, maxPitch: 75,
+  canvasContextAttributes: { antialias: true },
+});
+map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+
+// Дулаан палитр: OSM-ийн давхаргуудыг дахин будна (style JSON-д хүрэхгүй)
+// Мини хоттой нэг хэл: өдөр E1 color-block · үдэш E2 salmon+indigo · шөнө E4 navy+улбар шар. Улаанбаатарын цагаар солигдоно.
+const PAL = {
+  day:   { bg: '#efe6d6', road: '#d8cdbb', roadMain: '#cbbda5', water: '#2d6fb3', park: '#3f7d4a', label: '#1a1a1a', halo: '#efe6d6',
+           sand: ['#f7efe2', '#efdfc4', '#e3c9a2'], blocks: ['#e8442c', '#f2c230', '#f06aa8', '#1c1c22', '#2d4fb3', '#e9763a'], pin: '#D6453D', arc: '#1a1a1a' },
+  dusk:  { bg: '#5a4c98', road: '#4a3f88', roadMain: '#6c5ba8', water: '#2b2e78', park: '#3f3f88', label: '#fff1e6', halo: '#3a2f78',
+           sand: ['#f3a58c', '#f6b59a', '#e98f78'], blocks: ['#ffc79a', '#f0807a', '#ffd8b0'], pin: '#ffd27a', arc: '#ffd27a' },
+  night: { bg: '#161d44', road: '#232c63', roadMain: '#2e3874', water: '#111d50', park: '#1f3a3a', label: '#e8e4ff', halo: '#161d44',
+           sand: ['#24306b', '#2a3470', '#1f2a63'], blocks: ['#ffb35c', '#3b4690', '#ffcf7a'], pin: '#ffb35c', arc: '#ffb35c' },
+};
+function phase() { const h = new Date(Date.now() + 8 * 36e5).getUTCHours() + new Date().getUTCMinutes() / 60;   // УБ цаг (нар ойролцоо: 07–18)
+  return h >= 8.3 && h < 17.3 ? 'day' : (h >= 6.8 && h < 8.3) || (h >= 17.3 && h < 19.3) ? 'dusk' : 'night'; }
+window.setPh = p => { PH = p; warmStyle(); };
+let PH = new URLSearchParams(location.search).get('mood') || phase();
+function warmStyle() {
+  const P = PAL[PH], set = (id, prop, val) => { if (map.getLayer(id)) try { map.setPaintProperty(id, prop, val); } catch {} };
+  document.body.style.background = P.bg;
+  for (const l of map.getStyle().layers) {
+    if (l.type === 'background') set(l.id, 'background-color', P.bg);
+    else if (/water/.test(l.id) && l.type === 'fill') set(l.id, 'fill-color', P.water);
+    else if (/water/.test(l.id) && l.type === 'line') set(l.id, 'line-color', P.water);
+    else if (/park|grass|wood|forest|landcover|landuse/.test(l.id) && l.type === 'fill') { set(l.id, 'fill-color', /park|grass|wood|forest/.test(l.id) ? P.park : P.bg); set(l.id, 'fill-opacity', 1); }
+    else if (l.type === 'line' && /road|highway|street|path|bridge|tunnel/.test(l.id)) set(l.id, 'line-color', /primary|trunk|motorway|secondary/.test(l.id) ? P.roadMain : P.road);
+    else if (l.type === 'line' && /boundary|rail/.test(l.id)) set(l.id, 'line-opacity', .25);
+    else if (l.type === 'symbol') { if (/poi|shield|oneway|transit|aeroway/.test(l.id)) map.setLayoutProperty(l.id, 'visibility', 'none');
+      else { set(l.id, 'text-color', P.label); set(l.id, 'text-halo-color', P.halo); set(l.id, 'icon-opacity', 0); } }
+    else if (l.id === 'building') set(l.id, 'fill-color', P.sand[0]);
+  }
+  // барилга: 78% элсэн/суурь, 22% тод блок — id-аас тогтвортой
+  const seed = ['floor', ['+', ['*', ['coalesce', ['get', 'render_height'], 6], 37.3], ['*', ['coalesce', ['to-number', ['id'], 0], 0], 0.61]]];   // id байхгүй үед өндрөөр
+  const k = ['%', seed, 100], pick = (arr, off) => ['match', ['%', ['+', seed, off], arr.length], ...arr.slice(0, -1).flatMap((c, i) => [i, c]), arr.at(-1)];
+  set('building-3d', 'fill-extrusion-color', ['case', ['<', k, 22], pick(P.blocks, 0), pick(P.sand, 5)]);
+  set('building-3d', 'fill-extrusion-opacity', 1);
+  set('building-3d', 'fill-extrusion-vertical-gradient', true);
+  if (map.getLayer('arcs')) { set('arcs', 'line-color', P.arc); set('partners', 'circle-color', P.pin); set('partners', 'circle-stroke-color', P.bg);
+    set('partner-labels', 'text-color', P.label); set('partner-labels', 'text-halo-color', P.halo); }
+  map.setLight({ anchor: 'map', color: PH === 'night' ? '#8fa6ff' : PH === 'dusk' ? '#ffb48e' : '#fff4e6', intensity: PH === 'night' ? .25 : .45, position: [1.5, 210, 40] });
+  document.querySelectorAll('[data-ph]').forEach(b => b.classList.toggle('on', b.dataset.ph === PH));
+}
+setInterval(() => { if (!new URLSearchParams(location.search).get('mood')) { const n = phase(); if (n !== PH) { PH = n; warmStyle(); } } }, 60000);
+
+// Partner ↔ оффис нум: дээшээ муруйсан bezier, lng/lat-аар
+function arc(a, b, n = 48) {
+  const [x1, y1] = a, [x2, y2] = b, mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  const dx = x2 - x1, dy = y2 - y1, cx = mx - dy * 0.25, cy = my + dx * 0.25;
+  const pts = [];
+  for (let i = 0; i <= n; i++) { const t = i / n, u = 1 - t;
+    pts.push([u * u * x1 + 2 * u * t * cx + t * t * x2, u * u * y1 + 2 * u * t * cy + t * t * y2]); }
+  return pts;
+}
+
+// Оффисын барилга — three.js custom layer (low-poly: суурь, давхар, дээвэр дээрх арал)
+function officeLayer() {
+  const origin = ORGS.office.lngLat;
+  return {
+    id: 'office-3d', type: 'custom', renderingMode: '3d',
+    onAdd(m, gl) {
+      this.map = m; this.camera = new THREE.Camera(); this.scene = new THREE.Scene();
+      this.scene.add(new THREE.AmbientLight(0xfff2e0, 0.9));
+      const sun = new THREE.DirectionalLight(0xffd8a8, 1.4); sun.position.set(60, -80, 120); this.scene.add(sun);
+      const mat = c => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
+      const g = new THREE.Group();
+      const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
+      add(new THREE.BoxGeometry(70, 50, 6), mat(0x8fae6b), 0, 0, 3);            // ногоон суурь (арал)
+      add(new THREE.BoxGeometry(46, 30, 36), mat(0xf4e3c8), 0, 0, 24);          // барилга
+      add(new THREE.BoxGeometry(50, 34, 4), mat(0xd9732e), 0, 0, 44);           // дээвэр (accent)
+      [[-14, 0], [0, 0], [14, 0]].forEach(([x, y], i) =>                          // дээвэр дээрх төслийн арлууд
+        add(new THREE.CylinderGeometry(5, 6, 5, 7).rotateX(Math.PI / 2), mat([0xa8c48a, 0xe0b46a, 0x9cc0c4][i]), x, y, 49));
+      for (let i = 0; i < 6; i++)                                                   // low-poly мод
+        add(new THREE.ConeGeometry(4, 12, 6).rotateX(Math.PI / 2), mat(0x5f8a4a), -30 + i * 12, -21, 12);
+      this.scene.add(g);
+      this.renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true });
+      this.renderer.autoClear = false;
+    },
+    render(gl, args) {
+      const model = this.map.transform.getMatrixForModel(origin, 0);
+      const m = new THREE.Matrix4().fromArray(args.defaultProjectionData.mainMatrix);
+      // getMatrixForModel: x = зүүн, y = дээш, z = өмнө зүг → бидний z-дээш загварыг эргүүлнэ
+      const l = new THREE.Matrix4().fromArray(model).multiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+      this.camera.projectionMatrix = m.multiply(l);
+      this.renderer.resetState(); this.renderer.render(this.scene, this.camera);
+      this.map.triggerRepaint();
+    },
+  };
+}
+
+map.on('style.load', () => {
+  warmStyle();
+  const arcs = ORGS.partners.map(p => ({ type: 'Feature', properties: { name: p.name },
+    geometry: { type: 'LineString', coordinates: arc(ORGS.office.lngLat, p.lngLat) } }));
+  const pts = ORGS.partners.map(p => ({ type: 'Feature', properties: { name: p.name, org: p.org || '', project: p.project || '', addr: p.addr || '' },
+    geometry: { type: 'Point', coordinates: p.lngLat } }));
+  map.addSource('arcs', { type: 'geojson', data: { type: 'FeatureCollection', features: arcs } });
+  map.addSource('partners', { type: 'geojson', data: { type: 'FeatureCollection', features: pts } });
+  map.addLayer({ id: 'arcs', type: 'line', source: 'arcs', paint: { 'line-color': '#D6453D', 'line-width': 2.5, 'line-dasharray': [2, 1.2], 'line-opacity': 0.9 } });
+  map.addLayer({ id: 'partners', type: 'circle', source: 'partners', paint: { 'circle-radius': 9, 'circle-color': '#D6453D', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 3 } });
+  map.addLayer({ id: 'partner-labels', type: 'symbol', source: 'partners',
+    layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-offset': [0, 1.3], 'text-anchor': 'top' },
+    paint: { 'text-color': '#1a1714', 'text-halo-color': '#fffdf8', 'text-halo-width': 2 } });
+  map.addLayer(officeLayer()); warmStyle();
+  map.on('click', 'partners', e => new maplibregl.Popup().setLngLat(e.lngLat)
+    .setHTML(`<b>${e.features[0].properties.name}</b><br>${e.features[0].properties.org} · ${e.features[0].properties.project}<br><small>${e.features[0].properties.addr}</small>`).addTo(map));
+  const bb = new maplibregl.LngLatBounds(ORGS.office.lngLat, ORGS.office.lngLat); ORGS.partners.forEach(p => bb.extend(p.lngLat));
+  map.fitBounds(bb, { padding: { top: 80, bottom: 80, left: 340, right: 380 }, pitch: 50, bearing: -20, duration: 0, maxZoom: 15 });
+});
+
+// Globe ↔ mercator. Style ачаалсны дараа л тавина (судалгааны эрсдэл 1).
+const gb = document.getElementById('globe');
+gb.onclick = () => {
+  const toGlobe = !gb.classList.contains('on');
+  map.setProjection({ type: toGlobe ? 'globe' : 'mercator' });
+  gb.classList.toggle('on', toGlobe);
+  if (toGlobe) map.flyTo({ zoom: 3, pitch: 0, duration: 2500 });
+  else map.flyTo({ center: ORGS.office.lngLat, zoom: 15.2, pitch: 58, bearing: -24, duration: 2500 });
+};
+document.getElementById('office').onclick = () =>
+  map.flyTo({ center: ORGS.office.lngLat, zoom: 17, pitch: 62, bearing: -24, duration: 2000 });
+let spinning = false;
+const sp = document.getElementById('spin');
+sp.onclick = () => { spinning = !spinning; sp.classList.toggle('on', spinning); };
+
+// FPS — rAF-ийн дундаж, 1 сек тутам
+let frames = 0, last = performance.now();
+window.__fps = 0;
+(function tick(now) {
+  frames++;
+  if (spinning) map.setBearing(map.getBearing() + 0.15);
+  if (now - last >= 1000) { window.__fps = Math.round(frames * 1000 / (now - last));
+    document.getElementById('fps').textContent = window.__fps + ' fps'; frames = 0; last = now; }
+  requestAnimationFrame(tick);
+})(performance.now());
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>
