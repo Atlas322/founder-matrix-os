@@ -1,5 +1,5 @@
 """Мини хот = бодит гудамж: OSM (Overpass)-аас гэрийн орчмын барилга, зам, цэцэрлэг, ус, модыг татаж
-локал метр координат руу хөрвүүлж, жижиг JSON болгоно. Төв цэг нь gitignore хийсэн ub-map.local.json-оос.
+локал метр координат руу хөрвүүлж, жижиг JSON болгоно. Төв цэг нь ub-map.local.json-оос (vault/_system/fm/ эсвэл энэ хавтасны gitignore хуулбар).
 
 Татсан түүхий өгөгдөл, хөрвүүлсэн JSON хоёул ~/.fmos/fm-office/-д (repo, vault-д биш — гэрийн байршил).
 build(center, radius) → {"center", "radius", "buildings":[[h, x0,z0,x1,z1,...]], "roads":[[w, ...]], "areas":{kind:[[...]]}, "trees":[x,z,...]}

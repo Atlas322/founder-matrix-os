@@ -35,7 +35,15 @@ STATIC = {"/": ("landing.html", "text/html; charset=utf-8"),           # нүү�
           "/spiral": ("spiral.html", "text/html; charset=utf-8"),           # өдөр бүр = спиралийн блок               # Gallery hall: хавтас, YouTube, highlight → атом
           "/map": ("home.html", "text/html; charset=utf-8"),                 # хот = мини хоттой нэг хөдөлгүүр (Three.js, «Хот» харагдац)
           "/map-old": ("ub-map.html", "text/html; charset=utf-8"),           # хуучин MapLibre хувилбар (globe)
-          "/ub-map.local.json": ("ub-map.local.json", "application/json; charset=utf-8")}  # gitignore — бодит байршил
+          }
+LOCAL_MAP = "ub-map.local.json"   # бодит байршил: vault/_system/fm/ (Drive-аар хоёр машинд) → эсвэл repo-гийн gitignore хуулбар
+
+
+def local_map(vault):
+    for f in (Path(vault) / "_system" / "fm" / LOCAL_MAP, HERE / LOCAL_MAP):
+        if f.exists():
+            return json.loads(f.read_text(encoding="utf-8"))
+    return None
 ASSET_TYPES = {".glb": "model/gltf-binary", ".webp": "image/webp", ".jpg": "image/jpeg", ".png": "image/png", ".json": "application/json; charset=utf-8"}
 
 
@@ -93,6 +101,9 @@ def make_handler(vault):
         def do_GET(self):
             path = self.path.split("?")[0]
             try:
+                if path == "/" + LOCAL_MAP:
+                    loc = local_map(vault)
+                    return self._send(200, loc) if loc else self._send(404, {"error": LOCAL_MAP + " алга"})
                 if path in STATIC:
                     f, ct = STATIC[path]
                     return self._send(200, (HERE / f).read_bytes(), ct)
@@ -153,7 +164,7 @@ def make_handler(vault):
                     p = arts.get(f)
                     return self._send(200, p.read_bytes(), ASSET_TYPES[p.suffix.lower()]) if p else self._send(404, {"error": "зураг алга"})
                 if path == "/api/weather":                              # Улаанбаатарын одоогийн цаг агаар (Open-Meteo, 10 мин cache)
-                    loc = json.loads((HERE / "ub-map.local.json").read_text(encoding="utf-8")) if (HERE / "ub-map.local.json").exists() else {"office": [106.9176, 47.9188]}
+                    loc = local_map(vault) or {"office": [106.9176, 47.9188]}
                     try:
                         return self._send(200, weather_data.current(loc["office"][1], loc["office"][0]))
                     except Exception as e:
@@ -175,7 +186,7 @@ def make_handler(vault):
                     return self._send(200, f.read_bytes(), "image/png")
                 if path == "/api/osm":                                  # мини хот = гэрийн орчмын бодит гудамж (cache ~/.fmos)
                     import gzip
-                    loc = json.loads((HERE / "ub-map.local.json").read_text(encoding="utf-8")) if (HERE / "ub-map.local.json").exists() else None
+                    loc = local_map(vault)
                     if not loc:
                         return self._send(404, {"error": "ub-map.local.json алга"})
                     body = json.dumps(osm_data.build(loc["office"], 5000), separators=(",", ":")).encode()
