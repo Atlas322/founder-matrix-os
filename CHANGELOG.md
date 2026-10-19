@@ -21,7 +21,7 @@
 
 ## Unreleased
 
-- fm 0.9.99: дэд сешн өөрийн baton-той — нэг дүрийн дэд сешнүүд («🏛️ Architect › Danista», «Spa салон · Инженер») бүгд `state/<дүр>.md`-д бичиж, нэгнийх нь хүсэлт, «хаана зогссон», task бусдад нь орж холилдож байв. Registry-д `baton` түлхүүр (`fmconfig.baton_key/baton_file`), `fm_role.py bind --baton <key>`, `relay.py register --baton`; `/fm:role` дэд сешнд `--baton <slug>-<дүр>` өгнө (tests/test_sub_session_baton.py).
+- fm 0.9.99: дэд сешн өөрийн baton-той — нэг дүрийн дэд сешнүүд («🏛️ Architect › Danista», «Spa салон · Инженер») бүгд `state/<дүр>.md`-д бичиж, нэгнийх нь хүсэлт, «хаана зогссон», task бусдад нь орж холилдож байв. Registry-д `baton` түлхүүр (`fmconfig.baton_key/baton_file`), `fm_role.py bind --baton <key>`, `relay.py register --baton`; `/fm:role` дэд сешнд `--baton <slug>-<дүр>` өгнө (tests/test_sub_session_baton.py). «📌 Миний task» самбар: өөр сешн (📁 төсөл, `--folder`-тэй дэд сешн) тухайн төсөлд scope-тэй бол хүрээгүй дүрийн сешн (GTD, Architect) тэр төслийн task-ийг харуулахгүй, owner нь өөрийнх байсан ч.
   - Яагаад: дэд сешн бүр зөвхөн өөрийн ажлаа санана, нөгөөгийнхтэй холилдохгүй · Дүрэм: `/fm:role` 1-р алхам «Дэд сешн → өөрийн baton»
   - Ойлго: нэг дүр = олон сешн байж болно; дэд сешн бүр өөрийн baton-той.
 
