@@ -21,6 +21,10 @@
 
 ## Unreleased
 
+- fm 0.9.99: дэд сешн өөрийн baton-той — нэг дүрийн дэд сешнүүд («🏛️ Architect › Danista», «Spa салон · Инженер») бүгд `state/<дүр>.md`-д бичиж, нэгнийх нь хүсэлт, «хаана зогссон», task бусдад нь орж холилдож байв. Registry-д `baton` түлхүүр (`fmconfig.baton_key/baton_file`), `fm_role.py bind --baton <key>`, `relay.py register --baton`; `/fm:role` дэд сешнд `--baton <slug>-<дүр>` өгнө (tests/test_sub_session_baton.py).
+  - Яагаад: дэд сешн бүр зөвхөн өөрийн ажлаа санана, нөгөөгийнхтэй холилдохгүй · Дүрэм: `/fm:role` 1-р алхам «Дэд сешн → өөрийн baton»
+  - Ойлго: нэг дүр = олон сешн байж болно; дэд сешн бүр өөрийн baton-той.
+
 - fm 0.9.98: relay watch/dispatch — сонсож эхэлснээс хойш нээгдсэн thread-ийг үүссэн мөчөөс нь уншина; бот нээсэн thread-д илрэхээс өмнө бичигдсэн хариу алгасагддаг байсныг засав (tests/test_thread_base.py).
 
 - fm 0.9.97: Figma bridge server `~/.fmos/figma/plugin`-ийн хуулбарыг 60 сек тутам repo-той тааруулна (өмнө нь зөвхөн асахдаа) — `git pull`/plugin update-ийн дараа Figma хуучин UI-тай үлддэг байв; одоо plugin-ийг дахин нээхэд л шинэ UI.

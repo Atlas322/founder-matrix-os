@@ -780,7 +780,7 @@ def _d_baton(hook, push_every):
     if is_private(me): return  # privacy (itge.e 2026-10-05): finance/private chat never leaves the machine
     user, asst = _last_turn(hook.get("transcript_path", ""))
     if not asst: return
-    f = STATE_DIR / f"{me['project']}.md"; f.parent.mkdir(parents=True, exist_ok=True)
+    f = fmconfig.baton_file(me); f.parent.mkdir(parents=True, exist_ok=True)
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     first = asst.split("\n")[0][:140]
     with regstore.file_lock(BATON_LOCK, what="baton lock"):   # parallel Stop hooks: never drop each other's ТҮҮХ lines
@@ -792,7 +792,7 @@ def _d_baton(hook, push_every):
         line = f"- {ts} · {DEVICE} · {me['name']} · {first}"
         _write_text_atomic(f, now + "\n## ТҮҮХ\n" + (hist + "\n" if hist else "") + line + "\n")
     if VAULT_MODE: return  # vault file written; Drive syncs it — no git
-    st = load(STATE, {}); k = "_baton_push_" + me["project"]
+    st = load(STATE, {}); k = "_baton_push_" + fmconfig.baton_key(me)
     if time.time() - st.get(k, 0) > push_every:
         try: safe_sync([f], f"baton {me['project']} · {me['name']} ({DEVICE})")
         except TimeoutError: return
@@ -814,7 +814,7 @@ def d_next(text, sid):
     me = load(REG, {"sessions": {}})["sessions"].get(sid)
     if not me or not me.get("project"): print("project алга"); return
     if is_private(me): print("private — baton бичихгүй"); return  # same rule as d_baton: never written/pushed
-    f = STATE_DIR / f"{me['project']}.md"; f.parent.mkdir(parents=True, exist_ok=True)
+    f = fmconfig.baton_file(me); f.parent.mkdir(parents=True, exist_ok=True)
     with regstore.file_lock(BATON_LOCK, what="baton lock"):
         old = f.read_text(encoding="utf-8") if f.exists() else f"# {me['project']}\n\n## ТҮҮХ\n"
         head, _, tail = old.partition("## ТҮҮХ")
