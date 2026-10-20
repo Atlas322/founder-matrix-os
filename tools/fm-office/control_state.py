@@ -161,7 +161,7 @@ def build(now=None, include_archived=False):
         last = max(tr["last_ts"], (a.get("lastActivityAt") or 0) / 1000)
         waiting = next((p for p in tr["pending"] if p["tool"] in ASK_TOOLS), None)
         sessions.append({
-            "id": sid, "title": a.get("title") or "?", "model": a.get("model") or "",
+            "id": sid, "title": a.get("title") or "?", "model": a.get("model") or "", "cwd": "" if priv else (a.get("cwd") or ""),
             "parent": (a.get("spawnedFrom") or {}).get("sessionId"),
             "state": st, "private": priv, "since_s": int(now - last) if last else None,
             "turns": a.get("completedTurns") or 0, "routine": bool(ROUTINE.search(a.get("title") or "")),
