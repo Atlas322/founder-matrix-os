@@ -33,6 +33,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPixelatedPass } from 'three/addons/postprocessing/RenderPixelatedPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const COL = { needs_you:0xffa829, shell:0x9973ff, working:0x33c773, idle:0x8a8f99 };
 const ROOM = 9, GAP = 3;                       // өрөөний хэмжээ (нэгж), хоорондын зай
@@ -43,7 +46,9 @@ let pixel = (localStorage.getItem('o25.px') ?? '1') === '1';
 const labels = new CSS2DRenderer(); labels.domElement.style.cssText = 'position:fixed;inset:0;pointer-events:none'; document.body.appendChild(labels.domElement);
 const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 500);
 cam.position.set(40, 40, 40); cam.zoom = 1;
-const ctl = new OrbitControls(cam, renderer.domElement); ctl.enableRotate = false; ctl.screenSpacePanning = true;
+const composer = new EffectComposer(renderer); const pxPass = new RenderPixelatedPass(3, scene, cam); pxPass.normalEdgeStrength = 0.35; pxPass.depthEdgeStrength = 0.5; composer.addPass(pxPass); composer.addPass(new OutputPass());
+const pxSize = () => pxPass.setPixelSize(Math.max(2, Math.round(3 * Math.sqrt(cam.zoom))));
+const ctl = new OrbitControls(cam, renderer.domElement); ctl.addEventListener('change', pxSize); ctl.enableRotate = false; ctl.screenSpacePanning = true;
 ctl.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }; ctl.zoomToCursor = true;
 scene.add(new THREE.HemisphereLight(0xfff3e0, 0x404858, 1.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(20, 40, 10); sun.castShadow = true;
@@ -51,8 +56,7 @@ sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left:-60,
 function resize() {
   const w = innerWidth, h = innerHeight, a = w / h, s = 22;
   Object.assign(cam, { left:-s * a, right:s * a, top:s, bottom:-s }); cam.updateProjectionMatrix();
-  renderer.setPixelRatio(pixel ? 0.5 : Math.min(devicePixelRatio, 2)); renderer.setSize(w, h); labels.setSize(w, h);
-  renderer.domElement.classList.toggle('px', pixel);
+  renderer.setPixelRatio(1); renderer.setSize(w, h); composer.setSize(w, h); labels.setSize(w, h); pxSize();
 }
 addEventListener('resize', resize); resize();
 addEventListener('keydown', e => { if (e.key === 'p' || e.key === 'P') { pixel = !pixel; try { localStorage.setItem('o25.px', pixel ? '1' : '0'); } catch {} resize(); } });
@@ -63,9 +67,15 @@ const load = p => cache[p] ||= new Promise(r => loader.load(p, g => r(g), undefi
 async function prop(name, x, z, ry = 0, s = 1) {
   const g = await load(`/assets/kenney/furniture/${name}.glb`); if (!g) return null;
   const o = g.scene.clone(true); o.position.set(x, 0, z); o.rotation.y = ry; o.scale.setScalar(s * 2.2);
-  o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } }); world.add(o); return o;
+  o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } }); toonify(o); world.add(o); return o;
 }
-const toon = c => new THREE.MeshToonMaterial({ color: c });
+const grad = (() => { const t = new THREE.DataTexture(new Uint8Array([70, 150, 255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+const toon = c => new THREE.MeshToonMaterial({ color: c, gradientMap: grad });
+function toonify(o, tint, skin) { o.traverse(m => { if (m.isMesh && m.material) { const src = m.material, nm = (src.name || '') + ' ' + (m.name || '');
+  const t = new THREE.MeshToonMaterial({ color: src.color ? src.color.clone() : new THREE.Color(0xffffff), map: src.map || null, gradientMap: grad });
+  if (tint && /shirt|body|torso|cloth|top/i.test(nm)) t.color.lerp(new THREE.Color(tint), 0.65);
+  if (skin && /skin|head|face/i.test(nm)) t.color.lerp(new THREE.Color(skin), 0.5);
+  m.material = t; } }); }
 const world = new THREE.Group(); scene.add(world);
 function label(text, cls, y = 0) { const d = document.createElement('div'); d.className = cls; d.textContent = text; const o = new CSS2DObject(d); o.position.y = y; return o; }
 
@@ -109,31 +119,53 @@ async function build(data) {
 
 // ── агентууд: сешн бүр нэг дүр
 const CH = ['character-male-b', 'character-female-c'];
+const SHIRTS = [0x3d7aff, 0xe0574a, 0x33c773, 0xffa829, 0x9973ff, 0x2bb3c0, 0xe86fb0, 0x6b7280, 0xd9a441, 0x4f8a5b, 0x8b5cf6, 0xf97316, 0x0ea5e9, 0x84cc16];
+const SKIN = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac];
+const taken = new Map();
+function freeSeat(r, id) { for (const p of r.seats) { const k = p.x.toFixed(1) + ',' + p.z.toFixed(1); if (!taken.has(k) || taken.get(k) === id) { taken.set(k, id); return p; } } return null; }
 function roomOf(s) {
   const key = Object.keys(rooms).find(p => p !== '__meet' && (s.cwd + ' ' + s.title).toLowerCase().includes(p.toLowerCase()));
   return key ? rooms[key] : rooms.__meet;
 }
 async function spawn(s, i) {
   const g = await load(`/assets/kenney/chars/${CH[i % 2]}.glb`); if (!g) return;
-  const o = SkeletonUtils.clone(g.scene); o.scale.setScalar(2.4); o.traverse(m => { if (m.isMesh) m.castShadow = true; });
+  const o = SkeletonUtils.clone(g.scene); o.scale.setScalar(2.2 + (i % 3) * 0.12); o.traverse(m => { if (m.isMesh) m.castShadow = true; }); toonify(o, SHIRTS[i % SHIRTS.length], SKIN[i % SKIN.length]);
   const mixer = new THREE.AnimationMixer(o); mixers.push(mixer);
   const clip = n => mixer.clipAction(g.animations.find(a => a.name === n) || g.animations[0]);
-  const r = roomOf(s), seat = r.seats[i % Math.max(1, r.seats.length)] || new THREE.Vector3(r.cx, 0.2, r.cz);
+  const r = roomOf(s), seat = freeSeat(r, s.id) || r.seats[i % Math.max(1, r.seats.length)] || new THREE.Vector3(r.cx, 0.2, r.cz);
   o.position.copy(seat).add(new THREE.Vector3((Math.random() - .5), 0, (Math.random() - .5)));
   const name = label(s.title.replace(/^[^\s]+\s/, ''), 'lbl', 2.9); o.add(name);
   const bub = label('', 'bub', 2.9); o.add(bub);
   const hit = new THREE.Mesh(new THREE.BoxGeometry(1, 2.6, 1), new THREE.MeshBasicMaterial({ visible:false })); hit.position.y = 1.3; hit.userData = { kind:'agent', id:s.id }; o.add(hit); clickables.push(hit);
   world.add(o);
-  agents[s.id] = { o, mixer, clip, cur:null, s, home:seat.clone(), target:null, bub, wait:0 };
+  agents[s.id] = { o, mixer, clip, cur:null, s, home:seat.clone(), target:null, bub, name, wait:0 };
+}
+const PRI = { needs_you:3, shell:2, working:1, idle:0 };
+let hover = null;
+function declutter() {
+  const items = Object.values(agents).flatMap(a => [[a.bub.element, PRI[a.s.state] + 10 + (a === hover ? 20 : 0)], [a.name.element, PRI[a.s.state] + (a === hover ? 40 : 0)]])
+    .filter(([el]) => el.textContent && el.style.visibility !== 'hidden').sort((x, y) => y[1] - x[1]);
+  const placed = [];
+  for (const [el] of items) { el.style.opacity = '1'; const r = el.getBoundingClientRect();
+    if (placed.some(q => r.left < q.right && r.right > q.left && r.top < q.bottom && r.bottom > q.top)) el.style.opacity = '0'; else placed.push(r); }
+}
+function chatLines(s) { return (s.tools || []).slice(-4).map(t => (t.error ? '⚠ ' : '') + t.tool + ' · ' + t.arg).concat(s.last_text ? ['💬 ' + s.last_text] : []); }
+function typeTick(a, dt) {
+  const lines = chatLines(a.s); if (!lines.length) return;
+  a.tt = (a.tt || 0) + dt; const L = lines[(a.li || 0) % lines.length], n = Math.min(L.length, Math.floor(a.tt * 28));
+  a.bub.element.textContent = (a.s.state === 'shell' ? '⏳ ' : '') + L.slice(0, n) + (n < L.length ? '▍' : '');
+  a.bub.element.style.visibility = 'visible';
+  if (a.tt > L.length / 28 + 2.2) { a.tt = 0; a.li = (a.li || 0) + 1; }
 }
 function setAnim(a, n) { if (a.cur === n) return; const next = a.clip(n); next.reset().fadeIn(.25).play(); if (a.cur) a.clip(a.cur).fadeOut(.25); a.cur = n; }
 function apply(a, s) {
   a.s = s; const el = a.bub.element;
   if (s.state === 'needs_you') { el.className = 'bub ask'; el.textContent = '✋ ' + (s.ask || 'чамайг хүлээж байна'); }
-  else if (s.state === 'shell') { el.className = 'bub shell'; el.textContent = '⏳ ' + (s.tools.at(-1)?.arg || 'ажиллаж байна'); }
-  else if (s.state === 'working') { el.className = 'bub'; el.textContent = '💬 ' + (s.tools.at(-1) ? s.tools.at(-1).tool + ' · ' + s.tools.at(-1).arg : s.last_text).slice(0, 80); }
+  else if (s.state === 'shell') { el.className = 'bub shell'; if (!el.textContent) el.textContent = '⏳'; }
+  else if (s.state === 'working') { el.className = 'bub'; if (!el.textContent) el.textContent = '💬'; }
   else { el.className = 'bub'; el.textContent = ''; }
   el.style.visibility = el.textContent ? 'visible' : 'hidden';
+  a.name.element.style.visibility = s.state === 'idle' && a !== hover ? 'hidden' : 'visible';
 }
 const clock = new THREE.Clock();
 function tick() {
@@ -150,15 +182,23 @@ function tick() {
         const d = a.target.clone().sub(a.o.position); d.y = 0; const step = Math.min(d.length(), dt * 2.2);
         a.o.position.add(d.normalize().multiplyScalar(step)); a.o.rotation.y = Math.atan2(d.x, d.z); setAnim(a, 'walk');
       }
-    } else { a.target = null; a.o.position.lerp(a.home, 0.05); setAnim(a, st === 'working' ? 'pick-up' : 'idle'); }
+    } else {
+      a.target = null; const d = a.home.clone().sub(a.o.position); d.y = 0;
+      if (d.length() > 0.25) { a.o.position.add(d.normalize().multiplyScalar(Math.min(d.length(), dt * 2.2))); a.o.rotation.y = Math.atan2(d.x, d.z); setAnim(a, 'walk'); }
+      else { a.o.position.set(a.home.x, 0.05, a.home.z); a.o.rotation.y = Math.PI; setAnim(a, 'sit'); }
+      typeTick(a, dt);
+    }
     a.mixer.update(dt);
   }
-  ctl.update(); renderer.render(scene, cam); labels.render(scene, cam); requestAnimationFrame(tick);
+  ctl.update(); if (pixel) composer.render(); else renderer.render(scene, cam); labels.render(scene, cam); declutter(); requestAnimationFrame(tick);
 }
 
 // ── дарах
 const ray = new THREE.Raycaster(), mp = new THREE.Vector2(); let down = null;
 renderer.domElement.addEventListener('pointerdown', e => down = [e.clientX, e.clientY]);
+renderer.domElement.addEventListener('pointermove', e => { mp.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(mp, cam);
+  const h = ray.intersectObjects(clickables, false)[0], a = h && h.object.userData.kind === 'agent' ? agents[h.object.userData.id] : null;
+  if (a !== hover) { const old = hover; hover = a; for (const x of [old, a]) if (x) apply(x, x.s); renderer.domElement.style.cursor = h ? 'pointer' : ''; } });
 renderer.domElement.addEventListener('pointerup', e => {
   if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
   mp.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(mp, cam);
