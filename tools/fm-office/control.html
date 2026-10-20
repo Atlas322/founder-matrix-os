@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Удирдлагын өрөө · FM Office</title>
+<style>
+  :root { --bg:#111214; --panel:#1c1d20; --card:#212226; --line:#2e3036; --text:#f2f2f4; --mute:#9a9ea8;
+          --blue:#3d7aff; --amber:#ffa829; --green:#33c773; --red:#f25454; --violet:#9973ff; }
+  * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 Inter, system-ui, sans-serif; }
+  header { display:flex; align-items:center; gap:16px; padding:56px 28px 12px; flex-wrap:wrap; }
+  h1 { font-size:26px; margin:0; } .sub { color:var(--mute); font-size:13px; }
+  .tabs { display:flex; gap:4px; background:var(--panel); padding:4px; border-radius:10px; }
+  .tabs button { background:none; border:0; color:var(--mute); padding:6px 14px; border-radius:8px; font:500 13px Inter, sans-serif; cursor:pointer; }
+  .tabs button.on { background:var(--blue); color:#fff; }
+  .counts { display:flex; gap:8px; margin-left:auto; flex-wrap:wrap; }
+  .pill { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; font:600 11px Inter, sans-serif; white-space:nowrap; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 420px; gap:20px; padding:8px 28px 28px; }
+  @media (max-width:1000px) { main { grid-template-columns:minmax(0,1fr); } }
+  .lane { background:var(--panel); border-radius:12px; padding:14px; margin-bottom:14px; }
+  .lane h2 { font-size:15px; margin:0 0 8px; display:flex; gap:8px; align-items:center; }
+  .row { display:flex; align-items:center; gap:12px; padding:10px 12px; background:var(--bg); border-radius:10px; margin-top:6px; cursor:pointer; border:1px solid transparent; }
+  .row:hover, .row.sel { border-color:var(--blue); }
+  .dot { width:10px; height:10px; border-radius:50%; flex:none; }
+  .mid { flex:1; min-width:0; } .mid b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mid small { color:var(--mute); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ago { font:600 12px Inter, sans-serif; white-space:nowrap; }
+  aside { background:var(--panel); border-radius:12px; padding:18px; align-self:start; position:sticky; top:12px; }
+  aside h3 { margin:0 0 4px; font-size:16px; } .muted { color:var(--mute); font-size:12px; }
+  .tool { display:flex; gap:8px; align-items:baseline; margin-top:8px; font-size:12px; } .tool code { color:var(--mute); word-break:break-all; }
+  #tree { position:relative; overflow:auto; background:#16171a; border-radius:12px; min-height:600px; }
+  .node { position:absolute; width:260px; background:var(--card); border-radius:12px; padding:10px 12px; border:1px solid #33353b; cursor:pointer; }
+  .node.needs_you { border:2px solid var(--amber); } .node.failed { border:1px solid var(--red); }
+  .node b { display:block; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:70px; }
+  .node .pill { position:absolute; top:10px; right:10px; } .node small { color:var(--mute); font-size:11px; display:block; }
+  .node p { margin:6px 0 0; font-size:12px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  svg.edges { position:absolute; inset:0; pointer-events:none; }
+  details.routine summary { cursor:pointer; color:var(--mute); font-size:12px; margin-top:6px; }
+  .empty { color:var(--mute); font-size:12px; padding:6px 2px; }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Удирдлагын өрөө</h1><div class="sub">Claude Code-ийн сешнүүд · хэн чамайг хүлээж байна · хэн хэнийг эхлүүлсэн · шат 1 (зөвхөн унших)</div></div>
+  <div class="tabs"><button data-v="lanes" class="on">Сешн</button><button data-v="tree">Agent tree</button></div>
+  <div class="counts" id="counts"></div>
+</header>
+<main>
+  <section id="view"></section>
+  <aside id="insp"><h3>Сешн сонго</h3><div class="muted">Мөр эсвэл карт дээр дарвал tool-ийн дараалал, асуулт, сүүлийн мессеж энд гарна.</div></aside>
+</main>
+<script src="/nav.js" defer></script>
+<script>
+const COL = { needs_you:'var(--amber)', shell:'var(--violet)', working:'var(--green)', idle:'var(--mute)', done:'var(--green)', failed:'var(--red)' };
+const LBL = { needs_you:'✋ Чамайг хүлээж байна', shell:'⏳ Shell хүлээж байна', working:'🟢 Ажиллаж байна', idle:'💤 Чөлөөтэй', done:'Done', failed:'Failed' };
+const SHORT = { needs_you:'Needs you', shell:'Shell', working:'Running', idle:'Idle', done:'Done', failed:'Failed' };
+let data = null, view = localStorage.getItem('ctl.view') || 'lanes', sel = null;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const ago = s => s == null ? '' : s < 60 ? s + ' с' : s < 3600 ? Math.round(s / 60) + ' мин' : s < 86400 ? Math.round(s / 3600) + ' ц' : Math.round(s / 86400) + ' өдөр';
+const tok = n => n > 1e6 ? (n / 1e6).toFixed(1) + 'M' : n > 1e3 ? Math.round(n / 1e3) + 'k' : String(n || 0);
+const pill = (st, txt) => `<span class="pill" style="color:${COL[st]};background:color-mix(in srgb, ${COL[st]} 18%, transparent)">${esc(txt ?? SHORT[st])}</span>`;
+
+function counts() {
+  const c = data.counts;
+  document.getElementById('counts').innerHTML = ['needs_you', 'shell', 'working', 'idle'].map(k => pill(k, LBL[k].split(' ')[0] + ' ' + c[k])).join('')
+    + `<span class="pill" style="color:var(--mute);background:var(--panel)">${data.total} сешн · ${tok(data.tokens)} токен</span>`;
+}
+function row(s) {
+  const what = s.private ? '🔒 хаалттай' : (s.ask ? '❓ ' + s.ask : s.tools.length ? s.tools.at(-1).tool + ' · ' + s.tools.at(-1).arg : s.last_text);
+  return `<div class="row ${sel === s.id ? 'sel' : ''}" data-id="${s.id}"><span class="dot" style="background:${COL[s.state]}"></span>
+    <div class="mid"><b>${esc(s.title)}</b><small>${esc(what)}</small></div>
+    <span class="pill" style="color:var(--mute);background:var(--panel)">${esc(s.model.replace('claude-', ''))}</span>
+    <span class="ago" style="color:${COL[s.state]}">${ago(s.since_s)}</span></div>`;
+}
+function lanes() {
+  return ['needs_you', 'shell', 'working', 'idle'].map(k => {
+    const all = data.sessions.filter(s => s.state === k), main = all.filter(s => !s.routine), rout = all.filter(s => s.routine);
+    return `<div class="lane"><h2 style="color:${COL[k]}">${LBL[k]} ${pill(k, String(all.length))}</h2>
+      ${main.map(row).join('') || '<div class="empty">алга</div>'}
+      ${rout.length ? `<details class="routine"><summary>Routine ${rout.length} (Harvester, тойм)</summary>${rout.map(row).join('')}</details>` : ''}</div>`;
+  }).join('');
+}
+function tree() {
+  const W = 260, H = 96, GX = 30, GY = 60;
+  const nodes = data.sessions.filter(s => !s.routine).map(s => ({ ...s, kids: [] }));
+  const by = Object.fromEntries(nodes.map(n => [n.id, n]));
+  for (const n of nodes) for (const a of n.subagents) n.kids.push({ id: n.id + ':' + a.id, title: '🤖 ' + a.name, model: a.model || 'subagent', state: a.state, ask: null, tools: [], last_text: a.task, kids: [], sub: true, since_s: null });
+  const roots = [];
+  for (const n of nodes) (n.parent && by[n.parent] ? by[n.parent].kids.unshift(n) : roots.push(n));
+  // зөвхөн хүүхэдтэй эсвэл идэвхтэй модыг дээр; бусад нь доор жижиг
+  roots.sort((a, b) => (b.kids.length - a.kids.length) || (a.state === 'idle') - (b.state === 'idle'));
+  let x = 20; const out = [], edges = [];
+  function place(n, depth) {
+    let w = 0; const start = x;
+    if (!n.kids.length) { n.x = x; x += W + GX; w = W; }
+    else { for (const k of n.kids) place(k, depth + 1); n.x = (n.kids[0].x + n.kids.at(-1).x) / 2; }
+    n.y = 20 + depth * (H + GY); out.push(n);
+    for (const k of n.kids) edges.push([n, k]);
+  }
+  for (const r of roots) place(r, 0);
+  const maxY = Math.max(...out.map(n => n.y)) + H + 40, maxX = x + 20;
+  const path = ([a, b]) => { const x1 = a.x + W / 2, y1 = a.y + H, x2 = b.x + W / 2, y2 = b.y, ym = (y1 + y2) / 2; return `<path d="M${x1} ${y1} C${x1} ${ym} ${x2} ${ym} ${x2} ${y2}" stroke="#4a4d55" stroke-width="1.5" fill="none" ${b.sub ? 'stroke-dasharray="4 4"' : ''}/>`; };
+  return `<div id="tree" style="height:${maxY}px"><div style="position:relative;width:${maxX}px;height:${maxY}px">
+    <svg class="edges" width="${maxX}" height="${maxY}">${edges.map(path).join('')}</svg>
+    ${out.map(n => `<div class="node ${n.state}" data-id="${n.sub ? '' : n.id}" style="left:${n.x}px;top:${n.y}px">${pill(n.state)}
+      <b>${esc(n.title)}</b><small>${esc((n.model || '').replace('claude-', ''))}${n.since_s != null ? ' · ' + ago(n.since_s) : ''}${n.tokens ? ' · ' + tok(n.tokens) + ' ток' : ''}</small>
+      <p>${esc(n.private ? '🔒 хаалттай' : n.ask ? '❓ ' + n.ask : n.last_text)}</p></div>`).join('')}
+  </div></div>`;
+}
+function inspector() {
+  const s = data.sessions.find(x => x.id === sel), el = document.getElementById('insp');
+  if (!s) return;
+  el.innerHTML = `<h3>${esc(s.title)}</h3><div class="muted">${pill(s.state, LBL[s.state])} · ${esc(s.model)} · ${s.turns} turn · ${ago(s.since_s)} өмнө</div>
+    ${s.private ? '<p class="muted">🔒 Хувийн санхүүгийн сешн — агуулга уншихгүй.</p>' : `
+    ${s.ask ? `<p style="color:var(--amber)">❓ ${esc(s.ask)}</p>` : ''}
+    <div class="muted" style="margin-top:12px">Tool-ийн дараалал (сүүлийн ${s.tools.length})</div>
+    ${s.tools.map(t => `<div class="tool">${pill(t.error ? 'failed' : 'working', t.tool)}<code>${esc(t.arg)}</code></div>`).join('') || '<div class="empty">алга</div>'}
+    ${s.subagents.length ? `<div class="muted" style="margin-top:12px">Subagent</div>${s.subagents.map(a => `<div class="tool">${pill(a.state, a.name)}<code>${esc(a.task)}</code></div>`).join('')}` : ''}
+    <div class="muted" style="margin-top:12px">Сүүлийн мессеж</div><p style="font-size:13px">${esc(s.last_text)}</p>`}
+    <p class="muted">Шат 3-т: эндээс сешн рүү бичих, зөвшөөрөл өгөх.</p>`;
+}
+function render() {
+  counts();
+  document.getElementById('view').innerHTML = view === 'tree' ? tree() : lanes();
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
+  document.querySelectorAll('[data-id]').forEach(e => e.dataset.id && (e.onclick = () => { sel = e.dataset.id; render(); }));
+  inspector();
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { view = b.dataset.v; try { localStorage.setItem('ctl.view', view); } catch {} render(); });
+async function load() {
+  try { data = await (await fetch('/api/control')).json(); render(); } catch (e) { document.getElementById('view').innerHTML = '<div class="empty">Сервертэй холбогдсонгүй</div>'; }
+}
+load(); setInterval(load, 5000);
+</script>
+</body>
+</html>
