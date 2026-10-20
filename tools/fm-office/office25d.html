@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Агентын оффис · 2.5D</title>
+<style>
+  html, body { margin:0; height:100%; background:#1b1d22; overflow:hidden; font:13px/1.4 Inter, system-ui, sans-serif; color:#f2f2f4; }
+  canvas { display:block; } canvas.px { image-rendering:pixelated; }
+  #hud { position:fixed; left:16px; top:56px; background:rgba(17,18,20,.86); border:1px solid #2e3036; border-radius:12px; padding:12px 14px; max-width:320px; }
+  #hud h1 { font-size:16px; margin:0 0 6px; } #hud .row { display:flex; gap:6px; flex-wrap:wrap; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:99px; font:600 11px Inter, sans-serif; background:#26282d; }
+  #panel { position:fixed; right:16px; top:56px; width:360px; max-height:calc(100% - 80px); overflow:auto; background:rgba(17,18,20,.92); border:1px solid #2e3036; border-radius:12px; padding:14px 16px; display:none; }
+  #panel h2 { font-size:15px; margin:0 0 4px; } .muted { color:#9a9ea8; font-size:12px; } .tool { font-size:12px; margin-top:5px; } .tool code { color:#9a9ea8; }
+  #panel .x { position:absolute; right:12px; top:8px; cursor:pointer; color:#9a9ea8; }
+  .lbl { font:600 12px Inter, sans-serif; color:#1a1a1a; background:rgba(255,255,255,.92); padding:2px 8px; border-radius:6px; white-space:nowrap; pointer-events:none; }
+  .room { font:700 13px Inter, sans-serif; color:#fff; background:rgba(20,22,26,.8); padding:3px 10px; border-radius:8px; white-space:nowrap; pointer-events:none; }
+  .bub { font:600 12px Inter, sans-serif; background:#fff; color:#1a1a1a; padding:5px 9px; border-radius:10px; max-width:220px; white-space:normal; pointer-events:none; box-shadow:0 2px 8px rgba(0,0,0,.35); }
+  .bub.ask { background:#ffa829; } .bub.shell { background:#c9b8ff; }
+  #help { position:fixed; left:16px; bottom:14px; color:#9a9ea8; font-size:12px; }
+</style>
+<script type="importmap">{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<div id="hud"><h1>Агентын оффис</h1><div class="muted" id="sum">ачаалж байна…</div><div class="row" id="cnt" style="margin-top:6px"></div></div>
+<div id="panel"><span class="x" id="px">✕</span><div id="pc"></div></div>
+<div id="help">Чирэх = гүйлгэх · Дугуй = томруулах · Дүр/ширээ дээр дарах = дэлгэрэнгүй · P = pixel горим · <a href="/control" style="color:#7aa2ff">/control</a></div>
+<script src="/nav.js" defer></script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+const COL = { needs_you:0xffa829, shell:0x9973ff, working:0x33c773, idle:0x8a8f99 };
+const ROOM = 9, GAP = 3;                       // өрөөний хэмжээ (нэгж), хоорондын зай
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1b1d22);
+const renderer = new THREE.WebGLRenderer({ antialias:false }); renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+let pixel = (localStorage.getItem('o25.px') ?? '1') === '1';
+const labels = new CSS2DRenderer(); labels.domElement.style.cssText = 'position:fixed;inset:0;pointer-events:none'; document.body.appendChild(labels.domElement);
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 500);
+cam.position.set(40, 40, 40); cam.zoom = 1;
+const ctl = new OrbitControls(cam, renderer.domElement); ctl.enableRotate = false; ctl.screenSpacePanning = true;
+ctl.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }; ctl.zoomToCursor = true;
+scene.add(new THREE.HemisphereLight(0xfff3e0, 0x404858, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(20, 40, 10); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left:-60, right:60, top:60, bottom:-60 }); scene.add(sun);
+function resize() {
+  const w = innerWidth, h = innerHeight, a = w / h, s = 22;
+  Object.assign(cam, { left:-s * a, right:s * a, top:s, bottom:-s }); cam.updateProjectionMatrix();
+  renderer.setPixelRatio(pixel ? 0.5 : Math.min(devicePixelRatio, 2)); renderer.setSize(w, h); labels.setSize(w, h);
+  renderer.domElement.classList.toggle('px', pixel);
+}
+addEventListener('resize', resize); resize();
+addEventListener('keydown', e => { if (e.key === 'p' || e.key === 'P') { pixel = !pixel; try { localStorage.setItem('o25.px', pixel ? '1' : '0'); } catch {} resize(); } });
+
+// ── asset
+const loader = new GLTFLoader(), cache = {};
+const load = p => cache[p] ||= new Promise(r => loader.load(p, g => r(g), undefined, () => r(null)));
+async function prop(name, x, z, ry = 0, s = 1) {
+  const g = await load(`/assets/kenney/furniture/${name}.glb`); if (!g) return null;
+  const o = g.scene.clone(true); o.position.set(x, 0, z); o.rotation.y = ry; o.scale.setScalar(s * 2.2);
+  o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } }); world.add(o); return o;
+}
+const toon = c => new THREE.MeshToonMaterial({ color: c });
+const world = new THREE.Group(); scene.add(world);
+function label(text, cls, y = 0) { const d = document.createElement('div'); d.className = cls; d.textContent = text; const o = new CSS2DObject(d); o.position.y = y; return o; }
+
+// ── оффисын бүтэц: өрөө = төсөл, ширээ = task, төвд хурлын ширээ
+let built = false, rooms = {}, agents = {}, deskMeta = [], clickables = [];
+const mixers = [];
+async function build(data) {
+  const desks = data.desks.filter(d => d.project !== 'Бусад').slice(0, 8);
+  const cols = 3, pos = i => { const k = i >= 4 ? i + 1 : i; return [(k % cols - 1) * (ROOM + GAP), (Math.floor(k / cols) - 1) * (ROOM + GAP)]; };
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), toon(0x2a2d33)); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; world.add(ground);
+  const tones = [0xe9dfcf, 0xd9e4ea, 0xe6dccd, 0xdfe7da, 0xeadbd6, 0xdcdcea, 0xe8e2c9, 0xd6e3e3];
+  for (const [i, d] of desks.entries()) {
+    const [cx, cz] = pos(i), g = new THREE.Group(); g.position.set(cx, 0, cz); world.add(g);
+    const fl = new THREE.Mesh(new THREE.BoxGeometry(ROOM, 0.2, ROOM), toon(tones[i % tones.length])); fl.position.y = 0.1; fl.receiveShadow = true; g.add(fl);
+    for (const [w, h, x, z] of [[ROOM, 0.25, 0, -ROOM / 2], [0.25, ROOM, -ROOM / 2, 0]]) {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 1.6, h), toon(0x5a5f69)); wall.position.set(x, 0.9, z); wall.castShadow = true; g.add(wall);
+    }
+    const lb = label('📁 ' + d.project + (d.questions.length ? '  ❓' + d.questions.length : ''), 'room', 0); lb.position.set(cx - ROOM / 2 + 1.5, 2.2, cz - ROOM / 2); world.add(lb);
+    rooms[d.project] = { cx, cz, desk: d, seats: [] };
+    const ts = d.tasks.slice(0, 6);
+    for (const [j, t] of ts.entries()) {
+      const x = cx - 2.6 + (j % 3) * 2.6, z = cz - 1.6 + Math.floor(j / 3) * 3.2;
+      await prop('desk', x, z, 0, 1); await prop('chairDesk', x, z + 1.0, Math.PI, 1); await prop('computerKeyboard', x, z - 0.1, 0, 1);
+      const mon = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.06), new THREE.MeshBasicMaterial({ color: t.status === 'in-progress' ? 0x3d7aff : 0x22252b })); mon.position.set(x, 1.95, z - 0.45); world.add(mon);
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.16), new THREE.MeshBasicMaterial({ color: t.questions.length ? 0xffa829 : t.status === 'in-progress' ? 0x33c773 : 0x8a8f99 })); lamp.position.set(x + 0.7, 1.9, z - 0.3); world.add(lamp);
+      const hit = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1.6), new THREE.MeshBasicMaterial({ visible:false })); hit.position.set(x, 1, z); hit.userData = { kind:'task', task:t, project:d.project }; world.add(hit); clickables.push(hit);
+      rooms[d.project].seats.push(new THREE.Vector3(x, 0.2, z + 1.0));
+    }
+    await prop('pottedPlant', cx + ROOM / 2 - 0.8, cz - ROOM / 2 + 0.8);
+  }
+  // хурлын ширээ төвд
+  const mt = new THREE.Mesh(new THREE.BoxGeometry(ROOM, 0.2, ROOM), toon(0x3a3226)); mt.position.set(0, 0.1, 0); world.add(mt);
+  await prop('tableRound', 0, 0, 0, 1.6);
+  for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; await prop('chair', Math.cos(a) * 2.4, Math.sin(a) * 2.4, -a + Math.PI / 2, 1); }
+  const mi = data.meeting.items.filter(i => !i.done);
+  const ml = label('🗣 Хурлын ширээ · ' + mi.length + ' асуудал', 'room'); ml.position.set(-2.5, 2.2, -ROOM / 2); world.add(ml);
+  const mhit = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 2), new THREE.MeshBasicMaterial({ visible:false })); mhit.position.set(0, 1, 0); mhit.userData = { kind:'meeting' }; world.add(mhit); clickables.push(mhit);
+  rooms.__meet = { cx:0, cz:0, seats:[...Array(6)].map((_, k) => { const a = k / 6 * Math.PI * 2; return new THREE.Vector3(Math.cos(a) * 3.2, 0.2, Math.sin(a) * 3.2); }) };
+  built = true;
+}
+
+// ── агентууд: сешн бүр нэг дүр
+const CH = ['character-male-b', 'character-female-c'];
+function roomOf(s) {
+  const key = Object.keys(rooms).find(p => p !== '__meet' && (s.cwd + ' ' + s.title).toLowerCase().includes(p.toLowerCase()));
+  return key ? rooms[key] : rooms.__meet;
+}
+async function spawn(s, i) {
+  const g = await load(`/assets/kenney/chars/${CH[i % 2]}.glb`); if (!g) return;
+  const o = SkeletonUtils.clone(g.scene); o.scale.setScalar(2.4); o.traverse(m => { if (m.isMesh) m.castShadow = true; });
+  const mixer = new THREE.AnimationMixer(o); mixers.push(mixer);
+  const clip = n => mixer.clipAction(g.animations.find(a => a.name === n) || g.animations[0]);
+  const r = roomOf(s), seat = r.seats[i % Math.max(1, r.seats.length)] || new THREE.Vector3(r.cx, 0.2, r.cz);
+  o.position.copy(seat).add(new THREE.Vector3((Math.random() - .5), 0, (Math.random() - .5)));
+  const name = label(s.title.replace(/^[^\s]+\s/, ''), 'lbl', 2.9); o.add(name);
+  const bub = label('', 'bub', 2.9); o.add(bub);
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(1, 2.6, 1), new THREE.MeshBasicMaterial({ visible:false })); hit.position.y = 1.3; hit.userData = { kind:'agent', id:s.id }; o.add(hit); clickables.push(hit);
+  world.add(o);
+  agents[s.id] = { o, mixer, clip, cur:null, s, home:seat.clone(), target:null, bub, wait:0 };
+}
+function setAnim(a, n) { if (a.cur === n) return; const next = a.clip(n); next.reset().fadeIn(.25).play(); if (a.cur) a.clip(a.cur).fadeOut(.25); a.cur = n; }
+function apply(a, s) {
+  a.s = s; const el = a.bub.element;
+  if (s.state === 'needs_you') { el.className = 'bub ask'; el.textContent = '✋ ' + (s.ask || 'чамайг хүлээж байна'); }
+  else if (s.state === 'shell') { el.className = 'bub shell'; el.textContent = '⏳ ' + (s.tools.at(-1)?.arg || 'ажиллаж байна'); }
+  else if (s.state === 'working') { el.className = 'bub'; el.textContent = '💬 ' + (s.tools.at(-1) ? s.tools.at(-1).tool + ' · ' + s.tools.at(-1).arg : s.last_text).slice(0, 80); }
+  else { el.className = 'bub'; el.textContent = ''; }
+  el.style.visibility = el.textContent ? 'visible' : 'hidden';
+}
+const clock = new THREE.Clock();
+function tick() {
+  const dt = clock.getDelta();
+  for (const a of Object.values(agents)) {
+    const st = a.s.state;
+    if (st === 'needs_you') { setAnim(a, 'emote-yes'); a.target = null; }
+    else if (st === 'idle') {                                    // сул агент хурлын ширээ, өрөө хооронд алхана
+      if (!a.target || a.o.position.distanceTo(a.target) < 0.2) {
+        if ((a.wait -= dt) <= 0) { const r = Math.random() < 0.5 ? rooms.__meet : roomOf(a.s); const p = r.seats[Math.floor(Math.random() * r.seats.length)] || a.home; a.target = p.clone(); a.wait = 3 + Math.random() * 5; }
+        else { setAnim(a, 'idle'); }
+      }
+      if (a.target && a.o.position.distanceTo(a.target) >= 0.2) {
+        const d = a.target.clone().sub(a.o.position); d.y = 0; const step = Math.min(d.length(), dt * 2.2);
+        a.o.position.add(d.normalize().multiplyScalar(step)); a.o.rotation.y = Math.atan2(d.x, d.z); setAnim(a, 'walk');
+      }
+    } else { a.target = null; a.o.position.lerp(a.home, 0.05); setAnim(a, st === 'working' ? 'pick-up' : 'idle'); }
+    a.mixer.update(dt);
+  }
+  ctl.update(); renderer.render(scene, cam); labels.render(scene, cam); requestAnimationFrame(tick);
+}
+
+// ── дарах
+const ray = new THREE.Raycaster(), mp = new THREE.Vector2(); let down = null;
+renderer.domElement.addEventListener('pointerdown', e => down = [e.clientX, e.clientY]);
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+  mp.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(mp, cam);
+  const h = ray.intersectObjects(clickables, false)[0]; if (h) show(h.object.userData);
+});
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const ago = s => s == null ? '' : s < 60 ? s + ' с' : s < 3600 ? Math.round(s / 60) + ' мин' : s < 86400 ? Math.round(s / 3600) + ' ц' : Math.round(s / 86400) + ' өдөр';
+let last = null;
+function show(u) {
+  const P = document.getElementById('pc'); document.getElementById('panel').style.display = 'block';
+  if (u.kind === 'agent') {
+    const s = agents[u.id]?.s; if (!s) return;
+    P.innerHTML = `<h2>${esc(s.title)}</h2><div class="muted">${esc(s.state)} · ${esc(s.model)} · ${ago(s.since_s)} өмнө</div>
+      ${s.private ? '<p class="muted">🔒 хаалттай</p>' : `${s.ask ? `<p style="color:#ffa829">❓ ${esc(s.ask)}</p>` : ''}
+      <div class="muted" style="margin-top:8px">Tool-ийн дараалал</div>${s.tools.map(t => `<div class="tool">${t.error ? '🔴' : '•'} <b>${esc(t.tool)}</b> <code>${esc(t.arg)}</code></div>`).join('')}
+      <div class="muted" style="margin-top:8px">Сүүлийн мессеж</div><p>${esc(s.last_text)}</p>`}`;
+  } else if (u.kind === 'task') {
+    const t = u.task;
+    P.innerHTML = `<h2>${esc(t.title)}</h2><div class="muted">📁 ${esc(u.project)} · ${esc(t.status)}${t.workflow ? ' · ' + esc(t.workflow) + ' ' + t.steps.join('/') : ''}</div>
+      <p>${esc(t.why)}</p>${Object.entries(t.raci).map(([k, v]) => `<div class="tool"><b>${k[0].toUpperCase()}</b> ${esc(v)}</div>`).join('') || `<div class="tool">эзэн · ${esc(t.owner)}</div>`}
+      ${t.next_step ? `<div class="muted" style="margin-top:8px">Дараагийн алхам: ${esc(t.next_step)}</div>` : ''}${t.questions.map(q => `<p style="color:#ffa829">❓ ${esc(q)}</p>`).join('')}`;
+  } else if (u.kind === 'meeting') {
+    const m = last.meeting;
+    P.innerHTML = `<h2>🗣 Хурлын ширээ</h2><div class="muted">${esc(m.path)}</div>${m.items.map(i => `<div class="tool" style="${i.done ? 'opacity:.5;text-decoration:line-through' : ''}">• ${esc(i.text)}</div>`).join('') || '<p class="muted">Асуудал алга</p>'}
+      <textarea id="iss" style="width:100%;min-height:60px;margin-top:10px;background:#111214;color:#fff;border:1px solid #2e3036;border-radius:8px;padding:6px"></textarea>
+      <button id="add" style="margin-top:6px;background:#ffa829;border:0;border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer">Ширээнд тавих</button>`;
+    document.getElementById('add').onclick = async () => { const t = document.getElementById('iss').value.trim(); if (!t) return;
+      const r = await fetch('/api/meeting', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ text:t }) }); if (r.ok) { await refresh(); show(u); } };
+  }
+}
+document.getElementById('px').onclick = () => document.getElementById('panel').style.display = 'none';
+
+async function refresh() {
+  let d; try { d = await (await fetch('/api/control')).json(); } catch { document.getElementById('sum').textContent = 'Сервертэй холбогдсонгүй'; return; }
+  last = d;
+  if (!built) await build(d);
+  const live = d.sessions.filter(s => !s.routine && (s.state !== 'idle' || (s.since_s ?? 1e9) < 86400 * 2)).slice(0, 14);
+  for (const [i, s] of live.entries()) { if (!agents[s.id]) await spawn(s, i); apply(agents[s.id], s); }
+  for (const id of Object.keys(agents)) if (!live.find(s => s.id === id)) { world.remove(agents[id].o); delete agents[id]; }
+  const c = d.counts;
+  document.getElementById('sum').textContent = `${live.length} агент оффист · ${d.desks.length} төсөл · хурлын ширээнд ${d.meeting.items.filter(i => !i.done).length} асуудал`;
+  document.getElementById('cnt').innerHTML = `<span class="pill" style="color:#ffa829">✋ ${c.needs_you}</span><span class="pill" style="color:#c9b8ff">⏳ ${c.shell}</span><span class="pill" style="color:#33c773">🟢 ${c.working}</span><span class="pill" style="color:#9a9ea8">💤 ${c.idle}</span>`;
+}
+await refresh(); tick(); setInterval(refresh, 5000);
+</script>
+</body>
+</html>
