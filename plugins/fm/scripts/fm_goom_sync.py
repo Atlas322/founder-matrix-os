@@ -1,7 +1,19 @@
 #!/usr/bin/env python3
 """fm_goom_sync: vault -> Goomnet sync (POST {url}/api/web/private/vault/sync).
 
-Usage: fm_goom_sync.py <vault> [--apply] [--full] [--allow-empty-kind] [--kinds project,task,reference,atom,decision]
+Usage: fm_goom_sync.py <vault> [--apply] [--once] [--full] [--allow-empty-kind] [--kinds project,task,...]
+
+Kinds: project, task, reference, atom, decision, plus (Goomnet phase 6 World):
+  day      01-GTD/Daily/*.md whose name starts with YYYY-MM-DD
+  person   03-Areas/people notes with a `home:` key only (the owner note); frontmatter is sent, never printed
+  glossary 04-Resources/glossary/*.md
+  note     every other .md in 01-GTD..04-Resources not covered above (03-Areas/people is never sent as note)
+  media    metadata of files under 02-Projects/*/Output and 04-Resources/Research/*/Output (images, mp4; html, gif,
+           svg too for newsletter projects and Output/generative art); frontmatter {path, mime, size, sha256, project}.
+           With --apply the bytes go to POST /api/web/private/vault/media/upload-url then PUT to the presigned url;
+           a 404 there (endpoint not built yet) skips the bytes with a warning, metadata is still sent.
+Notes with private: true, a lock in the name, and anything inside a folder named *private* or with a lock are skipped.
+--once: single run (accepted for Task Scheduler clarity; every run is one pass).
 
 Dry-run is the default: it prints per-kind counts and skipped notes, no network.
 --apply reads ~/.fmos/goom.json ({"url","token","workspace_id"}) and posts batches of <= 500 items.
@@ -20,7 +32,14 @@ content_hash = sha256(kind + "\\n" + project_slug + "\\n" + raw frontmatter text
 import argparse, hashlib, json, re, sys, unicodedata, urllib.error, urllib.request
 from pathlib import Path
 
-KINDS = ("project", "task", "reference", "atom", "decision")
+KINDS = ("project", "task", "reference", "atom", "decision", "day", "person", "glossary", "note", "media")
+MD_KINDS = KINDS[:-1]
+MEDIA_ENDPOINT = "/api/web/private/vault/media/upload-url"
+MEDIA_EXT = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
+             ".mp4": "video/mp4"}
+EXTRA_EXT = {".html": "text/html", ".gif": "image/gif", ".svg": "image/svg+xml"}
+PARA = ("01-GTD", "02-Projects", "03-Areas", "04-Resources")
+_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 BATCH = 500
 ENDPOINT = "/api/web/private/vault/sync"
 CONFIG_REL = (".fmos", "goom.json")
@@ -83,6 +102,13 @@ def _parse_fields(lines):
             continue
         if line[0] in " \t":
             item = line.strip()
+            sub = _KEY_RE.match(item)
+            if last is not None and not item.startswith("- ") and sub and \
+                    (fields.get(last) is None or isinstance(fields.get(last), dict)):
+                cur = fields.get(last) or {}
+                cur[sub.group(1).strip()] = _scalar(sub.group(2) or "")
+                fields[last] = cur
+                continue
             if last is not None and item.startswith("- "):
                 cur = fields.get(last)
                 if not isinstance(cur, list):
@@ -123,7 +149,47 @@ def _project_slug(value):
     return slug or None
 
 
+def in_private_folder(rel):
+    """True when any folder of the vault-relative posix path is private (name contains 'private' or a lock)."""
+    return any("private" in d.lower() or "\U0001f512" in d for d in rel.split("/")[:-1])
+
+
+def _covered(rel):
+    """Kind a .md path belongs to apart from note, or None (keeps note disjoint from the other kinds)."""
+    parts = rel.split("/")
+    if rel.startswith("01-GTD/Tasks/") and len(parts) == 3:
+        return "task"
+    if rel.startswith("01-GTD/Daily/") and len(parts) == 3:
+        return "day"
+    if rel.startswith("03-Areas/people/"):
+        return "person"
+    if rel.startswith("04-Resources/glossary/") and len(parts) == 3:
+        return "glossary"
+    for folder, kind in (("04-Resources/references/", "reference"), ("04-Resources/Atomic/knowledge/", "atom"),
+                         ("04-Resources/Atomic/decisions/", "decision")):
+        if rel.startswith(folder):
+            return kind
+    if len(parts) == 3 and parts[0] == "02-Projects" and parts[2][:-3] == parts[1]:
+        return "project"
+    return None
+
+
 def _sources(vault, kind):
+    if kind == "day":
+        return sorted(vault.glob("01-GTD/Daily/*.md"))
+    if kind == "person":
+        d = vault / "03-Areas/people"
+        return sorted(d.rglob("*.md")) if d.is_dir() else []
+    if kind == "glossary":
+        return sorted(vault.glob("04-Resources/glossary/*.md"))
+    if kind == "note":
+        out = []
+        for top in PARA:
+            d = vault / top
+            if d.is_dir():
+                out += [f for f in d.rglob("*.md")
+                        if _covered(unicodedata.normalize("NFC", f.relative_to(vault).as_posix())) is None]
+        return sorted(out)
     if kind == "project":
         return [f for f in sorted(vault.glob("02-Projects/*/*.md")) if f.stem == f.parent.name]
     if kind == "task":
@@ -135,12 +201,80 @@ def _sources(vault, kind):
     return sorted(d.rglob("*.md")) if d.is_dir() else []
 
 
+def media_project(rel):
+    """Project slug for a media path: the 02-Projects/<P> or 04-Resources/Research/<R> folder."""
+    parts = rel.split("/")
+    if parts[0] == "02-Projects" and len(parts) > 2:
+        return slugify(parts[1])
+    if parts[:2] == ["04-Resources", "Research"] and len(parts) > 3:
+        return slugify(parts[2])
+    return None
+
+
+def media_mime(rel):
+    """Mime when rel is a media file to send, else None: Output images/mp4 of projects and research hubs; html, gif
+    and svg too inside a newsletter project's Output or a research hub's Output/generative."""
+    parts = rel.split("/")
+    ext = Path(rel).suffix.lower()
+    if parts[0] == "02-Projects" and len(parts) > 3 and parts[2] == "Output":
+        extra = "newsletter" in parts[1].lower()
+    elif parts[:2] == ["04-Resources", "Research"] and len(parts) > 4 and parts[3] == "Output":
+        extra = len(parts) > 5 and parts[4] == "generative"
+    else:
+        return None
+    if ext in MEDIA_EXT:
+        return MEDIA_EXT[ext]
+    return EXTRA_EXT.get(ext) if extra else None
+
+
+def _media_sources(vault):
+    out = []
+    for pattern in ("02-Projects/*/Output", "04-Resources/Research/*/Output"):
+        for d in vault.glob(pattern):
+            out += [f for f in d.rglob("*") if f.is_file()]
+    return sorted(out)
+
+
+def _sha256_file(f):
+    h = hashlib.sha256()
+    with open(f, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _collect_media(vault, items, skipped):
+    for f in _media_sources(vault):
+        rel = unicodedata.normalize("NFC", f.relative_to(vault).as_posix())
+        mime = media_mime(rel)
+        if mime is None:
+            continue
+        if in_private_folder(rel) or "\U0001f512" in f.name:
+            skipped.append({"path": rel, "reason": "private", "kind": "media"})
+            continue
+        try:
+            size, sha = f.stat().st_size, _sha256_file(f)
+        except OSError:
+            skipped.append({"path": rel, "reason": "read", "kind": "media"})
+            continue
+        slug = media_project(rel)
+        fm = {"path": rel, "mime": mime, "size": size, "sha256": sha, "project": slug}
+        item = {"kind": "media", "source_path": rel, "title": f.name, "topics": [], "frontmatter": fm,
+                "body_md": "", "content_hash": _content_hash("media", slug, json.dumps(fm, sort_keys=True), "")}
+        if slug:
+            item["project_slug"] = slug
+        items.append(item)
+
+
 def collect(vault, kinds):
     """Returns (items, skipped). items: Goomnet vault item dicts. skipped: {path, reason, kind} where reason is
-    private, yaml, read or not-task. Only private notes are excluded from the --full manifest."""
+    private, yaml, read, not-task or not-day. Only private notes are excluded from the --full manifest.
+    person notes without `home:` are left out silently (neither sent nor listed, so no names get printed)."""
     vault = Path(vault)
     items, skipped = [], []
-    for kind in KINDS:
+    if "media" in kinds:
+        _collect_media(vault, items, skipped)
+    for kind in MD_KINDS:
         if kind not in kinds:
             continue
         for f in _sources(vault, kind):
@@ -149,7 +283,7 @@ def collect(vault, kinds):
             def skip(reason):
                 skipped.append({"path": rel, "reason": reason, "kind": kind})
 
-            if "finances/private" in rel.lower():
+            if "finances/private" in rel.lower() or in_private_folder(rel):
                 skip("private")
                 continue
             try:
@@ -171,6 +305,11 @@ def collect(vault, kinds):
                 continue
             if kind == "task" and str(fm.get("type", "")).strip() != "task":
                 skip("not-task")
+                continue
+            if kind == "day" and not (_DAY_RE.match(title) or _DAY_RE.match(f.stem)):
+                skip("not-day")
+                continue
+            if kind == "person" and "home" not in fm:
                 continue
             slug = _project_slug(fm.get("project"))
             topics = fm.get("tags", fm.get("topics"))
@@ -243,10 +382,49 @@ def _post(url, token, payload, endpoint=ENDPOINT):
         return json.loads(resp.read().decode("utf-8"))
 
 
+def _put(url, data, mime):
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": mime}, method="PUT")
+    with urllib.request.urlopen(req, timeout=300) as resp:
+        resp.read()
+
+
+def upload_media(vault, url, token, ws, media):
+    """Uploads media bytes via presigned urls; returns how many were PUT. Endpoint 404 -> one warning, all bytes
+    skipped (metadata is still sent by the caller). Other failures warn per file and continue."""
+    done = 0
+    for it in media:
+        fm = it["frontmatter"]
+        body = {"workspace_id": ws, "sha256": fm["sha256"], "mime": fm["mime"], "size": fm["size"]}
+        try:
+            res = _post(url, token, body, MEDIA_ENDPOINT)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                print("warning: media upload endpoint not available (HTTP 404); skipping bytes of "
+                      f"{len(media)} file(s), sending metadata only", file=sys.stderr)
+                return done
+            print(f"warning: media upload-url failed: HTTP {e.code} {it['source_path']}", file=sys.stderr)
+            continue
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            print(f"warning: media upload-url failed: {type(e).__name__} {it['source_path']}", file=sys.stderr)
+            continue
+        put = res.get("url") if isinstance(res, dict) else None
+        if not put:
+            continue  # server already has these bytes
+        try:
+            _put(put, (Path(vault) / it["source_path"]).read_bytes(), fm["mime"])
+            done += 1
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            print(f"warning: media PUT failed: {type(e).__name__} {it['source_path']}", file=sys.stderr)
+    if media:
+        print(f"media bytes: uploaded {done}/{len(media)}")
+    return done
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Vault -> Goomnet sync (dry-run unless --apply).")
     ap.add_argument("vault")
     ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--once", action="store_true", help="single run (every run is one pass)")
     ap.add_argument("--full", action="store_true", help="delete server rows of selected kinds that are gone from the vault")
     ap.add_argument("--allow-empty-kind", action="store_true",
                     help="with --full: allow a selected kind with no files (deletes all of its server rows)")
@@ -303,6 +481,8 @@ def main(argv=None):
     except SystemExit_ as e:
         print(str(e), file=sys.stderr)
         return 2
+
+    upload_media(vault, url, token, ws, [i for i in items if i["kind"] == "media"])
 
     totals = {"upserted": 0, "unchanged": 0, "deleted": 0}
     all_errors = []

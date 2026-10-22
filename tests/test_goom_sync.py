@@ -233,6 +233,102 @@ class TestGoomSync(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertNotIn(TOKEN, out + err)
 
+    # phase 6 (World) kinds
+    def _world_vault(self):
+        v = self.vault
+        w(v / "01-GTD/Daily/2026-10-22.md", "---\ntype: daily\n---\nday body\n")
+        w(v / "01-GTD/Daily/Template.md", "---\ntype: daily\n---\nx\n")
+        w(v / "01-GTD/Tasks/T.md", "---\ntype: task\n---\nx\n")
+        w(v / "01-GTD/Inbox/Idea.md", "---\ntitle: Idea\n---\nx\n")
+        w(v / "03-Areas/people/Owner.md", "---\ntype: person\nhome:\n  name: Гэр\n  place: Хот\n  lng: 106.9\n  lat: 47.9\n---\nx\n")
+        w(v / "03-Areas/people/Client.md", "---\ntype: person\n---\nx\n")
+        w(v / "04-Resources/glossary/Term.md", "---\ntitle: Term\n---\nx\n")
+        w(v / "04-Resources/references/R.md", "---\ntitle: R\n---\nx\n")
+        w(v / "02-Projects/Site/Site.md", "---\ntype: project\n---\nx\n")
+        w(v / "02-Projects/Site/Brief.md", "---\ntitle: Brief\n---\nx\n")
+        w(v / "02-Projects/Site/private/Secret.md", "---\ntitle: S\n---\nx\n")
+        w(v / "03-Areas/Health/Sleep.md", "---\nprivate: true\n---\nx\n")
+        (v / "02-Projects/Site/Output").mkdir(parents=True)
+        (v / "02-Projects/Site/Output/hero.png").write_bytes(b"\x89PNG1")
+        (v / "02-Projects/Site/Output/page.html").write_bytes(b"<html>")
+        (v / "02-Projects/Site/Output/private").mkdir()
+        (v / "02-Projects/Site/Output/private/x.jpg").write_bytes(b"j")
+        nl = v / "02-Projects/INAI Newsletter/Output/Journal/002"
+        nl.mkdir(parents=True)
+        (nl / "002.html").write_bytes(b"<html>nl")
+        (nl / "002.json").write_bytes(b"{}")
+        gen = v / "04-Resources/Research/Hub/Output/generative"
+        gen.mkdir(parents=True)
+        (gen / "art.svg").write_bytes(b"<svg/>")
+        (v / "04-Resources/Research/Hub/Output/clip.mp4").write_bytes(b"mp4")
+
+    def test_world_kind_classification(self):
+        self._world_vault()
+        items, skipped = gs.collect(self.vault, set(gs.KINDS))
+        kinds = {i["source_path"]: i["kind"] for i in items}
+        self.assertEqual(kinds["01-GTD/Daily/2026-10-22.md"], "day")
+        self.assertEqual(kinds["03-Areas/people/Owner.md"], "person")
+        self.assertEqual(kinds["04-Resources/glossary/Term.md"], "glossary")
+        self.assertEqual(kinds["01-GTD/Inbox/Idea.md"], "note")
+        self.assertEqual(kinds["02-Projects/Site/Brief.md"], "note")
+        self.assertEqual(kinds["01-GTD/Tasks/T.md"], "task")
+        self.assertEqual(kinds["02-Projects/Site/Site.md"], "project")
+        self.assertEqual(kinds["04-Resources/references/R.md"], "reference")
+        self.assertNotIn("03-Areas/people/Client.md", kinds)
+        self.assertNotIn("03-Areas/people/Client.md", [s["path"] for s in skipped])
+        self.assertIn({"path": "01-GTD/Daily/Template.md", "reason": "not-day", "kind": "day"}, skipped)
+        owner = next(i for i in items if i["kind"] == "person")
+        self.assertEqual(owner["frontmatter"]["home"], {"name": "Гэр", "place": "Хот", "lng": "106.9", "lat": "47.9"})
+        media = {i["source_path"]: i for i in items if i["kind"] == "media"}
+        self.assertEqual(set(media), {"02-Projects/Site/Output/hero.png",
+                                      "02-Projects/INAI Newsletter/Output/Journal/002/002.html",
+                                      "04-Resources/Research/Hub/Output/generative/art.svg",
+                                      "04-Resources/Research/Hub/Output/clip.mp4"})
+        hero = media["02-Projects/Site/Output/hero.png"]
+        self.assertEqual(hero["title"], "hero.png")
+        self.assertEqual(hero["frontmatter"], {"path": "02-Projects/Site/Output/hero.png", "mime": "image/png",
+                                               "size": 5, "sha256": gs.hashlib.sha256(b"\x89PNG1").hexdigest(),
+                                               "project": "site"})
+        self.assertEqual(media["04-Resources/Research/Hub/Output/clip.mp4"]["frontmatter"]["project"], "hub")
+        # every path belongs to exactly one kind
+        self.assertEqual(len(kinds), len(items))
+
+    def test_world_private_filtering(self):
+        self._world_vault()
+        items, skipped = gs.collect(self.vault, set(gs.KINDS))
+        paths = {i["source_path"] for i in items}
+        for p in ("02-Projects/Site/private/Secret.md", "03-Areas/Health/Sleep.md",
+                  "02-Projects/Site/Output/private/x.jpg"):
+            self.assertNotIn(p, paths)
+            self.assertIn({"path": p, "reason": "private", "kind": "media" if p.endswith(".jpg") else "note"}, skipped)
+        self.assertTrue(gs.in_private_folder("02-Projects/A/Private Stuff/x.md"))
+        self.assertTrue(gs.in_private_folder("03-Areas/\U0001f512 Finance/x.md"))
+        self.assertFalse(gs.in_private_folder("02-Projects/A/private.md"))
+
+    def test_media_upload_404_keeps_metadata(self):
+        def responder(n, body):
+            if "items" not in body:
+                return 404, None
+            return 200, {"upserted": len(body["items"]), "unchanged": 0, "deleted": 0, "errors": []}
+        server, requests = self._server(responder)
+        self._config(f"http://127.0.0.1:{server.server_address[1]}")
+        self._world_vault()
+        rc, out, err = self._run([str(self.vault), "--apply", "--once", "--kinds", "media"])
+        self.assertEqual(rc, 0)
+        self.assertIn("HTTP 404", err)
+        self.assertEqual(requests[0]["path"], "/api/web/private/vault/media/upload-url")
+        self.assertEqual(set(requests[0]["body"]), {"workspace_id", "sha256", "mime", "size"})
+        syncs = [r for r in requests if r["path"] == "/api/web/private/vault/sync"]
+        self.assertEqual(len(requests), 2)
+        self.assertEqual(len(syncs[0]["body"]["items"]), 4)
+
+    def test_person_home_never_printed(self):
+        self._world_vault()
+        rc, out, err = self._run([str(self.vault), "--kinds", "person,day,note"])
+        self.assertEqual(rc, 0)
+        for secret in ("Гэр", "Хот", "106.9", "Client", "Owner"):
+            self.assertNotIn(secret, out + err)
+
 
 if __name__ == "__main__":
     unittest.main()
