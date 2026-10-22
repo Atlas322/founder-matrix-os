@@ -1,5 +1,11 @@
 # FM Office (2.5D + 3D прототип)
 
+> **Goomnet дотор ч ажиллана.** FM Office-ийн бүх дэлгэц (city, gallery, hall, fpv, xr, garden, office, campus,
+> khuvsgul) одоо Goomnet-д `/<workspace>/world/…` дор ажилладаг; calendar нь 3-р шатны Цаглабарт үлдэнэ. Өгөгдлийг
+> синк хийсэн vault-аас Goomnet-ийн Go API өгнө (goomnet repo, `claude/world-port-577e41` branch). Энэ python
+> серверийг itge.e зогсоох шийдвэр гаргах хүртэл хадгална. World дэлгэцүүдэд өгөгдөл орохын тулд
+> `fm_goom_sync.py <vault> --apply`-г ажиллуулах ёстой (media upload ба hall атомын draft-ууд үүгээр явна).
+
 Цаглабар (Inai Operation App)-ын «Оффис» модуль. Vault = барилга, давхар = PARA, төсөл бүр = өрөө
 (дотор нь одоогийн stage / Key Activity), агент сешн = ширээнд суугаа хүн. Three.js r160 (CDN, importmap), build алхамгүй.
 
