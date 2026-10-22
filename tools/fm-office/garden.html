@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FM Office · Zen цэцэрлэг</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Zen цэцэрлэг = миний хот. Павильон бүр Second Brain-ий нэг хэсэг (PARA). Asset: Kenney (CC0) + кодоор хийсэн элс, өвс, павильон. */
+  :root { --ink:#1f1d1a; --paper:#f4efe2; --red:#c8432f; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#e9dcc4; font-family:"Inter Tight", system-ui, sans-serif; color:var(--ink); }
+  canvas { display:block; }
+  .hud { position:fixed; left:20px; top:20px; width:270px; padding:14px 16px; background:rgba(244,239,226,.82); backdrop-filter:blur(6px); border:1px solid rgba(31,29,26,.5); }
+  .hud h1 { margin:2px 0 6px; font:600 19px "Inter Tight"; } .hud p { margin:0; font-size:12.5px; line-height:1.5; opacity:.75; }
+  .hud.min p { display:none; } .hud .mini { position:absolute; top:8px; right:8px; width:22px; height:22px; border:1px solid rgba(31,29,26,.5); background:transparent; cursor:pointer; padding:0; }
+  .eb { font:600 10.5px ui-monospace, monospace; letter-spacing:.14em; text-transform:uppercase; opacity:.55; }
+  #hint { position:fixed; left:50%; bottom:30px; transform:translateX(-50%); display:none; padding:9px 16px; background:rgba(31,29,26,.88); color:var(--paper); font-size:13.5px; cursor:pointer; letter-spacing:.01em; }
+  #hint b { display:inline-block; margin-right:10px; padding:1px 7px; background:var(--red); }
+  .panel { position:fixed; right:20px; top:20px; width:min(380px, 90vw); max-height:82vh; overflow:auto; padding:20px 22px; background:rgba(244,239,226,.95); border:1px solid rgba(31,29,26,.5); display:none; }
+  .panel.on { display:block; } .panel h2 { margin:0 0 4px; font:600 20px "Inter Tight"; } .panel li { margin:5px 0; font-size:13.5px; }
+  .panel .x { float:right; border:1px solid rgba(31,29,26,.5); background:transparent; cursor:pointer; font:inherit; font-size:12px; padding:3px 8px; }
+  .panel small, .panel .sub { opacity:.6; } .panel .sub { font-size:12px; margin:0 0 12px; }
+  .panel .st { display:inline-block; min-width:62px; font:600 10px ui-monospace, monospace; letter-spacing:.08em; text-transform:uppercase; opacity:.55; }
+  .panel .st.active { color:var(--red); opacity:1; }
+  .lbl { padding:3px 9px; background:rgba(31,29,26,.78); color:var(--paper); font:500 12px "Inter Tight"; letter-spacing:.04em; white-space:nowrap; pointer-events:none; }
+  .lbl small { opacity:.65; margin-left:6px; }
+  #joy { position:fixed; left:24px; bottom:24px; width:120px; height:120px; border:1px solid rgba(31,29,26,.5); border-radius:50%; background:rgba(244,239,226,.45); display:none; touch-action:none; }
+  #joy i { position:absolute; left:40px; top:40px; width:40px; height:40px; border-radius:50%; background:var(--ink); }
+  #joy.touch { display:block; }
+  #load { position:fixed; inset:0; display:grid; place-items:center; background:#e9dcc4; font:600 11px ui-monospace, monospace; letter-spacing:.2em; transition:opacity .8s; z-index:20; }
+  #fps { position:fixed; right:12px; bottom:8px; font:11px ui-monospace, monospace; opacity:.45; }
+  @media (max-width:700px) { .hud { width:auto; right:20px; } .hud p { display:none; } }
+</style>
+<script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<div id="load">ЦЭЦЭРЛЭГ НЭЭГДЭЖ БАЙНА…</div>
+<div class="hud" id="hud"><button class="mini" id="hmin">–</button><div class="eb">Second Brain · zen цэцэрлэг</div><h1>Миний хот</h1>
+  <p>WASD алхах, Shift гүйх, хулганаар чирж эргэх, дугуйгаар ойртох. Павильон бүр Second Brain-ий нэг хэсэг. Ойртоод <b>E</b> дар.</p></div>
+<div id="hint"></div>
+<aside class="panel" id="panel"><button class="x" id="px">Хаах</button><div id="pc"></div></aside>
+<div id="joy"><i></i></div><div id="fps"></div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+const $ = id => document.getElementById(id), esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches, MOBILE = innerWidth < 700;
+// Quality түвшин (Bruno/summer-afternoon шиг): ?q=low|high, анхдагч нь утсанд low. low = PCF сүүдэр, DoF/bloom/SMAA-гүй, цөөн өвс
+const QUALITY = new URLSearchParams(location.search).get('q') || (MOBILE ? 'low' : 'high'), HIGH = QUALITY === 'high';
+const rnd = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();   // тогтвортой санамсаргүй (байршил үргэлж ижил)
+
+// ── Өнгөний зохицол: хөвд ногоон · элсэн шар · модны хүрэн · шифер саарал · агчны улаан (FM accent) ──
+const PAL = {
+  day:   { sky: 0x9ec9df, hor: 0xf4e6c8, sun: 0xffe2b0, sunI: 2.4, hemi: 1.15, gnd: 0x4f7a3a, moss: 0x6f9a48, tip: 0xa9c46a, sand: 0xf1ece0, fog: 0xe9dcc4, exp: 1.0, bloom: .18, dir: [40, 32, 14], lantern: 0 },
+  dusk:  { sky: 0x5d5a9a, hor: 0xf3a77e, sun: 0xffa66b, sunI: 2.0, hemi: .7, gnd: 0x4a5e36, moss: 0x66803e, tip: 0xe0a65a, sand: 0xe9cdb0, fog: 0xd99a82, exp: 1.0, bloom: .5, dir: [50, 14, -10], lantern: 1 },
+  night: { sky: 0x101a3a, hor: 0x34406e, sun: 0xa9bcff, sunI: .8, hemi: .55, gnd: 0x26392e, moss: 0x3c5a42, tip: 0x6a8a6a, sand: 0xb8bfd0, fog: 0x1c2648, exp: 1.1, bloom: .9, dir: [-20, 40, 30], lantern: 1 },
+};
+const hr = new Date().getHours() + new Date().getMinutes() / 60, Q = new URLSearchParams(location.search).get('t');   // ?t=day|dusk|night
+const P = PAL[Q] || (hr >= 20.5 || hr < 6 ? PAL.night : (hr >= 17.5 || hr < 7.5) ? PAL.dusk : PAL.day), NIGHT = P === PAL.night;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, HIGH ? 2 : 1.25)); renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = HIGH ? THREE.VSMShadowMap : THREE.PCFSoftShadowMap;   // VSM = зөөлөн, бүдэг захтай сүүдэр (summer-afternoon)
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = P.exp;
+document.body.prepend(renderer.domElement);
+const labels = new CSS2DRenderer(); Object.assign(labels.domElement.style, { position: 'fixed', top: 0, left: 0, pointerEvents: 'none' }); document.body.appendChild(labels.domElement);
+const scene = new THREE.Scene(); scene.fog = new THREE.Fog(P.fog, 30, 150);
+const camera = new THREE.PerspectiveCamera(40, 1, .1, 600);
+
+// тэнгэр
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
+  uniforms: { a: { value: new THREE.Color(P.sky) }, b: { value: new THREE.Color(P.hor) }, night: { value: NIGHT ? 1 : 0 } },
+  vertexShader: 'varying vec3 vp; void main(){ vp = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: `uniform vec3 a,b; uniform float night; varying vec3 vp;
+    float h(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,45.164))) * 43758.5453); }
+    void main(){ vec3 c = mix(b, a, smoothstep(-.02, .45, vp.y));
+      if (night > .5) { vec3 q = floor(vp * 260.); float s = step(.9975, h(q)) * smoothstep(.05, .3, vp.y); c += s * .9; }
+      gl_FragColor = vec4(c, 1.); }` })));
+// холын уулс: давхар силуэт (Windland маягийн гүн)
+for (const [r, h, k, sh] of [[230, 60, .55, 0], [190, 38, .35, 1.3], [160, 22, .18, 2.1]]) {
+  const g = new THREE.CylinderGeometry(r, r, 1, 128, 1, true), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) if (p.getY(i) > 0) { const a = Math.atan2(p.getZ(i), p.getX(i)); p.setY(i, h * (.45 + .35 * Math.sin(a * 3 + sh) + .2 * Math.sin(a * 11 + sh * 2))); } else p.setY(i, -2);
+  g.computeVertexNormals();
+  scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: new THREE.Color(P.fog).lerp(new THREE.Color(P.sky), k * .6).multiplyScalar(1 - k * .25), side: THREE.BackSide, fog: false })));
+}
+
+const hemi = new THREE.HemisphereLight(P.sky, P.gnd, P.hemi); scene.add(hemi);
+const sun = new THREE.DirectionalLight(P.sun, P.sunI); sun.castShadow = true;
+sun.shadow.mapSize.set(HIGH ? 2048 : 1024, HIGH ? 2048 : 1024); if (HIGH) { sun.shadow.radius = 6; sun.shadow.blurSamples = 16; } Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, far: 200 }); sun.shadow.bias = -.0004; sun.shadow.normalBias = .05;
+scene.add(sun, sun.target);
+
+// ── Газар ──
+const R = 46;                                                    // цэцэрлэгийн радиус
+const POND = { x: 20, z: 17, r: 7.5 }, SAND = { x: 0, z: 0, r: 12.5 };
+const H = (x, z) => { const r = Math.hypot(x, z); let h = Math.sin(x * .07) * .35 + Math.cos(z * .06 + 1) * .3 + Math.max(0, r - R + 8) * .35;
+  const dp = Math.hypot(x - POND.x, z - POND.z); if (dp < POND.r + 1.5) h -= (1 - Math.min(1, dp / (POND.r + 1.5))) ** .7 * 1.2;
+  const ds = Math.hypot(x - SAND.x, z - SAND.z); if (ds < SAND.r + 2) h = THREE.MathUtils.lerp(h, .05, 1 - THREE.MathUtils.smoothstep(ds, SAND.r, SAND.r + 2));
+  return h; };
+const gg = new THREE.PlaneGeometry(260, 260, 200, 200); gg.rotateX(-Math.PI / 2);
+{ const p = gg.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, H(p.getX(i), p.getZ(i))); gg.computeVertexNormals(); }
+const ground = new THREE.Mesh(gg, new THREE.MeshLambertMaterial({ color: P.gnd })); ground.receiveShadow = true; scene.add(ground);
+
+// karesansui: хүрзээр зурсан элс — чулуу тойрсон цагираг + шулуун зураас (shader)
+const STONES = [[-4, -2.5, 2.2], [3.5, 1.5, 1.6], [1, -6.5, 1.2]];
+const sandM = new THREE.ShaderMaterial({ fog: true,
+  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { c: { value: new THREE.Color(P.sand) }, sunC: { value: new THREE.Color(P.sun) }, st: { value: STONES.map(s => new THREE.Vector3(...s)) } }]),
+  vertexShader: `#include <fog_pars_vertex>
+    varying vec2 vw; void main(){ vec4 w = modelMatrix * vec4(position,1.); vw = w.xz; vec4 mvPosition = viewMatrix * w; gl_Position = projectionMatrix * mvPosition;
+    #include <fog_vertex>
+    }`,
+  fragmentShader: `#include <fog_pars_fragment>
+    uniform vec3 c, sunC; uniform vec3 st[3]; varying vec2 vw;
+    void main(){ float d = 1e3;
+      for (int i = 0; i < 3; i++){ float q = length(vw - st[i].xy) - st[i].z * .7; d = min(d, q); }
+      float v = d < 3.2 ? d * 4.2 : vw.x * 4.2;                                         // чулууны орчим цагираг, бусад нь шулуун ховил
+      float g = .5 + .5 * sin(v * 3.14159);
+      vec3 col = c * (.74 + .26 * g); col = mix(col, col * sunC, .08);
+      float edge = smoothstep(${(SAND.r - .3).toFixed(1)}, ${SAND.r.toFixed(1)}, length(vw)); col = mix(col, col * .8, edge);
+      gl_FragColor = vec4(col, 1.);
+      #include <fog_fragment>
+    }` });
+{ const s = new THREE.Mesh(new THREE.CircleGeometry(SAND.r, 96), sandM); s.rotation.x = -Math.PI / 2; s.position.set(0, .07, 0); scene.add(s);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(SAND.r + .15, .22, 6, 96), new THREE.MeshLambertMaterial({ color: 0x8c8679 })); rim.rotation.x = Math.PI / 2; rim.position.y = .1; scene.add(rim); }
+
+// цөөрөм
+const water = new THREE.Mesh(new THREE.CircleGeometry(POND.r, 64), new THREE.MeshPhongMaterial({ color: NIGHT ? 0x1d2a55 : 0x4f8a8c, shininess: 120, specular: 0xffffff, transparent: true, opacity: .88 }));
+water.rotation.x = -Math.PI / 2; water.position.set(POND.x, -.35, POND.z); scene.add(water);
+// koi загас
+const KOI = 9, koiM = new THREE.InstancedMesh(new THREE.CapsuleGeometry(.12, .45, 3, 6).rotateZ(Math.PI / 2), new THREE.MeshLambertMaterial(), KOI);
+for (let i = 0; i < KOI; i++) koiM.setColorAt(i, new THREE.Color([0xe8742c, 0xf4efe2, 0xc8432f][i % 3])); scene.add(koiM);
+const koi = Array.from({ length: KOI }, () => ({ r: 1.5 + rnd() * 4.5, a: rnd() * 6.28, v: (.15 + rnd() * .25) * (rnd() < .5 ? 1 : -1) }));
+
+// ── Павильоны тэгш өнцөгт, зам (өвс, мөргөлдөөнд) ──
+const BUILD = [], PATHS = [];
+const inBuild = (x, z, m = 0) => BUILD.some(b => Math.abs(x - b.x) < b.w / 2 + m && Math.abs(z - b.z) < b.d / 2 + m);
+const onPath = (x, z) => PATHS.some(([a, b]) => { const dx = b[0] - a[0], dz = b[1] - a[1], t = THREE.MathUtils.clamp(((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz), 0, 1);
+  return Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t) < .9; });
+
+// ── Хөвд өвс (shader, салхи) — элс, ус, павильон, замаас гадна ──
+const uT = { value: 0 }, uPlayer = { value: new THREE.Vector3() };
+function makeGrass() {
+  const N = HIGH ? 110000 : 45000, bg = new THREE.BufferGeometry();
+  bg.setAttribute('position', new THREE.Float32BufferAttribute([-.06, 0, 0, .06, 0, 0, -.035, .45, 0, .035, .45, 0, 0, .9, 0], 3)); bg.setIndex([0, 1, 2, 2, 1, 3, 2, 3, 4]);
+  const offs = new Float32Array(N * 4); let n = 0;
+  for (let i = 0; n < N && i < N * 4; i++) { const a = rnd() * 6.283, r = Math.sqrt(rnd()) * (R + 4), x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (Math.hypot(x - SAND.x, z - SAND.z) < SAND.r + .6 || Math.hypot(x - POND.x, z - POND.z) < POND.r + .4 || inBuild(x, z, .4) || onPath(x, z)) continue;
+    offs.set([x, H(x, z), z, rnd()], n * 4); n++; }
+  const ig = new THREE.InstancedBufferGeometry().copy(bg); ig.instanceCount = n; ig.setAttribute('aOff', new THREE.InstancedBufferAttribute(offs, 4));
+  const m = new THREE.ShaderMaterial({ side: THREE.DoubleSide, fog: true,
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { c1: { value: new THREE.Color(P.moss) }, c2: { value: new THREE.Color(P.tip) }, base: { value: new THREE.Color(P.gnd) } }]),
+    vertexShader: `#include <fog_pars_vertex>
+      attribute vec4 aOff; uniform float uT; uniform vec3 uPlayer; varying float vH; varying float vR;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+      float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f); return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y); }
+      void main(){ float a = aOff.w * 6.2832, s = .28 + aOff.w * .34; vH = position.y / .9; vR = aOff.w;
+        vec3 p = position * vec3(1., s, 1.); p.xz = mat2(cos(a), -sin(a), sin(a), cos(a)) * p.xz; vec3 w = p + aOff.xyz;
+        float wind = noise(aOff.xz * .07 + vec2(uT * .3, uT * .1)) * 1.1 - .3, k = vH * vH;
+        w.x += (wind * .3 + sin(uT * 2. + aOff.x * .5) * .04) * k; w.z += wind * .14 * k;
+        vec2 d = w.xz - uPlayer.xz; float dl = length(d); w.xz += normalize(d + .0001) * max(0., 1. - dl) * .35 * k;
+        vec4 mvPosition = modelViewMatrix * vec4(w, 1.); gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }`,
+    fragmentShader: `#include <fog_pars_fragment>
+      uniform vec3 c1, c2, base; varying float vH; varying float vR;
+      void main(){ vec3 c = mix(base, mix(c1, c2, vR * .6), smoothstep(0., 1., vH)); gl_FragColor = vec4(c, 1.);
+      #include <fog_fragment>
+      }` });
+  m.uniforms.uT = uT; m.uniforms.uPlayer = uPlayer;
+  const g = new THREE.Mesh(ig, m); g.frustumCulled = false; scene.add(g);
+}
+
+// ── Asset ачаалагч (Kenney CC0) — өндрөөр нь хэмжээ тааруулж, сүүдэр асаана ──
+const loader = new GLTFLoader(), cache = {};
+// Kenney-ийн материалыг палитрт оруулна: агч = accent улаан, хулс = залуу ногоон, их бие = хар хүрэн (арын гэрэлд ч өнгөө алдахгүй)
+const RECOLOR = { leafsFall: new THREE.MeshLambertMaterial({ color: 0xd8462e, emissive: 0x5a120a, emissiveIntensity: .35 }),
+  grass: new THREE.MeshLambertMaterial({ color: 0x8fae4f, emissive: 0x1c2a0c, emissiveIntensity: .3 }), woodBirch: new THREE.MeshLambertMaterial({ color: 0x5a3a2a }) };
+const glb = p => cache[p] ??= new Promise((ok, no) => loader.load('/assets/kenney/' + p, g => ok(g), undefined, no));
+async function put(p, x, z, { h = null, len = null, s = 1, ry = 0, y = null, parent = scene, tint = null } = {}) {
+  try { const g = await glb(p), o = g.scene.clone(true);
+    const sz = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()); o.scale.setScalar(len ? len / Math.max(sz.x, sz.z) : h ? h / sz.y : s);
+    o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; const rc = RECOLOR[m.material.name]; if (rc && p.startsWith('nature/')) m.material = rc; if (tint) { m.material = m.material.clone(); m.material.color.multiply(new THREE.Color(tint)); } } });
+    o.position.set(x, y ?? (parent === scene ? H(x, z) : 0), z); o.rotation.y = ry; parent.add(o); return o;
+  } catch (e) { console.warn('asset', p, e); } }
+
+// ── Зам: чулуун гишгүүр (павильон бүрийг элстэй холбоно) ──
+const stoneM = new THREE.MeshLambertMaterial({ color: 0xb9b2a3 });
+function path(a, b) { PATHS.push([a, b]); const L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.floor(L / 1.25);
+  for (let i = 0; i <= n; i++) { const t = i / n, x = a[0] + (b[0] - a[0]) * t + Math.sin(t * 9) * .25, z = a[1] + (b[1] - a[1]) * t + Math.cos(t * 7) * .25;
+    const s = new THREE.Mesh(new THREE.CylinderGeometry(.42 + rnd() * .15, .5, .16, 8), stoneM); s.position.set(x, H(x, z) + .03, z); s.rotation.y = rnd() * 3; s.receiveShadow = true; scene.add(s); } }
+
+// ── Павильон (кодоор): чулуун суурь, модон шал, багана, цаасан хана (шөнө гэрэлтэнэ), муруй дээвэр ──
+const woodM = new THREE.MeshLambertMaterial({ color: 0x7a4e33 }), woodD = new THREE.MeshLambertMaterial({ color: 0x4a2f22 }), roofM = new THREE.MeshLambertMaterial({ color: 0x3a3d47, side: THREE.DoubleSide });
+const baseM = new THREE.MeshLambertMaterial({ color: 0x9a9384 }), shojiM = new THREE.MeshLambertMaterial({ color: 0xf4efe2, emissive: 0xffb35c, emissiveIntensity: P.lantern ? .75 : 0 });
+const PAV = [];
+function pavilion(key, name, sub, x, z, w, d, ry = 0) {
+  const g = new THREE.Group(); g.position.set(x, H(x, z), z); g.rotation.y = ry; scene.add(g);
+  const sw = Math.abs(Math.sin(ry)) > .5; BUILD.push({ x, z, w: sw ? d + 1.6 : w + 1.6, d: sw ? w + 1.6 : d + 1.6 });
+  const add = (geo, m, px, py, pz, cast = true) => { const o = new THREE.Mesh(geo, m); o.position.set(px, py, pz); o.castShadow = cast; o.receiveShadow = true; g.add(o); return o; };
+  add(new THREE.BoxGeometry(w + 1.2, .5, d + 1.2), baseM, 0, .1, 0);
+  add(new THREE.BoxGeometry(w, .2, d), woodM, 0, .45, 0);
+  add(new THREE.BoxGeometry(1.6, .22, .8), baseM, 0, .12, d / 2 + .9);                                         // гишгүүр
+  const ph = 3.1;
+  for (const px of [-w / 2 + .15, w / 2 - .15]) for (const pz of [-d / 2 + .15, d / 2 - .15]) add(new THREE.BoxGeometry(.24, ph, .24), woodD, px, .55 + ph / 2, pz);
+  add(new THREE.BoxGeometry(w, .22, .24), woodD, 0, .55 + ph, d / 2 - .15); add(new THREE.BoxGeometry(w, .22, .24), woodD, 0, .55 + ph, -d / 2 + .15);
+  // цаасан хана: ар тал, хоёр хажуу (урд нь нээлттэй) — модон тортой
+  const shoji = (sx, sz, len, rot) => { const p = add(new THREE.BoxGeometry(len, ph - .3, .06), shojiM, sx, .55 + (ph - .3) / 2 + .05, sz, false); p.rotation.y = rot;
+    const ax = new THREE.Vector3(Math.cos(rot), 0, -Math.sin(rot));
+    for (let i = 1; i < Math.round(len / .7); i++) { const b = add(new THREE.BoxGeometry(.04, ph - .3, .1), woodD, 0, 0, 0, false); b.position.copy(p.position).addScaledVector(ax, -len / 2 + i * .7); b.rotation.y = rot; }
+    for (const yy of [.9, 1.8]) { const b = add(new THREE.BoxGeometry(len, .04, .1), woodD, 0, 0, 0, false); b.position.copy(p.position); b.position.y = .55 + yy; b.rotation.y = rot; } };
+  shoji(0, -d / 2 + .15, w - .3, 0); shoji(-w / 2 + .15, 0, d - .3, Math.PI / 2); shoji(w / 2 - .15, 0, d - .3, Math.PI / 2);
+  // дээвэр: хип хэлбэр, захаараа дээш эргэсэн (тороор үүсгэнэ)
+  const rw = w + 2.4, rd = d + 2.4, rh = 2.1, y0 = .55 + ph + .1, seg = 12, v = [], idx = [];
+  const hAt = (x, z) => { const t = Math.max(0, Math.min((rw / 2 - Math.abs(x)) / (rd / 2), (rd / 2 - Math.abs(z)) / (rd / 2)));   // 0 = зах, 1 = нуруу
+    return rh * (1 - Math.pow(1 - t, 1.8)) * .85 + (t < .22 ? Math.pow((.22 - t) / .22, 2) * .55 : 0); };          // хотгор налуу + дээш эргэсэн зах
+  for (let i = 0; i <= seg * 2; i++) for (let j = 0; j <= seg * 2; j++) { const x = (i / seg - 1) * rw / 2, z = (j / seg - 1) * rd / 2; v.push(x, y0 + hAt(x, z), z); }
+  for (let i = 0; i < seg * 2; i++) for (let j = 0; j < seg * 2; j++) { const a = i * (seg * 2 + 1) + j, b = a + seg * 2 + 1; idx.push(a, a + 1, b, b, a + 1, b + 1); }
+  const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); rg.setIndex(idx); rg.computeVertexNormals();
+  const roof = new THREE.Mesh(rg, roofM); roof.castShadow = true; g.add(roof);
+  add(new THREE.BoxGeometry(Math.max(.4, rw - rd + .4), .25, .35), woodD, 0, y0 + rh + .05, 0);
+  add(new THREE.BoxGeometry(1.6, .45, .08), woodD, 0, .55 + ph - .45, d / 2 - .05);                            // нэрийн самбар
+  const el = document.createElement('div'); el.className = 'lbl'; el.innerHTML = `${esc(name)}<small>${esc(sub)}</small>`;
+  const lo = new CSS2DObject(el); lo.position.set(0, y0 + rh + 1.1, 0); g.add(lo);
+  const L = new THREE.PointLight(0xffb35c, P.lantern ? 9 : 0, 9, 1.6); L.position.set(0, 2.6, 0); g.add(L);
+  const pv = { key, name, sub, g, x, z, w, d, ry, front: () => g.localToWorld(new THREE.Vector3(0, 0, d / 2 + 1.6)) };
+  PAV.push(pv); return pv;
+}
+
+// ── Чулуун дэнлүү (tōrō) ──
+const lanternM = new THREE.MeshLambertMaterial({ color: 0xa8a191 }), glowM = new THREE.MeshBasicMaterial({ color: P.lantern ? 0xffc27a : 0xe9e1cf });
+let lights = 0;
+function toro(x, z) { const g = new THREE.Group(); g.position.set(x, H(x, z), z);
+  const add = (geo, m, y) => { const o = new THREE.Mesh(geo, m); o.position.y = y; o.castShadow = true; g.add(o); return o; };
+  add(new THREE.CylinderGeometry(.35, .45, .25, 6), lanternM, .12); add(new THREE.CylinderGeometry(.12, .14, .9, 6), lanternM, .7);
+  add(new THREE.CylinderGeometry(.38, .3, .18, 6), lanternM, 1.2); add(new THREE.BoxGeometry(.42, .38, .42), glowM, 1.48);
+  add(new THREE.ConeGeometry(.6, .45, 6), lanternM, 1.9); add(new THREE.SphereGeometry(.09, 6, 4), lanternM, 2.15);
+  if (P.lantern && lights++ < 8) { const L = new THREE.PointLight(0xffb05a, 6, 8, 1.8); L.position.y = 1.5; g.add(L); }
+  scene.add(g); }
+
+// ── Унах навч (агч) / галт хорхой ──
+let leaves, flies;
+function particles() {
+  const n = MOBILE ? 140 : 320; leaves = new THREE.InstancedMesh(new THREE.PlaneGeometry(.16, .12), new THREE.MeshLambertMaterial({ side: THREE.DoubleSide }), n);
+  leaves.userData.p = Array.from({ length: n }, () => ({ x: (rnd() - .5) * 80, y: rnd() * 14, z: (rnd() - .5) * 80, s: .4 + rnd() * .6, r: rnd() * 6 }));
+  for (let i = 0; i < n; i++) leaves.setColorAt(i, new THREE.Color([0xc8432f, 0xe07a3a, 0xd9a441, 0xb5352a][i % 4]));
+  leaves.frustumCulled = false; scene.add(leaves);
+  if (P.lantern) { const m = 180, a = new Float32Array(m * 3); for (let i = 0; i < m; i++) a.set([(rnd() - .5) * 70, .4 + rnd() * 3, (rnd() - .5) * 70], i * 3);
+    flies = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(a, 3)), new THREE.PointsMaterial({ color: 0xfff1a0, size: .16, transparent: true, depthWrite: false }));
+    scene.add(flies); }
+}
+
+// ── Хүн дүр (Kenney Mini Characters, CC0: idle · walk · sprint · sit) ──
+const me = new THREE.Group(); scene.add(me);
+const ANIM = { mixer: null, acts: {}, cur: null };
+function play(n, f = .2) { const a = ANIM.acts[n]; if (!a || ANIM.cur === a) return; a.reset().fadeIn(f).play(); ANIM.cur?.fadeOut(f); ANIM.cur = a; }
+const WK = { x: 0, z: 24, yaw: Math.PI, keys: new Set(), joy: [0, 0], zone: null, sit: false }, cam = { az: Math.PI / 2 + .35, el: .5, dist: 11 };
+
+// ── Барилгууд = Second Brain (PARA) ──
+let DATA = { projects: [], areas: [], inbox: { count: 0, recent: [] }, archive: 0 }, HOME = {};
+const today = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+const panel = html => { $('pc').innerHTML = html; $('panel').classList.add('on'); };
+const ZONES = [];
+async function build() {
+  const pv = {
+    room: pavilion('room', 'Миний өрөө', 'өнөөдөр', 0, -24, 8, 6, 0),
+    proj: pavilion('proj', 'Төслүүд', 'Projects', -24, -6, 7, 5.5, Math.PI / 2),
+    lib: pavilion('lib', 'Номын сан', 'Resources', 24, -6, 7, 5.5, -Math.PI / 2),
+    area: pavilion('area', 'Хүрээ', 'Areas', -21, 20, 6, 5, Math.PI * .8),
+    arch: pavilion('arch', 'Архив', 'Archive', 4, 36, 5, 4, Math.PI),
+  };
+  path([0, -SAND.r - 1], [0, -19.5]); path([-SAND.r - 1, 0], [-19.5, -5]); path([SAND.r + 1, 0], [19.5, -5]);
+  path([-8, 10], [-17, 17]); path([7, 10], [13, 14]); path([2, SAND.r + 1], [4, 31]);
+  makeGrass();
+  const jobs = [];
+  const J = (...a) => jobs.push(put(...a));
+  // элсэн дээрх чулуунууд
+  J('nature/stone_tallA.glb', STONES[0][0], STONES[0][1], { h: 2.6, ry: .4, y: 0 }); J('nature/stone_largeB.glb', STONES[0][0] + 1.4, STONES[0][1] + .6, { h: 1, y: 0 });
+  J('nature/stone_tallC.glb', STONES[1][0], STONES[1][1], { h: 1.8, ry: 1.2, y: 0 }); J('nature/stone_largeD.glb', STONES[2][0], STONES[2][1], { h: 1.1, ry: 2, y: 0 });
+  // дотор тавилга
+  const R0 = pv.room.g;
+  J('furniture/rugRectangle.glb', 0, -.6, { len: 3.2, parent: R0, y: .56 });
+  J('furniture/desk.glb', 0, -1.3, { h: .78, parent: R0, y: .56 }); J('furniture/chairDesk.glb', 0, -.4, { h: 1, parent: R0, y: .56, ry: Math.PI });
+  J('furniture/lampRoundTable.glb', .7, -1.4, { h: .5, parent: R0, y: 1.34 }); J('furniture/books.glb', -.6, -1.35, { h: .25, parent: R0, y: 1.34 });
+  J('furniture/bookcaseOpen.glb', -2.8, -2.3, { h: 2.1, parent: R0, y: .56 }); J('furniture/pottedPlant.glb', 3.1, -2.1, { h: 1.3, parent: R0, y: .56 });
+  for (let i = 0; i < 3; i++) J('furniture/bookcaseOpen.glb', -2.4 + i * 2.4, -2.1, { h: 2.2, parent: pv.lib.g, y: .56 });
+  J('furniture/books.glb', 0, -.2, { h: .3, parent: pv.lib.g, y: .58 }); J('furniture/rugRound.glb', 0, .2, { len: 2.4, parent: pv.lib.g, y: .56 });
+  J('furniture/tableCoffee.glb', 0, -.3, { h: .45, parent: pv.proj.g, y: .56 }); J('furniture/benchCushionLow.glb', 0, 1, { h: .45, parent: pv.proj.g, y: .56 });
+  J('furniture/loungeChairRelax.glb', 0, -.5, { h: 1, parent: pv.area.g, y: .56, ry: Math.PI }); J('furniture/plantSmall2.glb', 1.6, -1.5, { h: .6, parent: pv.area.g, y: .56 });
+  J('nature/pot_large.glb', 0, -.6, { h: 1, parent: pv.arch.g, y: .56 });
+  // цөөрөм: гүүр, сараана, чулуун хүрээ
+  J('nature/bridge_woodRound.glb', POND.x - 2, POND.z, { len: 2 * POND.r + 1, ry: 0, y: -.45 });
+  for (let i = 0; i < 7; i++) { const a = rnd() * 6.28, r = 2 + rnd() * 4.5; J(i % 2 ? 'nature/lily_large.glb' : 'nature/lily_small.glb', POND.x + Math.cos(a) * r, POND.z + Math.sin(a) * r, { h: .08, y: -.32, ry: rnd() * 6 }); }
+  for (let i = 0; i < 12; i++) { const a = i / 12 * 6.28, r = POND.r + .4; J(i % 2 ? 'nature/rock_smallFlatA.glb' : 'nature/rock_smallFlatB.glb', POND.x + Math.cos(a) * r, POND.z + Math.sin(a) * r, { h: .45, ry: rnd() * 6 }); }
+  // агч (улаан) — гол accent · хулс — арын хана · нарс — гүн
+  const maples = [[-10, -14], [10, -15], [-16, 6], [14, 6], [12, 28], [-8, 30], [28, 10], [-30, 8], [30, -18], [-30, -20], [-14, -32], [16, -32], [28, 28]];
+  for (const [x, z] of maples) J(['nature/tree_default_fall.glb', 'nature/tree_oak_fall.glb', 'nature/tree_detailed_fall.glb', 'nature/tree_fat_fall.glb'][Math.floor(rnd() * 4)], x, z, { h: 5 + rnd() * 2.5, ry: rnd() * 6 });
+  for (let i = 0; i < 24; i++) { const a = rnd() * 6.28, r = 14 + rnd() * 26, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (inBuild(x, z, 1) || Math.hypot(x - POND.x, z - POND.z) < POND.r + 1.5 || onPath(x, z)) continue; J('nature/plant_bushDetailed.glb', x, z, { h: .9 + rnd() * .6, ry: rnd() * 6 }); }
+  for (const [x, z] of [[-2, -16], [2, -16], [-15, -3], [15, -3], [-14, 14], [10, 12], [-1.5, 26], [POND.x - 8, POND.z - 4]]) toro(x, z);
+  // гол хаалга (torii) — урд талд, агчны улаантай нэг өнгө
+  { const g = new THREE.Group(), rm = new THREE.MeshLambertMaterial({ color: 0xc8432f }), x = 0, z = 32; g.position.set(x, H(x, z) - .1, z);
+    const add = (geo, m, px, py) => { const o = new THREE.Mesh(geo, m); o.position.set(px, py, 0); o.castShadow = true; g.add(o); };
+    add(new THREE.CylinderGeometry(.22, .26, 4.6, 10), rm, -2, 2.3); add(new THREE.CylinderGeometry(.22, .26, 4.6, 10), rm, 2, 2.3);
+    add(new THREE.BoxGeometry(5.4, .3, .4), rm, 0, 3.7); add(new THREE.BoxGeometry(6.4, .32, .5), woodD, 0, 4.55); scene.add(g); }
+  particles();
+  // дүр
+  try { const g = await glb('chars/character-male-b.glb'), m = g.scene; m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+    const b = new THREE.Box3().setFromObject(m); m.scale.setScalar(1.7 / b.getSize(new THREE.Vector3()).y); me.add(m);
+    ANIM.mixer = new THREE.AnimationMixer(m); for (const c of g.animations) ANIM.acts[c.name] = ANIM.mixer.clipAction(c); play('idle', 0);
+  } catch (e) { console.warn('дүр ачаалагдсангүй', e); me.add(new THREE.Mesh(new THREE.CapsuleGeometry(.28, .9, 4, 8), new THREE.MeshLambertMaterial({ color: 0xc8432f }))); }
+  try { DATA = await (await fetch('/api/garden')).json(); } catch {}
+  try { HOME = await (await fetch('/api/home')).json(); } catch {}
+  // идэвхтэй төсөл бүр — Төслийн павильонд улаан дарцаг
+  DATA.projects.filter(p => p.status === 'active').slice(0, 8).forEach((p, i) => { const flag = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, 1.6, 5), woodD); pole.position.y = .8; flag.add(pole);
+    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(.35, .9), new THREE.MeshLambertMaterial({ color: 0xc8432f, side: THREE.DoubleSide })); cloth.position.set(.18, 1.1, 0); flag.add(cloth);
+    flag.position.set(-2.6 + i * .75, .56, -1.9); pv.proj.g.add(flag); });
+  ZONES.push(
+    { name: 'Миний өрөө', sub: 'өнөөдрийн урсгал', p: pv.room, go: async () => { panel('<h2>Миний өрөө</h2><p class="sub">Ачаалж байна…</p>');
+        try { const d = await (await fetch('/api/day?d=' + today)).json();
+          panel(`<h2>Өнөөдөр</h2><p class="sub">${esc(d.date)} · ширээн дээр</p>` + (d.tasks?.length ? '<p><b>Дууссан ажил</b></p><ul>' + d.tasks.map(t => `<li>${esc(t)}</li>`).join('') + '</ul>' : '')
+            + '<p><b>Өдрийн урсгал</b></p><ul>' + (d.log || []).slice(-12).reverse().map(l => `<li><small>${esc(l.t)}</small> ${esc(l.actor)} — ${esc(String(l.text).slice(0, 90))}</li>`).join('') + '</ul><p><a href="/khuvsgul#spiral">Өдрийн спираль →</a></p>');
+        } catch { panel('<h2>Миний өрөө</h2><p>Өгөгдөл ачаалж чадсангүй.</p>'); } } },
+    { name: 'Төслүүд', sub: `${DATA.projects.length} төсөл`, p: pv.proj, go: () => panel(`<h2>Төслүүд</h2><p class="sub">02-Projects · идэвхтэй нь улаан дарцагтай</p><ul>`
+        + DATA.projects.map(p => `<li><span class="st ${esc(p.status)}">${esc(p.status)}</span>${esc(p.name)}</li>`).join('') + '</ul>') },
+    { name: 'Номын сан', sub: `${HOME.library?.atoms ?? '…'} атом`, p: pv.lib, go: () => { const L = HOME.library || {};
+        panel(`<h2>Номын сан</h2><p class="sub">04-Resources · ${L.atoms ?? 0} атом · ${L.decisions ?? 0} шийдвэр · ${L.research ?? 0} судалгаа</p><p><b>Сүүлд нэмэгдсэн</b></p><ul>`
+          + (L.recent || []).map(t => `<li>${esc(t.replace(/^\d{4}-\d\d-\d\d - /, ''))}</li>`).join('') + '</ul><p><a href="/gallery">Gallery →</a> · <a href="/hall?topics=1">POV танхим →</a></p>'); } },
+    { name: 'Хүрээ', sub: `${DATA.areas.length} хүрээ`, p: pv.area, go: () => panel(`<h2>Хүрээ</h2><p class="sub">03-Areas · үргэлжилдэг хариуцлага</p><ul>` + DATA.areas.map(a => `<li>${esc(a)}</li>`).join('') + '</ul>') },
+    { name: 'Архив', sub: `${DATA.archive} хавтас`, p: pv.arch, go: () => panel(`<h2>Архив</h2><p class="sub">99-Archive · ${DATA.archive} хавтас</p><p>Дууссан зүйлс энд амарна.</p>`) },
+    { name: 'Цөөрөм', sub: `Inbox · ${DATA.inbox.count}`, x: POND.x, z: POND.z, r: POND.r + 2.2, go: () => panel(`<h2>Цөөрөм · Inbox</h2><p class="sub">01-GTD/Inbox · ${DATA.inbox.count} note хөвж байна</p><ul>`
+        + DATA.inbox.recent.map(t => `<li>${esc(t)}</li>`).join('') + '</ul>') },
+    { name: 'Элсэн цэцэрлэг', sub: 'бясалгах', x: 0, z: 0, r: SAND.r + 1.5, go: () => { WK.sit = !WK.sit; if (WK.sit) panel('<h2>Бясалгал</h2><p class="sub">Амьсгаа аваад, элсний ховилыг даган бод.</p><p><small>E эсвэл алхаад босно</small></p>'); else $('panel').classList.remove('on'); } },
+  );
+  for (const z of ZONES) if (z.p) { const f = z.p.front(); z.x = f.x; z.z = f.z; z.r = 3.4; }
+  await Promise.all(jobs);
+  // 2-р шат: холын хулс, нарсыг дэлгэц нээгдсэний дараа ачаална (эхний ачаалал хурдан)
+  requestAnimationFrame(() => {
+  for (let i = 0; i < 70; i++) { const a = -Math.PI * .95 + rnd() * Math.PI * .9, r = 36 + rnd() * 7; put(rnd() < .5 ? 'nature/crops_bambooStageB.glb' : 'nature/crops_bambooStageA.glb', Math.cos(a) * r, Math.sin(a) * r, { h: 6 + rnd() * 4, ry: rnd() * 6 }); }
+  for (let i = 0; i < 26; i++) { const a = rnd() * 6.28, r = 42 + rnd() * 10; put('nature/tree_cone_dark.glb', Math.cos(a) * r, Math.sin(a) * r, { h: 8 + rnd() * 5, ry: rnd() * 6 }); }
+  });
+  $('load').style.opacity = 0; setTimeout(() => $('load').remove(), 900);
+}
+
+// ── Оролт (кирилл гар дээр ч товчны байрлалаар) ──
+const keyOf = e => ({ KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', KeyE: 'e', ShiftLeft: 'shift', ShiftRight: 'shift', ArrowUp: 'arrowup', ArrowDown: 'arrowdown', ArrowLeft: 'arrowleft', ArrowRight: 'arrowright', Escape: 'escape' })[e.code] || e.key.toLowerCase();
+addEventListener('keydown', e => { const k = keyOf(e);
+  if (k === 'e' && WK.zone) return WK.zone.go(); if (k === 'escape') return $('panel').classList.remove('on');
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(k)) { WK.keys.add(k); e.preventDefault(); if (k !== 'shift') WK.sit = false; } });
+addEventListener('keyup', e => WK.keys.delete(keyOf(e))); addEventListener('blur', () => WK.keys.clear());
+$('px').onclick = () => $('panel').classList.remove('on'); $('hint').onclick = () => WK.zone?.go();
+$('hmin').onclick = () => { const m = $('hud').classList.toggle('min'); $('hmin').textContent = m ? '+' : '–'; };
+{ let drag = null; renderer.domElement.addEventListener('pointerdown', e => drag = [e.clientX, e.clientY]); addEventListener('pointerup', () => drag = null);
+  addEventListener('pointermove', e => { if (!drag || e.target !== renderer.domElement) return; cam.az -= (e.clientX - drag[0]) * .006; cam.el = THREE.MathUtils.clamp(cam.el + (e.clientY - drag[1]) * .004, .12, 1.15); drag = [e.clientX, e.clientY]; });
+  renderer.domElement.addEventListener('wheel', e => { cam.dist = THREE.MathUtils.clamp(cam.dist * (1 + Math.sign(e.deltaY) * .1), 4, 40); }, { passive: true }); }
+if (matchMedia('(pointer: coarse)').matches) $('joy').classList.add('touch');
+{ const Jy = $('joy'), K = Jy.querySelector('i'); let id = null;
+  const mv = e => { const r = Jy.getBoundingClientRect(); let dx = e.clientX - r.left - 60, dy = e.clientY - r.top - 60; const l = Math.hypot(dx, dy); if (l > 44) { dx *= 44 / l; dy *= 44 / l; }
+    K.style.transform = `translate(${dx}px,${dy}px)`; WK.joy = [dx / 44, dy / 44]; if (l > 8) WK.sit = false; };
+  Jy.addEventListener('pointerdown', e => { id = e.pointerId; Jy.setPointerCapture(id); mv(e); }); Jy.addEventListener('pointermove', e => { if (e.pointerId === id) mv(e); });
+  const up = () => { id = null; WK.joy = [0, 0]; K.style.transform = ''; }; Jy.addEventListener('pointerup', up); Jy.addEventListener('pointercancel', up); }
+
+// ── Post: bloom (дэнлүү, цаасан хана) + дулаан өнгө, vignette ──
+const composer = new EffectComposer(renderer); composer.addPass(new RenderPass(scene, camera));
+// DoF: дүр дээр фокуслаж, ойр/холыг бүдгэрүүлнэ → жижиг diorama (tilt-shift) мэдрэмж
+const bokeh = new BokehPass(scene, camera, { focus: 11, aperture: .0022, maxblur: .007 }); bokeh.enabled = HIGH && !REDUCED; composer.addPass(bokeh);
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), P.bloom, .6, .82); bloomPass.enabled = HIGH; composer.addPass(bloomPass);
+composer.addPass(new ShaderPass({ uniforms: { tDiffuse: { value: null }, warm: { value: NIGHT ? -.02 : .012 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float warm; varying vec2 vUv;
+    void main(){ vec4 c = texture2D(tDiffuse, vUv); c.rgb += vec3(warm, warm * .4, -warm);
+      float v = smoothstep(.95, .35, length(vUv - .5) * 1.25); c.rgb *= mix(.78, 1., v); gl_FragColor = c; }` }));
+composer.addPass(new OutputPass());
+const smaa = new SMAAPass(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio()); smaa.enabled = HIGH; composer.addPass(smaa);
+
+function size() { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); labels.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+size(); addEventListener('resize', size);
+const clock = new THREE.Clock(), V = new THREE.Vector3(), ONE = new THREE.Vector3(1, 1, 1), M4 = new THREE.Matrix4(), Qn = new THREE.Quaternion(), E = new THREE.Euler(); let fr = 0, last = performance.now();
+const blocked = (x, z) => Math.hypot(x - POND.x, z - POND.z) < POND.r - .2 && !(Math.abs(z - POND.z) < 1.2 && Math.abs(x - POND.x + 2) < POND.r)   // гүүрээр гарна
+  || Math.hypot(x, z) > R - 3 || STONES.some(s => Math.hypot(x - s[0], z - s[1]) < s[2] * .75);
+window.garden = { WK, cam, ZONES, PAV, scene, bokeh, QUALITY };
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime; uT.value = REDUCED ? 0 : t;
+  const K = WK.keys; let f = (K.has('w') || K.has('arrowup') ? 1 : 0) - (K.has('s') || K.has('arrowdown') ? 1 : 0), r = (K.has('d') || K.has('arrowright') ? 1 : 0) - (K.has('a') || K.has('arrowleft') ? 1 : 0);
+  if (WK.joy[0] || WK.joy[1]) { f = -WK.joy[1]; r = WK.joy[0]; }
+  const fx = -Math.cos(cam.az), fz = -Math.sin(cam.az), rx = -fz, rz = fx;
+  let mx = fx * f + rx * r, mz = fz * f + rz * r; const l = Math.hypot(mx, mz), moving = l > .05 && !WK.sit, run = moving && (K.has('shift') || (l > .9 && (WK.joy[0] || WK.joy[1])));
+  if (moving) { const sp = (run ? 5.2 : 2.1) * Math.min(1, l); mx /= l; mz /= l; const nx = WK.x + mx * sp * dt, nz = WK.z + mz * sp * dt;
+    if (!blocked(nx, nz)) { WK.x = nx; WK.z = nz; } else if (!blocked(nx, WK.z)) WK.x = nx; else if (!blocked(WK.x, nz)) WK.z = nz;
+    const ty = Math.atan2(mx, mz); let d = ty - WK.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); WK.yaw += d * Math.min(1, dt * 10); }
+  if (ANIM.mixer) { play(WK.sit ? 'sit' : moving ? (run ? 'sprint' : 'walk') : 'idle'); ANIM.mixer.update(dt); }
+  const inside = BUILD.some(b => Math.abs(WK.x - b.x) < b.w / 2 - .8 && Math.abs(WK.z - b.z) < b.d / 2 - .8);
+  const onBridge = Math.abs(WK.z - POND.z) < 1.2 && Math.abs(WK.x - POND.x + 2) < POND.r;
+  const y = onBridge ? Math.max(H(WK.x, WK.z), .35 + Math.cos((WK.x - POND.x + 2) / POND.r * 1.57) * .9) : H(WK.x, WK.z) + (inside ? .55 : 0);
+  me.position.set(WK.x, y, WK.z); me.rotation.y = WK.yaw; uPlayer.value.set(WK.x, y, WK.z);
+  V.set(WK.x + Math.cos(cam.az) * Math.cos(cam.el) * cam.dist, y + 1.2 + Math.sin(cam.el) * cam.dist, WK.z + Math.sin(cam.az) * Math.cos(cam.el) * cam.dist);
+  V.y = Math.max(V.y, H(V.x, V.z) + 1); camera.position.lerp(V, Math.min(1, dt * 5)); camera.lookAt(WK.x, y + 1.1, WK.z);
+  sun.position.set(WK.x + P.dir[0], P.dir[1], WK.z + P.dir[2]); sun.target.position.set(WK.x, 0, WK.z);
+  if (!REDUCED) {
+    if (leaves) { const lp = leaves.userData.p; for (let i = 0; i < lp.length; i++) { const p = lp[i]; p.y -= dt * .55 * p.s; p.x += Math.sin(t * .7 + i) * dt * .5 + dt * .35; p.z += Math.cos(t * .5 + i) * dt * .3; p.r += dt * 2 * p.s;
+        if (p.y < H(p.x, p.z) + .05) { p.y = 10 + rnd() * 6; p.x = WK.x + (rnd() - .5) * 60; p.z = WK.z + (rnd() - .5) * 60; }
+        Qn.setFromEuler(E.set(p.r, p.r * .7, p.r * .3)); M4.compose(V.set(p.x, p.y, p.z), Qn, ONE); leaves.setMatrixAt(i, M4); }
+      leaves.instanceMatrix.needsUpdate = true; }
+    if (flies) { const a = flies.geometry.attributes.position.array; for (let i = 0; i < a.length; i += 3) { a[i] += Math.sin(t * .6 + i) * .01; a[i + 1] += Math.cos(t * .9 + i * .7) * .006; }
+      flies.geometry.attributes.position.needsUpdate = true; flies.material.opacity = .6 + Math.sin(t * 3) * .35; }
+    for (let i = 0; i < KOI; i++) { const k = koi[i]; k.a += k.v * dt; const x = POND.x + Math.cos(k.a) * k.r, z = POND.z + Math.sin(k.a) * k.r;
+      Qn.setFromAxisAngle(V.set(0, 1, 0), -k.a - Math.sign(k.v) * Math.PI / 2 + Math.sin(t * 6 + i) * .15); M4.compose(V.set(x, -.48, z), Qn, ONE); koiM.setMatrixAt(i, M4); }
+    koiM.instanceMatrix.needsUpdate = true;
+  }
+  let best = null, bd = Infinity; for (const z of ZONES) { const d = Math.hypot(z.x - WK.x, z.z - WK.z); if (d < z.r && d < bd) { bd = d; best = z; } }
+  if (best !== WK.zone) { WK.zone = best; const h = $('hint'); if (best) { h.innerHTML = `<b>E</b>${esc(best.name)} · ${esc(best.sub)}`; h.style.display = 'block'; } else h.style.display = 'none'; }
+  if (bokeh.enabled) bokeh.uniforms.focus.value = camera.position.distanceTo(me.position) + .5;
+  composer.render(); labels.render(scene, camera);
+  fr++; const now = performance.now(); if (now - last >= 1000) { $('fps').textContent = Math.round(fr * 1000 / (now - last)) + ' fps'; fr = 0; last = now; }
+});
+build().catch(e => { $('load').textContent = 'Алдаа: ' + e.message; console.error(e); });
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>

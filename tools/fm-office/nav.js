@@ -4,10 +4,14 @@
   const PAGES = [
     ['/', 'Нүүр', 'Second Brain'],
     ['/home', 'Гэр', 'Second Brain мини хот'],
+    ['/khuvsgul', 'Хөвсгөл', 'миний эрэг · Second Brain'],
+    ['/garden', 'Цэцэрлэг', 'суугаад ажиллах'],
     ['/gallery', 'Gallery', 'сэдвээр reference'],
     ['/fpv', 'Gallery FPV', 'алхаж үзэх'],
     ['/hall?topics=1', 'POV танхим', 'YouTube · highlight → атом'],
-    ['/spiral', 'Өдрийн спираль', 'өдөр бүр'],
+    
+    ['/office25d', 'Агентын оффис', '2.5D · алхдаг агентууд'],
+    ['/control', 'Удирдлагын өрөө', 'агентууд · agent tree'],
     ['/campus', 'Оффис', 'байгууллагын кампус'],
     ['/map', 'Хот', 'газрын зураг'],
     ['/calendar', 'Цаглабар', 'календарь'],

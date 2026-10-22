@@ -2,6 +2,7 @@
 
 days(vault)       → [{date, counts:{domain:n}, total, daily}]  (хамгийн эртний логоос өнөөдөр хүртэл)
 day(vault, date)  → {date, log:[{t,actor,domain,text}], atoms:[…], tasks:[…], daily:{title,lines}}
+full(vault)       → [{date, log, atoms, tasks, daily(bool)}] — спиралийн бүх цэг нэг удаа (Ross маягийн спираль)
 Хувийн (`private: true`) task, санхүүгийн хэсэг тоологдохгүй.
 """
 import re
@@ -98,3 +99,65 @@ def day(vault, ds):
         raise ValueError("огноо буруу")
     return {"date": ds, "log": _log_lines(vault, ds), "atoms": sorted(_atoms_by_day(vault).get(ds, [])),
             "tasks": sorted(_tasks_by_day(vault).get(ds, [])), "daily": _daily(vault, ds)}
+
+
+PROJ = re.compile(r"02-Projects/([^/\]|]+)")
+
+
+def full(vault, today=None):
+    """Өдөр бүрийн бүх лог мөр + атом + task. Мөр бүрт `project` (утас холбох) тодорхойлно."""
+    out, atoms, tasks = [], _atoms_by_day(vault), _tasks_by_day(vault)
+    for d in days(vault, today=today)["days"]:
+        ds = d["date"]; log = _log_lines(vault, ds)
+        for it in log:
+            m = PROJ.search(it["text"]) or (re.search(r"📁\s*([^·(]+)", it["actor"]))
+            it["project"] = (m.group(1).strip() if m else "")
+            if it["project"].lower() in ("project", "projects"): it["project"] = ""
+        out.append({"date": ds, "log": log, "atoms": sorted(atoms.get(ds, [])), "tasks": sorted(tasks.get(ds, [])), "daily": d["daily"]})
+    return out
+
+
+WIKI = re.compile(r"\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]")
+
+
+def _targets(text):
+    return {Path(m.group(1).strip()).name for m in WIKI.finditer(text)}
+
+
+def life(vault, today=None):
+    """Амьдралын спираль: өдөр бүрийн бүх цэг + «өнгөрснөөс → өнөөдөр» холбоос.
+
+    items: [{id, date, kind: log|atom|task, domain, t, text, project}]
+    edges: [[src_id, dst_id, days]] — dst (шинэ) нь src (хуучин) руу [[wikilink]]-ээр холбогдсон, days = хугацааны зөрүү.
+    Хувийн (`private: true`) note-ууд орохгүй.
+    """
+    root = Path(vault)
+    items, by_name = [], {}
+    for d in full(vault, today=today):
+        ds = d["date"]
+        for i, l in enumerate(d["log"]):
+            items.append({"id": f"L{ds}:{i}", "date": ds, "kind": "log", "domain": l["domain"], "t": l["t"], "actor": l["actor"],
+                          "text": l["text"], "project": l.get("project", ""), "_links": _targets(l["text"])})
+        for a in d["atoms"]:
+            it = {"id": f"A:{a}", "date": ds, "kind": "atom", "domain": "atom", "t": "", "text": re.sub(r"^\d{4}-\d\d-\d\d - ", "", a), "project": "", "_links": set()}
+            items.append(it); by_name[a] = it
+        for tk in d["tasks"]:
+            it = {"id": f"T:{tk}", "date": ds, "kind": "task", "domain": "task", "t": "", "text": tk, "project": "", "_links": set()}
+            items.append(it); by_name[tk] = it
+    atom_files = {p.stem: p for p in (root / "04-Resources/Atomic").rglob("*.md")} if (root / "04-Resources/Atomic").is_dir() else {}
+    for name, it in by_name.items():
+        p = atom_files.get(name) or (root / "01-GTD/Tasks" / f"{name}.md")
+        if p.is_file():
+            txt = p.read_text(encoding="utf-8", errors="ignore")
+            it["_links"] = _targets(txt) - {name}
+            m = re.search(r"^projects?:.*?02-Projects/([^/\]|]+)", txt[:1500], re.M)
+            if m:
+                it["project"] = m.group(1).strip()
+    edges = []
+    for it in items:
+        for tg in it.pop("_links"):
+            src = by_name.get(tg)
+            if src and src["date"] < it["date"]:
+                gap = (date.fromisoformat(it["date"]) - date.fromisoformat(src["date"])).days
+                edges.append([src["id"], it["id"], gap])
+    return {"items": items, "edges": edges}

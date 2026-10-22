@@ -40,6 +40,11 @@
   .mini { position:absolute; top:8px; right:8px; width:24px; height:24px; border:1px solid var(--line); background:#fff; cursor:pointer; font:600 14px/1 "Inter Tight", sans-serif; padding:0; }
   .hud, .panel, .clients { position:fixed; } .hud.min > :not(.eb):not(h1):not(.mini) { display:none; } .hud.min h1 { margin-bottom:0; }
   .panel.min #pc > :not(h2) { display:none; } .clients.min > :not(h2):not(.mini) { display:none; }
+  #walkhint { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:6; display:none; padding:8px 14px; background:#1A1A1A; color:#fff; font:500 13px "Inter Tight", sans-serif; cursor:pointer; }
+  #walkhint b { display:inline-block; min-width:18px; margin-right:8px; padding:1px 5px; background:#D6453D; text-align:center; }
+  #joy { position:fixed; left:24px; bottom:24px; width:120px; height:120px; border:1px solid #1A1A1A; border-radius:50%; background:rgba(255,255,255,.55); z-index:6; display:none; touch-action:none; }
+  #joy i { position:absolute; left:40px; top:40px; width:40px; height:40px; border-radius:50%; background:#1A1A1A; }
+  body.walking #joy.touch { display:block; }
   #fade { position:fixed; inset:0; background:var(--paper); opacity:0; pointer-events:none; z-index:5; }
   @media (max-width:700px) { .hud { width:auto; right:20px; } .hud p { display:none; } .panel { top:auto; bottom:16px; max-height:45vh; } }
 </style>
@@ -53,16 +58,19 @@
 <div class="hud">
   <button class="mini" data-min title="Хураах">–</button><div class="eb">Гэр · мини хот</div>
   <h1>Миний гудамж</h1>
-  <p>Гэрийн орчмын бодит 5 км. Чирж эргүүлж, дугуйгаар ойртуулна.</p>
+  <p>Гэрийн орчмын бодит 5 км. Чирж эргүүлж, дугуйгаар ойртуулна. F = алхах (WASD, Shift гүйх, E орох, Esc гарах).</p>
   <div class="lbl2">Байгууламж</div>
-  <div class="row"><button data-go="home">Гэр</button><button data-go="gallery">Gallery</button><button data-go="library">Номын сан</button><button data-go="park">Цэцэрлэг</button><button data-go="all">Хот</button><button id="cbtn">Харилцагч</button></div>
+  <div class="row"><button data-go="home">Гэр</button><button data-go="gallery">Gallery</button><button data-go="library">Номын сан</button><button data-go="park">Цэцэрлэг</button><button data-go="all">Хот</button><button id="cbtn">Харилцагч</button><button id="wbtn" title="WASD · E · Esc">Алхах</button></div>
   <div class="lbl2">Уур амьсгал</div>
   <div id="wx" style="font-size:12.5px;margin-top:6px">Улаанбаатар · цаг агаар ачаалж байна…</div>
   <div class="row" id="moods"><button data-m="live" class="on">● Бодит</button><button data-m="day">Өдөр</button><button data-m="autumn">Намар</button><button data-m="overcast">Бүрхэг</button><button data-m="rain">Бороо</button><button data-m="dusk">Үдэш</button><button data-m="snow">Цас</button><button data-m="night">Шөнө</button></div>
+  <div id="sunctl" style="margin-top:8px;font-size:12px"><label style="display:flex;gap:8px;align-items:center">☀ Нар <input id="sunh" type="range" min="0" max="23.98" step=".0167" style="flex:1"><b id="sunv">одоо</b></label>
+    <div class="row" id="sunq"><button data-h="6.5">Үүр</button><button data-h="9">Өглөө</button><button data-h="13">Үд</button><button data-h="18">Орой</button><button data-h="22.5">Шөнө</button><button data-h="now" class="on">Одоо</button></div></div>
   <div class="row"><button class="go" id="office">Оффис руу →</button></div>
 </div>
 <aside class="clients" id="clients"></aside>
 <aside class="panel" id="panel"><button class="x" id="px">Хаах</button><button class="mini" data-min title="Хураах" style="right:64px">–</button><div id="pc"></div></aside>
+<div id="walkhint"></div><div id="joy"><i></i></div>
 <div class="attr">© OpenStreetMap contributors</div>
 <div id="haze" style="position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;transition:opacity 1.5s;background:radial-gradient(ellipse at 50% 40%, rgba(150,138,118,.35), rgba(120,108,92,.75))"></div>
 <div id="fps"></div><div id="fade"></div>
@@ -463,10 +471,18 @@ function applyMood(m, instant, P = MOODS[m]) {
   rain.visible = !!(P.rain || P.snowfall); rain.userData.snow = !!P.snowfall;
   rain.material.color.set(P.snowfall ? 0xffffff : 0xdfe8f5); rain.material.opacity = P.snowfall ? .9 : .55;
 }
-document.querySelectorAll('#moods button').forEach(b => b.onclick = () => { if (b.dataset.m === 'live') return startLive(); live = false; applyMood(b.dataset.m); setSun(null); });
+document.querySelectorAll('#moods button').forEach(b => b.onclick = () => { if (b.dataset.m === 'live') return startLive(); live = false; MOOD_FIX = b.dataset.m; applyMood(b.dataset.m); setSun(CITY_H == null ? null : sunPos(cityNow(), (OSM?.center || [47.9])[0], (OSM?.center || [0, 106.9])[1])); });
 
 // ---------- БОДИТ ЦАГ: Улаанбаатарын цаг + нарны байрлал + одоогийн цаг агаар (Open-Meteo) ----------
-let live = true, WX = null;
+let live = true, WX = null, CITY_H = null, MOOD_FIX = null;
+const cityNow = () => { if (CITY_H == null) return new Date(); const d = new Date(Date.now() + 8 * 36e5); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) + (CITY_H - 8) * 36e5); };
+function setCityH(h) { CITY_H = h; const n = new Date(cityNow().getTime() + 8 * 36e5), hh = n.getUTCHours() + n.getUTCMinutes() / 60;
+  $('sunh').value = hh; $('sunv').textContent = (h == null ? 'одоо ' : '') + String(n.getUTCHours()).padStart(2, '0') + ':' + String(n.getUTCMinutes()).padStart(2, '0');
+  document.querySelectorAll('#sunq button').forEach(b => b.classList.toggle('on', (b.dataset.h === 'now') === (h == null) && (h == null || +b.dataset.h === h)));
+  if (live) liveTick(true); else { applyMood(MOOD_FIX || mood); setSun(sunPos(cityNow(), (OSM?.center || [47.9])[0], (OSM?.center || [0, 106.9])[1])); } }
+$('sunh').oninput = e => setCityH(+e.target.value);
+document.querySelectorAll('#sunq button').forEach(b => b.onclick = () => setCityH(b.dataset.h === 'now' ? null : +b.dataset.h));
+setTimeout(() => setCityH(null), 0);
 function sunPos(date, lat, lon) {                              // NOAA-ийн хялбаршуулсан томьёо → өндөр, азимут (градус)
   const rad = Math.PI / 180, d = (date - Date.UTC(date.getUTCFullYear(), 0, 0)) / 864e5, g = 2 * Math.PI / 365 * (d - 1 + (date.getUTCHours() - 12) / 24);
   const eq = 229.18 * (.000075 + .001868 * Math.cos(g) - .032077 * Math.sin(g) - .014615 * Math.cos(2 * g) - .040849 * Math.sin(2 * g));
@@ -488,10 +504,10 @@ function blend(A, B, t) {                                      // хоёр уу�
   for (const k of ['sun', 'hemi', 'lit']) o[k] = A[k] + (B[k] - A[k]) * t;
   o.night = t > .5; o.shadow = A.shadow && t < .7; o.shade = t > .5 ? B.shade : A.shade; return o;
 }
-async function liveTick() {
+async function liveTick(noFetch) {
   if (!live || !OSM) return;
-  try { WX = await (await fetch('/api/weather')).json(); } catch {}
-  const now = new Date(), c = OSM.center || [47.9, 106.9], sp = sunPos(now, c[0], c[1]), month = new Date(now.getTime() + 8 * 36e5).getUTCMonth() + 1;
+  if (!noFetch || !WX) try { WX = await (await fetch('/api/weather')).json(); } catch {}
+  const now = cityNow(), c = OSM.center || [47.9, 106.9], sp = sunPos(now, c[0], c[1]), month = new Date(now.getTime() + 8 * 36e5).getUTCMonth() + 1;
   const k = WX?.kind || 'clear';
   let base = k === 'snow' ? 'snow' : (k === 'rain' || k === 'storm') ? 'rain' : (k === 'overcast' || k === 'fog') ? 'overcast'
     : (month === 9 || month === 10) ? 'autumn' : 'day';
@@ -542,7 +558,7 @@ function showPanel(name) {
   if (name === 'gallery') pc.innerHTML = `<h2>Gallery</h2><p><a href="/gallery">Тор харах →</a> · <a href="/fpv">Алхаж үзэх</a></p><ul>` +
     HOME.topics.map(t => `<li><a href="/gallery?topic=${encodeURIComponent(t.name)}">${esc(t.name)}</a> <small>${t.count}</small></li>`).join('') + '</ul>';
   else if (name === 'library') pc.innerHTML = L ? `<h2>Номын сан</h2><span class="stat"><b>${L.atoms}</b><small>атом</small></span><span class="stat"><b>${L.decisions}</b><small>шийдвэр</small></span>
-    <span class="stat"><b>${L.research}</b><small>судалгаа</small></span><p><small>Сүүлд нэмэгдсэн</small></p><ul>${L.recent.map(t => `<li>${esc(t.replace(/^\d{4}-\d\d-\d\d - /, ''))}</li>`).join('')}</ul><p><a href="/spiral">Өдрийн спираль →</a></p>` : '<h2>Номын сан</h2>';
+    <span class="stat"><b>${L.research}</b><small>судалгаа</small></span><p><small>Сүүлд нэмэгдсэн</small></p><ul>${L.recent.map(t => `<li>${esc(t.replace(/^\d{4}-\d\d-\d\d - /, ''))}</li>`).join('')}</ul><p><a href="/khuvsgul#spiral">Өдрийн спираль →</a></p>` : '<h2>Номын сан</h2>';
   else if (name === 'park') pc.innerHTML = '<h2>Цэцэрлэг</h2><p>Гэрийн ойрын хамгийн том ногоон байгууламж — амрах, бодох орон зай.</p>';
   else if (name === 'home') pc.innerHTML = '<h2>Гэр</h2><p>Миний байр. Эндээс бүх зүйл эхэлнэ.</p><p><a href="/">Нүүр хуудас →</a></p>';
   else { $('panel').classList.remove('on'); return; }
@@ -570,9 +586,77 @@ composer.addPass(poster); composer.addPass(new OutputPass());
 function sizeAll() { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); labels.setSize(innerWidth, innerHeight); frustum();
   poster.uniforms.uRes.value.set(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio()); }
 sizeAll(); addEventListener('resize', sizeAll);
+// ── Алхагч дүр: WASD/сум, гуравдагч биеийн дагах камер, утсанд joystick, Zone дээр «E» ──
+const WK = { on: false, x: 0, z: 0, yaw: 0, keys: new Set(), joy: [0, 0], zone: null };
+const walker = new THREE.Group();
+{ const mB = new THREE.MeshToonMaterial({ color: 0xd6453d }), mH = new THREE.MeshToonMaterial({ color: 0xf4f4f2 });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(1.1, 2.4, 4, 10), mB); body.position.y = 2.3;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.85, 12, 10), mH); head.position.y = 5;
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(.5, .35, .35), mB); nose.position.set(.85, 5, 0);
+  for (const m of [body, head, nose]) { m.castShadow = true; walker.add(m); } }
+walker.scale.setScalar(1.6); walker.visible = false; scene.add(walker);
+const WALK_V = 9, RUN_V = 22;                                   // м/с (Shift = гүйх)
+function zonesNow() {                                           // Zone = харилцагчийн барилга + байгууламжууд
+  return [...CL.map((c, i) => ({ name: c.name, sub: c.org, x: c.x, z: c.z, r: 34 + (c.bd ? Math.sqrt(c.bd[5]) / 2 : 0), go: () => goClient(i) })),
+    ...Object.entries(places).filter(([n]) => n !== 'all').map(([n, p]) => ({ name: p.d?.firstChild?.textContent || n, x: p.x, z: p.z, r: 30, go: () => showPanel(n) }))];
+}
+function walkStart() {
+  const h = special.home ? special.home[3] : { x: 0, y: 0 };
+  if (!WK.x && !WK.z) {                                         // гэрийн хамгийн ойрын замаас эхэлнэ (барилга дотор биш)
+    let best = Infinity; WK.x = h.x + 18; WK.z = h.y + 18;
+    for (const rd of OSM.roads) for (let i = 1; i + 1 < rd.length; i += 2) { const d = Math.hypot(rd[i] - h.x, rd[i + 1] - h.y); if (d < best) { best = d; WK.x = rd[i]; WK.z = rd[i + 1]; } } }
+  WK.on = true; walker.visible = true; document.body.classList.add('walking'); $('wbtn').classList.add('on');
+  controls.enablePan = false; controls.minZoom = 2; controls.minPolarAngle = .7;
+  gsap.to(camera, { zoom: 4.5, duration: REDUCED ? 0 : 1, onUpdate: () => camera.updateProjectionMatrix() });
+  $('panel').classList.remove('on');
+}
+function walkStop() {
+  WK.on = false; walker.visible = false; document.body.classList.remove('walking'); $('wbtn').classList.remove('on'); $('walkhint').style.display = 'none'; WK.zone = null;
+  controls.enablePan = true; controls.minZoom = .055; controls.minPolarAngle = .45;
+}
+$('wbtn').onclick = () => WK.on ? walkStop() : walkStart();
+const keyOf = e => ({ KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', KeyE: 'e', KeyF: 'f', ShiftLeft: 'shift', ShiftRight: 'shift', ArrowUp: 'arrowup', ArrowDown: 'arrowdown', ArrowLeft: 'arrowleft', ArrowRight: 'arrowright', Escape: 'escape' })[e.code] || e.key.toLowerCase();   // кирилл гар дээр ч ажиллана
+const typing = e => /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable;
+addEventListener('keydown', e => {
+  if (typing(e)) return; const k = keyOf(e);
+  if (!WK.on) { if (k === 'f') walkStart(); return; }
+  if (k === 'escape') return walkStop();
+  if (k === 'e' && WK.zone) { WK.zone.go(); return; }
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(k)) { WK.keys.add(k); e.preventDefault(); }
+});
+addEventListener('keyup', e => WK.keys.delete(keyOf(e)));
+addEventListener('blur', () => WK.keys.clear());
+$('walkhint').onclick = () => WK.zone?.go();
+// утасны joystick (хуруугаар хүрдэг төхөөрөмж дээр л харагдана)
+if (matchMedia('(pointer: coarse)').matches) $('joy').classList.add('touch');
+{ const J = $('joy'), Kn = J.querySelector('i'); let id = null;
+  const mv = e => { const r = J.getBoundingClientRect(); let dx = e.clientX - r.left - 60, dy = e.clientY - r.top - 60; const l = Math.hypot(dx, dy); if (l > 44) { dx *= 44 / l; dy *= 44 / l; }
+    Kn.style.transform = `translate(${dx}px,${dy}px)`; WK.joy = [dx / 44, dy / 44]; };
+  J.addEventListener('pointerdown', e => { id = e.pointerId; J.setPointerCapture(id); mv(e); });
+  J.addEventListener('pointermove', e => { if (e.pointerId === id) mv(e); });
+  const up = () => { id = null; WK.joy = [0, 0]; Kn.style.transform = ''; }; J.addEventListener('pointerup', up); J.addEventListener('pointercancel', up); }
+const WV = new THREE.Vector3();
+function walkTick(dt) {
+  const K = WK.keys; let f = (K.has('w') || K.has('arrowup') ? 1 : 0) - (K.has('s') || K.has('arrowdown') ? 1 : 0), r = (K.has('d') || K.has('arrowright') ? 1 : 0) - (K.has('a') || K.has('arrowleft') ? 1 : 0);
+  if (WK.joy[0] || WK.joy[1]) { f = -WK.joy[1]; r = WK.joy[0]; }
+  // камерын харж буй чиглэлд харьцангуй хөдөлнө
+  camera.getWorldDirection(WV); WV.y = 0; WV.normalize(); const fx = WV.x, fz = WV.z, rx = -fz, rz = fx;
+  let mx = fx * f + rx * r, mz = fz * f + rz * r; const l = Math.hypot(mx, mz);
+  if (l > .05) { const sp = (K.has('shift') ? RUN_V : WALK_V) * Math.min(1, l); mx /= l; mz /= l;
+    const R0 = 2400; WK.x = THREE.MathUtils.clamp(WK.x + mx * sp * dt, -R0, R0); WK.z = THREE.MathUtils.clamp(WK.z + mz * sp * dt, -R0, R0);
+    const ty = Math.atan2(-mz, mx); let d = ty - WK.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); WK.yaw += d * Math.min(1, dt * 12); }
+  const y = H(WK.x, WK.z), bob = l > .05 ? Math.abs(Math.sin(clock.elapsedTime * (K.has('shift') ? 16 : 10))) * .35 : 0;
+  walker.position.set(WK.x, y + bob, WK.z); walker.rotation.y = WK.yaw;
+  // камер дагана: target-ийг дүр рүү зөөж, камерыг ижил зайгаар хамт зөөнө
+  const t = controls.target; WV.set(WK.x - t.x, y + 3 - t.y, WK.z - t.z).multiplyScalar(Math.min(1, dt * 6)); t.add(WV); camera.position.add(WV);
+  let best = null, bd = Infinity; for (const zn of zonesNow()) { const d = Math.hypot(zn.x - WK.x, zn.z - WK.z); if (d < zn.r && d < bd) { bd = d; best = zn; } }
+  if (best?.name !== WK.zone?.name) { WK.zone = best; const h = $('walkhint');
+    if (best) { h.innerHTML = `<b>E</b>${esc(best.name)}${best.sub ? ' · ' + esc(best.sub) : ''}`; h.style.display = 'block'; } else h.style.display = 'none'; }
+}
 const clock = new THREE.Clock(); let fr = 0, last = performance.now(); window.__fps = 0;
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), .05);
+  if (WK.on) walkTick(dt);
   controls.update();
   if (crowd) {
     // сүүдрийн камер харагдах хэсгийг дагана (zoom-оос хамаарч)
@@ -613,7 +697,7 @@ renderer.setAnimationLoop(() => {
   if (now - last >= 1000) { window.__fps = Math.round(fr * 1000 / (now - last)); $('fps').textContent = window.__fps + ' fps'; fr = 0; last = now; }
 });
 build().catch(e => { $('load').textContent = 'Алдаа: ' + e.message; console.error(e); });
-window.city = { goClient: i => goClient(i), applyMood, focus, camera, controls, get poster() { return poster; }, renderer, sim: (o = {}) => { live = false; if (o.smog != null) smog = o.smog; if (o.traffic != null) trafficNow = o.traffic; applyMood(o.mood || mood); } };   // турших: city.sim({smog:.8, traffic:1, mood:'day'})
+window.city = { walk: o => o === false ? walkStop() : walkStart(), WK, goClient: i => goClient(i), applyMood, focus, camera, controls, get poster() { return poster; }, renderer, sim: (o = {}) => { live = false; if (o.smog != null) smog = o.smog; if (o.traffic != null) trafficNow = o.traffic; applyMood(o.mood || mood); } };   // турших: city.sim({smog:.8, traffic:1, mood:'day'})
 </script>
 <script src="/nav.js" defer></script>
 </body>

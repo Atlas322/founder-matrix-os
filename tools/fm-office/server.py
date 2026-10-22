@@ -12,7 +12,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from office_state import build_state, load_config  # noqa: E402
-import room_info, sender, calendar_data, home_data, hall_data, ref_data, days_data, osm_data, weather_data, map_data  # noqa: E402
+import room_info, sender, calendar_data, home_data, hall_data, ref_data, days_data, osm_data, weather_data, map_data, control_state, desk_data  # noqa: E402
 
 STATIC = {"/": ("landing.html", "text/html; charset=utf-8"),           # нүүр хуудас (Second Brain)
           "/office2d": ("office2d.html", "text/html; charset=utf-8"),   # 2.5D зурагт оффис (хуучин үндсэн)
@@ -26,13 +26,17 @@ STATIC = {"/": ("landing.html", "text/html; charset=utf-8"),           # нүү�
           "/3d": ("index.html", "text/html; charset=utf-8"),             # хуучин Three.js хувилбар
           "/index.html": ("index.html", "text/html; charset=utf-8"),
           "/main.js": ("main.js", "text/javascript; charset=utf-8"),
+          "/control": ("control.html", "text/html; charset=utf-8"),
+          "/office25d": ("office25d.html", "text/html; charset=utf-8"),      # Агентын оффис 2.5D (Three.js, Kenney)          # Удирдлагын өрөө (agent office, шат 1)
           "/campus": ("campus.html", "text/html; charset=utf-8"),            # Оффисын кампус (барилгын түвшин, v02)
           "/home": ("home.html", "text/html; charset=utf-8"),                # Second Brain мини хот (гэр)
           "/xr": ("gallery-xr.html", "text/html; charset=utf-8"),           # Spatial Gallery (WebXR, шил)
           "/hall": ("hall.html", "text/html; charset=utf-8"),
           "/gallery": ("gallery.html", "text/html; charset=utf-8"),         # Gallery: Neuform маягийн bento тор
           "/fpv": ("fpv.html", "text/html; charset=utf-8"),                 # Gallery FPV: хулгана түгжээд алхана
-          "/spiral": ("spiral.html", "text/html; charset=utf-8"),           # өдөр бүр = спиралийн блок               # Gallery hall: хавтас, YouTube, highlight → атом
+          "/khuvsgul": ("khuvsgul.html", "text/html; charset=utf-8"),       # Хөвсгөлийн ертөнц (Blender → вэб): алхаж, vault-тай
+          "/garden": ("garden.html", "text/html; charset=utf-8"),           # Миний цэцэрлэг: өвс, салхи, ажлын ширээ
+          # /spiral устгав (2026-10-20): өдрийн спираль одоо /khuvsgul-ийн тэнгэрт (#spiral)
           "/map": ("home.html", "text/html; charset=utf-8"),                 # хот = мини хоттой нэг хөдөлгүүр (Three.js, «Хот» харагдац)
           "/map-old": ("ub-map.html", "text/html; charset=utf-8"),           # хуучин MapLibre хувилбар (globe)
           }
@@ -48,7 +52,7 @@ def local_map(vault):
         if f.exists():
             return json.loads(f.read_text(encoding="utf-8"))
     return None
-ASSET_TYPES = {".glb": "model/gltf-binary", ".webp": "image/webp", ".jpg": "image/jpeg", ".png": "image/png", ".json": "application/json; charset=utf-8"}
+ASSET_TYPES = {".glb": "model/gltf-binary", ".webp": "image/webp", ".jpg": "image/jpeg", ".png": "image/png", ".json": "application/json; charset=utf-8", ".hdr": "application/octet-stream"}
 
 
 def _default_vault():
@@ -168,7 +172,11 @@ def make_handler(vault):
                     p = arts.get(f)
                     return self._send(200, p.read_bytes(), ASSET_TYPES[p.suffix.lower()]) if p else self._send(404, {"error": "зураг алга"})
                 if path == "/api/weather":                              # Улаанбаатарын одоогийн цаг агаар (Open-Meteo, 10 мин cache)
-                    loc = local_map(vault) or {"office": [106.9176, 47.9188]}
+                    from urllib.parse import parse_qs, urlparse
+                    if (parse_qs(urlparse(self.path).query).get("at") or [""])[0] == "khuvsgul":
+                        loc = {"office": [100.16, 50.45]}                   # Хатгал, Хөвсгөл (нийтийн газар)
+                    else:
+                        loc = local_map(vault) or {"office": [106.9176, 47.9188]}
                     try:
                         return self._send(200, weather_data.current(loc["office"][1], loc["office"][0]))
                     except Exception as e:
@@ -200,7 +208,15 @@ def make_handler(vault):
                         self.send_header("Content-Encoding", "gzip"); self.send_header("Content-Length", str(len(z)))
                         self.send_header("Cache-Control", "max-age=3600"); self.end_headers(); self.wfile.write(z); return
                     return self._send(200, body, "application/json; charset=utf-8")
+                if path == "/api/garden":                               # zen цэцэрлэгийн барилгууд = PARA
+                    import garden_data
+                    return self._send(200, garden_data.build(vault))
                 if path == "/api/days":                                 # өдрийн спираль
+                    from urllib.parse import parse_qs, urlparse
+                    if (parse_qs(urlparse(self.path).query).get("life") or [""])[0] == "1":
+                        return self._send(200, days_data.life(vault))
+                    if (parse_qs(urlparse(self.path).query).get("full") or [""])[0] == "1":
+                        return self._send(200, {"days": days_data.full(vault)})
                     return self._send(200, days_data.days(vault))
                 if path == "/api/day":
                     from urllib.parse import parse_qs, urlparse
@@ -208,8 +224,65 @@ def make_handler(vault):
                         return self._send(200, days_data.day(vault, (parse_qs(urlparse(self.path).query).get("d") or [""])[0]))
                     except ValueError as e:
                         return self._send(400, {"error": str(e)})
+                if path == "/api/feed":                                 # төслийн HUD: сүүлийн task + Output зураг/бичлэг
+                    import feed_data
+                    return self._send(200, feed_data.feed(vault))
+                if path == "/api/feed/file":                            # HUD-ийн зураг/бичлэг (Range дэмжинэ)
+                    import feed_data
+                    from urllib.parse import parse_qs, urlparse
+                    try:
+                        fp, ct = feed_data.media_file(vault, (parse_qs(urlparse(self.path).query).get("p") or [""])[0])
+                    except feed_data.FeedError as e:
+                        return self._send(404, {"error": str(e)})
+                    size = fp.stat().st_size; a, b = 0, size - 1
+                    m = re.match(r"bytes=(\d*)-(\d*)", self.headers.get("Range") or "")
+                    if m:
+                        a = int(m.group(1) or 0); b = min(int(m.group(2)) if m.group(2) else size - 1, size - 1)
+                    with open(fp, "rb") as f:
+                        f.seek(a); body = f.read(b - a + 1)
+                    self.send_response(206 if m else 200); self.send_header("Content-Type", ct); self.send_header("Accept-Ranges", "bytes")
+                    if m:
+                        self.send_header("Content-Range", f"bytes {a}-{b}/{size}")
+                    self.send_header("Content-Length", str(len(body))); self.send_header("Cache-Control", "max-age=600"); self.end_headers(); self.wfile.write(body); return
+                if path == "/api/books":                                # Хөвсгөлийн номын сан: 04-Resources → тавиур, ном
+                    import library_data
+                    return self._send(200, library_data.books(vault))
+                if path.startswith("/nl/"):                            # newsletter-ийн html ба түүний зураг (дугаарын хавтас дотроос л)
+                    import library_data
+                    from urllib.parse import unquote
+                    parts = unquote(path[4:]).split("/", 1)
+                    try:
+                        body, ct = library_data.issue_asset(vault, parts[0], parts[1] if len(parts) > 1 else "")
+                    except library_data.LibraryError as e:
+                        return self._send(404, {"error": str(e)})
+                    self.send_response(200); self.send_header("Content-Type", ct); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body); return
+                if path == "/api/nl":                                   # INAI Newsletter дугаарын html / нүүр зураг
+                    import library_data
+                    from urllib.parse import parse_qs, urlparse
+                    q = parse_qs(urlparse(self.path).query)
+                    try:
+                        body, ct = library_data.issue_file(vault, (q.get("no") or [""])[0], (q.get("f") or ["html"])[0])
+                    except library_data.LibraryError as e:
+                        return self._send(404, {"error": str(e)})
+                    self.send_response(200); self.send_header("Content-Type", ct); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body); return
+                if path == "/api/backlinks":                            # энэ note руу заасан note-ууд (wiki «Энд холбогдсон»)
+                    import library_data
+                    from urllib.parse import parse_qs, urlparse
+                    return self._send(200, {"links": library_data.backlinks(vault, (parse_qs(urlparse(self.path).query).get("path") or [""])[0])})
+                if path == "/api/book":                                 # нэг номыг унших (private-гүй, 04-Resources дотор)
+                    import library_data
+                    from urllib.parse import parse_qs, urlparse
+                    rel = (parse_qs(urlparse(self.path).query).get("path") or [""])[0]
+                    try:
+                        return self._send(200, library_data.read(vault, rel))
+                    except library_data.LibraryError as e:
+                        return self._send(404, {"error": str(e)})
                 if path == "/api/home":
                     return self._send(200, home_data.build(vault))
+                if path == "/api/control":                              # Claude Code сешнүүдийн төлөв, agent tree
+                    d = control_state.build()
+                    d["desks"] = desk_data.desks(vault, d["sessions"]); d["meeting"] = desk_data.meeting(vault)
+                    return self._send(200, d)
                 if path == "/api/state":
                     return self._send(200, build_state(vault))
                 if path == "/favicon.ico":
@@ -219,13 +292,19 @@ def make_handler(vault):
                 self._send(500, {"error": str(e)})
         def do_POST(self):
             route = self.path.split("?")[0]
-            if route not in ("/api/send", "/api/schedule", "/api/atom"):
+            if route not in ("/api/send", "/api/schedule", "/api/atom", "/api/meeting"):
                 return self._send(404, {"error": "not found"})
             origin = self.headers.get("Origin") or ""
             if origin and not re.match(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$", origin):
                 return self._send(403, {"error": "зөвхөн localhost-оос"})
             if "application/json" not in (self.headers.get("Content-Type") or ""):
                 return self._send(415, {"error": "JSON хэрэгтэй"})
+            if route == "/api/meeting":                                # Удирдлагын өрөө → хурлын ширээнд асуудал нэмэх (append)
+                try:
+                    n = min(int(self.headers.get("Content-Length", 0)), 4000)
+                    return self._send(200, desk_data.add_issue(vault, json.loads(self.rfile.read(n) or b"{}")))
+                except desk_data.DeskError as e:
+                    return self._send(400, {"error": str(e)})
             if route == "/api/atom":                                   # Gallery hall → шинэ атом (байгааг дарахгүй)
                 try:
                     n = min(int(self.headers.get("Content-Length", 0)), 40000)

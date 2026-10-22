@@ -38,6 +38,13 @@ class DaysTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             days_data.day(v, "../etc")
 
+    def test_life_links_past_to_present(self):
+        v = vault()
+        (v / "04-Resources/Atomic/decisions/2026-10-17 - хоёр.md").write_text("---\ntype: atom\n---\n[[2026-10-16 - нэг]] дээр тулгуурлав\n", encoding="utf-8")
+        L = days_data.life(v, today=date(2026, 10, 18))
+        self.assertIn(["A:2026-10-16 - нэг", "A:2026-10-17 - хоёр", 1], L["edges"])
+        self.assertFalse(any("нууц" in i["id"] for i in L["items"]))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,1406 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FM Office · Хөвсгөл</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Хөвсгөлийн ертөнц: Blender (blender/world.py + MCP) → GLB → энд. Second Brain = эрэг дээрх газрууд. */
+  :root { --ink:#1b2230; --paper:#f4f0e6; --red:#d2502f; --gold:#ffc45a; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#bcd6ee; font-family:"Inter Tight", system-ui, sans-serif; color:var(--ink); }
+  canvas { display:block; }
+  .glass { background:rgba(244,240,230,.86); backdrop-filter:blur(8px); border:1px solid rgba(27,34,48,.35); }
+  .hud { position:fixed; left:18px; top:18px; width:290px; padding:14px 16px; }
+  .hud h1 { margin:2px 0 6px; font:600 19px "Inter Tight"; } .hud p { margin:0; font-size:12.5px; line-height:1.5; opacity:.78; }
+  .hud .wx { margin-top:8px; font-size:12px; } .hud.min p, .hud.min .wx, .hud.min .row { display:none; }
+  .hud .mini { position:absolute; top:8px; right:8px; width:22px; height:22px; border:1px solid rgba(27,34,48,.4); background:transparent; cursor:pointer; padding:0; }
+  .row { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; } .row button { font:500 11.5px "Inter Tight"; padding:3px 8px; border:1px solid rgba(27,34,48,.35); background:transparent; cursor:pointer; }
+  .row button.on { background:var(--ink); color:var(--paper); }
+  .eb { font:600 10.5px ui-monospace, monospace; letter-spacing:.14em; text-transform:uppercase; opacity:.55; }
+  #hint { position:fixed; left:50%; bottom:30px; transform:translateX(-50%); display:none; padding:9px 16px; background:rgba(27,34,48,.9); color:var(--paper); font-size:13.5px; cursor:pointer; }
+  #hint b { display:inline-block; margin-right:10px; padding:1px 7px; background:var(--red); }
+  .panel { position:fixed; right:18px; top:18px; width:min(400px, 92vw); max-height:84vh; overflow:auto; padding:18px 20px; display:none; }
+  .panel.on { display:block; } .panel h2 { margin:0 0 4px; font:600 20px "Inter Tight"; } .panel li { margin:5px 0; font-size:13.5px; }
+  .panel .x { float:right; border:1px solid rgba(27,34,48,.4); background:transparent; cursor:pointer; font:inherit; font-size:12px; padding:3px 8px; }
+  .panel small, .panel .sub { opacity:.62; } .panel .sub { font-size:12px; margin:0 0 12px; }
+  .st { display:inline-block; min-width:62px; font:600 10px ui-monospace, monospace; letter-spacing:.08em; text-transform:uppercase; opacity:.55; } .st.active { color:var(--red); opacity:1; }
+  /* PC дэлгэц (гэр дотор) */
+  #pc { position:fixed; inset:6% 8%; display:none; background:#0f1520; color:#dfe8f5; border-radius:14px; box-shadow:0 30px 80px rgba(0,0,0,.45); padding:22px 26px; overflow:auto; }
+  #pc.on { display:block; } #pc h2 { margin:0 0 2px; font:600 22px "Inter Tight"; color:#fff; } #pc .sub { opacity:.6; font-size:12.5px; margin-bottom:14px; }
+  #pc .cols { display:grid; grid-template-columns:1.2fr 1fr; gap:22px; } #pc li { margin:5px 0; font-size:13px; line-height:1.4; } #pc li small { opacity:.55; }
+  #pc textarea, #pc input { width:100%; box-sizing:border-box; background:#18212f; color:#e9f0fa; border:1px solid #2c3a50; border-radius:8px; padding:9px 10px; font:inherit; font-size:13px; }
+  #pc textarea { height:120px; resize:vertical; } #pc button { margin-top:8px; padding:7px 14px; border:0; border-radius:8px; background:var(--gold); color:#1b2230; font:600 13px "Inter Tight"; cursor:pointer; }
+  #pc .x { position:absolute; top:14px; right:18px; background:transparent; color:#9fb0c8; border:1px solid #2c3a50; margin:0; }
+  #pc a { color:#ffd27a; } #msg { font-size:12px; margin-left:8px; opacity:.8; }
+  @media (max-width:760px) { #pc .cols { grid-template-columns:1fr; } .hud { width:auto; right:18px; } .hud p { display:none; } }
+  #joy { position:fixed; left:24px; bottom:24px; width:120px; height:120px; border:1px solid rgba(27,34,48,.4); border-radius:50%; background:rgba(244,240,230,.45); display:none; touch-action:none; }
+  #joy i { position:absolute; left:40px; top:40px; width:40px; height:40px; border-radius:50%; background:var(--ink); } #joy.touch { display:block; }
+  #load { position:fixed; inset:0; display:grid; place-items:center; background:#bcd6ee; font:600 11px ui-monospace, monospace; letter-spacing:.2em; transition:opacity .9s; z-index:20; }
+  #fps { position:fixed; left:12px; bottom:12px; z-index:6; padding:5px 10px; border-radius:7px; background:#080e168c; backdrop-filter:blur(8px); color:#e8f6ff; font:500 12px/1.2 'JetBrains Mono', ui-monospace, monospace; letter-spacing:.02em; pointer-events:none; }
+  #fps b { color:#5fe3d4; font-weight:600 } #fps.mid b { color:#ffb86b } #fps.bad b { color:#ff7a85 }
+body.life #hud{opacity:0;pointer-events:none;transform:translateY(-8px)} #hud{transition:opacity .6s,transform .6s}
+body.pov #cross{opacity:.75} body.pov #hud{opacity:.0;pointer-events:none} body.pov:has(#play.on) #hud{opacity:1;pointer-events:auto} #hud{z-index:8} #hmin{z-index:2} #wxp{z-index:8!important} #fps{z-index:8!important}   /* «Дарж эхлэх» давхаргаас дээр → товч дарагдана */ #cross{position:fixed;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .3s;z-index:5}
+#fishui{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);width:240px;display:none;z-index:6;font:600 12px Inter,system-ui;color:#fff;text-shadow:0 1px 2px #000}#fishui.on{display:block}#fishui .bar{height:7px;margin-top:5px;background:rgba(0,0,0,.4);border-radius:4px;overflow:hidden}#fishui .bar i{display:block;height:100%;width:0;border-radius:4px}
+#play{position:fixed;inset:0;display:none;place-items:center;background:radial-gradient(ellipse at center,rgba(8,14,22,.25),rgba(8,14,22,.6));z-index:7;cursor:pointer;color:#f4f1ea;text-align:center;font-family:Inter,system-ui}
+#play.on{display:grid}#play b{display:block;font:700 44px/1 Inter,system-ui;letter-spacing:.32em}#play p{margin:14px 0 18px;padding:10px 22px;border-radius:999px;background:#6fe0c8;color:#08201b;font-weight:600;display:inline-block}#play small{display:block;opacity:.85;font-size:12.5px}
+#look{position:fixed;left:50%;top:calc(50% + 18px);transform:translateX(-50%);display:none;padding:6px 12px;border-radius:8px;background:rgba(10,16,24,.62);color:#fff;font:500 13px Inter,system-ui;z-index:5;backdrop-filter:blur(6px);white-space:nowrap}#look.on{display:block}#look kbd{background:#fff;color:#111;border-radius:4px;padding:0 6px;margin-right:7px;font:600 11px Inter}
+#settings{position:fixed;top:14px;right:14px;bottom:14px;width:min(340px,calc(100vw - 28px));z-index:9;display:flex;flex-direction:column;border-radius:16px;color:#eef6f8;font:500 12.5px Inter,system-ui;opacity:0;visibility:hidden;transform:translateX(28px);transition:opacity .24s cubic-bezier(.2,.8,.2,1),transform .42s cubic-bezier(.2,.8,.2,1),visibility 0s linear .42s;overflow:hidden}
+#settings.on{opacity:1;visibility:visible;transform:none;transition-delay:0s}
+.st-glass{background:linear-gradient(180deg,#ffffff0b,#fff0 40%),#0c121a9e;border:1px solid #aad7eb1f;backdrop-filter:blur(18px) saturate(1.6);box-shadow:inset 0 1px #ffffff12,0 12px 32px -12px #0000008c}
+#settings header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px}#settings header b{font-size:14px}#settings header button{background:none;border:0;color:#eef6f8a0;cursor:pointer;font-size:14px}
+#settings nav{display:flex;gap:3px;margin:0 12px 8px;padding:3px;border-radius:12px;background:#00000038;box-shadow:inset 0 0 0 1px #aad7eb1f;overflow-x:auto}
+#settings nav button{flex:1;height:32px;border:0;border-radius:9px;background:none;color:#eef6f899;font:500 12px Inter;cursor:pointer;white-space:nowrap;padding:0 8px}#settings nav button.on{background:#aad7eb24;color:#fff;box-shadow:inset 0 1px #ffffff1a}
+.st-body{overflow:auto;padding:0 14px 10px;flex:1}.st-body section{margin:8px 0 14px;padding:10px 12px;border-radius:12px;background:#aad7eb0d;box-shadow:inset 0 0 0 1px #aad7eb14}
+.st-body h4{margin:0 0 8px;font:600 10.5px Inter;letter-spacing:.08em;text-transform:uppercase;color:#5fe3d4}
+.st-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px}.st-row label{color:#eef6f8d0}.st-v{font:500 11.5px 'JetBrains Mono',ui-monospace,monospace;color:#fff}
+.st-body input[type=range]{width:100%;margin:6px 0 2px;accent-color:#5fe3d4;height:4px}.st-tod{width:100%;border-radius:10px;margin-top:8px;display:block}
+.st-todbar{background:linear-gradient(90deg,#0b1430,#1c2a52 20%,#f2a37a 25%,#5d9be0 35%,#3f86d8 55%,#f5ddb8 72%,#f2a07a 80%,#111a3c 90%,#0b1430)!important;border-radius:4px;appearance:none;height:8px!important}
+.st-scale{display:flex;justify-content:space-between;font:10px 'JetBrains Mono',monospace;opacity:.55;margin-bottom:6px}
+.st-pre{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.st-pre button,.st-btn,.st-live{border:0;border-radius:9px;padding:8px 4px;background:#aad7eb14;color:#eef6f8;font:500 11.5px Inter;cursor:pointer}.st-pre button.on{background:#5fe3d433;box-shadow:inset 0 0 0 1px #5fe3d466;color:#fff}
+.st-btn,.st-live{width:100%;margin-top:8px}.st-tog{width:34px;height:20px;border-radius:10px;border:0;background:#ffffff26;position:relative;cursor:pointer}.st-tog i{position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s}.st-tog.on{background:#5fe3d4}.st-tog.on i{left:17px}
+#settings footer{padding:10px 16px;font-size:11px;color:#eef6f880;border-top:1px solid #aad7eb14}
+#play .keys{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:6px;padding:9px 16px;border-radius:12px;background:#0c121a9e;backdrop-filter:blur(12px);font-size:12.5px}#play kbd{display:inline-block;min-width:18px;margin-right:3px;padding:1px 5px;border-radius:5px;background:#ffffff1f;box-shadow:inset 0 -1px #0006;font:600 11px Inter}
+#wxp{position:fixed;left:12px;bottom:44px;z-index:6;width:min(300px,calc(100vw - 24px));border-radius:14px;color:#eef6f8;font:500 12.5px Inter,system-ui;overflow:hidden}
+#wxp .wx-head{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:none;border:0;color:inherit;cursor:pointer;text-align:left}#wxp .wx-head b{display:block;font-size:13.5px}#wxp .wx-head small{opacity:.7;font-size:11.5px}
+#wxp .wx-ic{font-size:24px;line-height:1}#wxp .wx-head kbd{margin-left:auto;padding:1px 6px;border-radius:5px;background:#ffffff1f;font:600 11px Inter}
+#wxp .wx-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:4px 10px 8px}#wxp .wx-grid button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;border:0;border-radius:9px;background:#aad7eb14;color:#eef6f8;font:500 10.5px Inter;cursor:pointer}
+#wxp .wx-grid button span{font-size:18px}#wxp .wx-grid button.on{background:#5fe3d433;box-shadow:inset 0 0 0 1px #5fe3d466}
+#wxp .wx-row{display:flex;align-items:center;gap:8px;padding:2px 12px}#wxp .wx-row input{flex:1;accent-color:#ffb86b}
+#wxp .wx-q{display:flex;gap:4px;padding:6px 10px 10px}#wxp .wx-q button.on{background:#5fe3d433;box-shadow:inset 0 0 0 1px #5fe3d466}#wxp .wx-q button{flex:1;border:0;border-radius:8px;padding:6px 0;background:#aad7eb14;color:#eef6f8;font:500 10.5px Inter;cursor:pointer}
+#lifelbl{position:fixed;inset:0;pointer-events:none;z-index:4}#lifelbl .ll{position:absolute;left:0;top:0;display:flex;align-items:center;gap:6px;padding:3px 8px;border-radius:7px;background:#0b1420b8;color:#eef6f8;font:500 11.5px Inter,system-ui;white-space:nowrap;backdrop-filter:blur(6px)}
+#lifelbl .ll i{width:7px;height:7px;border-radius:50%}#lifelbl .ll small{opacity:.65;margin-left:4px}#lifelbl .ll.old{box-shadow:inset 0 0 0 1px #ff7a5a99}
+#lifeleg{position:fixed;left:12px;top:12px;z-index:8;width:min(270px,calc(100vw - 24px));padding:12px 14px;border-radius:14px;color:#eef6f8;font:500 11.5px Inter,system-ui;display:none}body.lifeon #lifeleg{display:block}
+#lifeleg b{font-size:13px}#lifeleg p{margin:6px 0;opacity:.8;line-height:1.45}#lifeleg span{display:inline-flex;align-items:center;gap:5px;margin:2px 10px 2px 0}#lifeleg i{display:inline-block;width:8px;height:8px;border-radius:50%}
+#lifeleg i.ln{width:16px;height:2px;border-radius:1px;background:#fff1c2;vertical-align:middle}#lifeleg i.ln.o{background:#ff5a36}
+#reader{position:fixed;inset:0;z-index:20;display:none;overflow:auto;background:rgba(14,12,10,.72);backdrop-filter:blur(6px)}#reader.on{display:block}
+#reader .pg{position:relative;max-width:720px;margin:5vh auto;padding:46px 56px 40px;background:#f4ecdc;color:#2a2219;border-radius:6px;box-shadow:0 30px 80px #000a,inset 0 0 80px #d9c9a6;font:17px/1.65 Georgia,'Noto Serif',serif}
+#reader .x{position:absolute;right:18px;top:16px;border:0;background:#2a221912;padding:6px 10px;border-radius:6px;cursor:pointer;font:500 12px Inter}#reader .meta{font:500 11.5px Inter;letter-spacing:.08em;text-transform:uppercase;color:#8a6b4a}
+#reader h1{font-size:30px;line-height:1.2;margin:8px 0 18px}#reader h2,#reader h3,#reader h4,#reader h5{margin:22px 0 8px;line-height:1.3}#reader blockquote{margin:10px 0;padding:6px 14px;border-left:3px solid #b08a5a;background:#ebe0c8}
+#reader code{background:#e6dcc6;padding:1px 4px;border-radius:3px;font-size:14px}#reader pre{background:#2a2219;color:#efe6d4;padding:12px;border-radius:6px;overflow:auto;font-size:13px}
+#reader .wl{color:#7a3b1f;border-bottom:1px dotted;cursor:pointer}#reader .wl.miss{color:#999;cursor:default}#reader .tr{display:flex;gap:10px;border-bottom:1px solid #d8c9aa;padding:4px 0;font-size:14.5px}#reader .tr span{flex:1}
+#reader footer{margin-top:28px}#reader footer button{border:0;background:#2a2219;color:#f4ecdc;padding:8px 14px;border-radius:6px;cursor:pointer;font:500 13px Inter}
+#reader .q{width:100%;padding:10px 12px;border:1px solid #cdbb98;border-radius:8px;background:#fbf6ec;font:15px Inter;margin-bottom:10px}#reader .list ul{list-style:none;padding:0;margin:0 0 14px}
+#reader .list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 8px;border-bottom:1px solid #e2d5ba;cursor:pointer;font-size:15px}#reader .list li:hover{background:#ebdfc6}#reader .list li small{opacity:.55;font:12px Inter}#reader .list li.seen span::after{content:' ✓';color:#5a8a4a}
+@media (max-width:700px){#reader .pg{padding:36px 22px;margin:0;border-radius:0;min-height:100vh}}
+#reader .hero{display:flex;gap:22px;align-items:flex-end;margin-bottom:12px}#reader .hero .cv{width:150px;aspect-ratio:2/3;object-fit:cover;border-radius:3px;box-shadow:0 10px 24px #0005,inset 0 0 0 1px #0002;background:#d9cdb2;flex:none}
+#reader .au{font-style:italic;color:#6b543c;margin:-8px 0 0}#reader .list img.th{width:28px;height:42px;object-fit:cover;border-radius:2px;background:#d9cdb2;flex:none;box-shadow:0 2px 4px #0003}#reader .list li span{flex:1}#reader .list em{opacity:.6}
+#reader .pg.nl{max-width:1000px}#reader .pg.nl iframe{width:100%;height:76vh;border:0;border-radius:6px;background:#fff;box-shadow:inset 0 0 0 1px #0001}#reader footer a{color:#7a3b1f}
+@media (max-width:700px){#reader .hero{flex-direction:column;align-items:flex-start}}
+#reader .pg.wiki{max-width:1060px;font-size:15.5px}#reader .wk-top{display:flex;gap:16px;align-items:center;border-bottom:1px solid #cdbb98;padding-bottom:12px;margin-bottom:14px}.wk-logo{font-size:52px}
+#reader .wk-top h1{margin:0}#reader .sub2{margin:4px 0 0;color:#6b543c;font:14px Inter}#reader .wk-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:14px}
+#reader .wk-grid section{background:#fbf6ec;border:1px solid #e0d1b1;border-radius:6px;padding:12px 16px}#reader .wk-grid h2{font-size:17px;margin:4px 0 10px;padding-bottom:5px;border-bottom:1px solid #e0d1b1}
+#reader .wk-feat,#reader .wk-cat{grid-column:span 1}#reader .ft{display:flex;gap:14px}#reader .ft img.cv{width:110px;height:165px;align-self:flex-start;aspect-ratio:2/3;object-fit:cover;border-radius:3px;box-shadow:0 6px 14px #0004;flex:none;background:#d9cdb2}
+#reader .ft h3{margin:0 0 6px;font-size:19px}#reader .ex{font-size:14.5px;line-height:1.55}#reader [data-open],#reader [data-sec],#reader [data-tag]{color:#2a4a8a;cursor:pointer;text-decoration:none}#reader [data-open]:hover{text-decoration:underline}
+#reader .wiki ul{margin:0;padding-left:18px}#reader .wiki li{margin:3px 0}#reader .wiki small,#reader .mute{color:#8a7a62}#reader .rd{display:flex;gap:6px;flex-wrap:wrap}#reader .rd img{width:52px;height:78px;object-fit:cover;border-radius:2px;box-shadow:0 3px 6px #0004;background:#d9cdb2}
+#reader .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}#reader .chips a{background:#efe4cc;border-radius:999px;padding:3px 10px;font:13px Inter}#reader .wk-res{margin-top:8px}#reader .wk-res ul{columns:2}
+#reader .toc{display:inline-block;background:#f8f1e2;border:1px solid #d8c7a4;padding:10px 18px 10px 14px;margin:0 0 16px;font:14px Inter}#reader .toc ol{margin:6px 0 0;padding-left:18px}#reader .toc .l3{margin-left:14px}#reader .toc .l4{margin-left:28px}#reader .toc a{color:#2a4a8a}
+#reader .ibox{float:right;width:250px;margin:0 0 14px 20px;background:#f8f1e2;border:1px solid #d8c7a4;padding:10px;font:13px Inter}#reader .ibox img{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:2px;margin-bottom:8px;background:#d9cdb2}
+#reader .ibox th{text-align:left;padding:3px 8px 3px 0;color:#6b543c;vertical-align:top;white-space:nowrap}#reader .bl{clear:both;margin-top:26px;padding-top:10px;border-top:1px solid #d8c7a4}#reader .bl ul{columns:2;font-size:14.5px}
+#reader .hero.nocv .cv{display:none}#reader footer [data-r]{border:0;background:#2a2219;color:#f4ecdc;padding:8px 14px;border-radius:6px;cursor:pointer;font:500 13px Inter}#reader .wiki p button{border:0;background:#2a2219;color:#f4ecdc;padding:8px 14px;border-radius:6px;cursor:pointer;font:500 13px Inter}
+@media (max-width:760px){#reader .wk-grid{grid-template-columns:1fr}#reader .ibox{float:none;width:auto;margin:0 0 14px}#reader .wk-res ul,#reader .bl ul{columns:1}}
+#reader .pg.feed{max-width:1240px}#reader .feed .chips a.on{background:#2a2219;color:#f4ecdc}#reader .fp{margin:22px 0}#reader .fp h2{border-bottom:1px solid #d8c7a4;padding-bottom:6px}
+#reader .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}#reader .gal figure{margin:0;position:relative;cursor:zoom-in;background:#1b1712;border-radius:8px;overflow:hidden}
+#reader .gal img,#reader .gal video{width:100%;aspect-ratio:16/10;object-fit:cover;display:block}#reader .gal b{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);color:#fff;font-size:34px;text-shadow:0 2px 10px #000}
+#reader .gal figcaption{padding:6px 9px 8px;color:#f1e7d3;font:13px Inter;line-height:1.3}#reader .gal figcaption small{display:block;color:#b5a587}
+#reader .tl{list-style:none;padding:0;margin:12px 0 0;columns:2}#reader .tl li{margin:4px 0;break-inside:avoid}#reader .tl i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#6aa9d8;margin-right:8px}#reader .tl i.done{background:#4caf6e}#reader .tl i.in-progress{background:#e2a43a}
+#reader .lb{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;cursor:zoom-out}#reader .lb img,#reader .lb video{max-width:94vw;max-height:92vh;border-radius:6px}
+@media (max-width:760px){#reader .tl{columns:1}}
+</style>
+<script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<div id="load">ХӨВСГӨЛ НЭЭГДЭЖ БАЙНА…</div>
+<div class="hud glass" id="hud"><button class="mini" id="hmin">–</button><div class="eb">Second Brain · Хөвсгөл</div><h1>Миний эрэг</h1>
+  <p>WASD алхах · Shift гүйх · чирж эргэх · дугуйгаар ойртох. Газар бүр Second Brain-ий нэг хэсэг — ойртоод <b>E</b>. Гэрт орж PC дээр ажилла.</p>
+  <div class="wx" id="wx">Улаанбаатар · цаг агаар ачаалж байна…</div>
+  <div class="row" id="tod"><button data-t="live" class="on">● Бодит</button><button data-t="9">Өглөө</button><button data-t="14">Өдөр</button><button data-t="18.6">Үдэш</button><button data-t="22">Шөнө</button></div>
+  <div class="row"><button id="lifebtn">✦ Амьдралын спираль</button><button id="povbtn">👁 POV · V</button></div>
+</div>
+<div id="hint"></div><div id="play"><div><b>ХӨВСГӨЛ</b><p>Дарж эхлэх</p><div class="keys"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Алхах</span><span><kbd>🖱</kbd> Харах</span><span><kbd>E</kbd> Ашиглах</span><span><kbd>R</kbd> Саваа</span><span><kbd>H</kbd> Тохиргоо</span><span><kbd>T</kbd> Цаг агаар</span></div></div></div><div id="look"></div><div id="cross"></div>
+<aside class="panel glass" id="panel"><button class="x" id="px">Хаах</button><div id="pcx"></div></aside>
+<div id="pc"><button class="x" id="pcclose">Esc · Гарах</button><div id="pcbody"></div></div>
+<div id="joy"><i></i></div><div id="fps"></div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
+import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
+const $ = id => document.getElementById(id), esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const MOBILE = innerWidth < 760, REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const A = '/assets/khuvsgul/';
+// Blender (x, y, z) → three (x, z, -y)
+const B = (x, y, z = 0) => new THREE.Vector3(x, z, -y);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+const DPR0 = Math.min(devicePixelRatio, MOBILE ? 1.25 : 1.5); renderer.setPixelRatio(DPR0); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, .05, 4000);
+scene.fog = new THREE.Fog(0xbcd6ee, 500, 2600);
+
+// ── Тэнгэр: өнгө + нар ──
+const skyU = { top: { value: new THREE.Color() }, hor: { value: new THREE.Color() }, sunDir: { value: new THREE.Vector3() }, sunCol: { value: new THREE.Color() }, night: { value: 0 } };
+const sky = new THREE.Mesh(new THREE.SphereGeometry(3000, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false, uniforms: skyU,
+  vertexShader: 'varying vec3 vp; void main(){ vp = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: `uniform vec3 top, hor, sunDir, sunCol; uniform float night; varying vec3 vp;
+    float h(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,45.164))) * 43758.5453); }
+    void main(){ vec3 c = mix(hor, top, smoothstep(-.02, .5, vp.y)); float s = max(0., dot(vp, sunDir));
+      c += sunCol * (pow(s, 900.) * 6. + pow(s, 12.) * .35);
+      if (night > .5) c += step(.9978, h(floor(vp * 300.))) * smoothstep(.05, .35, vp.y) * .9;
+      gl_FragColor = vec4(c, 1.); }` }));
+scene.add(sky);
+const TX = new THREE.TextureLoader(), tex = (f, srgb) => { const t = TX.load(A + 'tex/' + f); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
+let HDR = null;
+new RGBELoader().load(A + 'tex/sky.hdr', t => { t.mapping = THREE.EquirectangularReflectionMapping; HDR = t;
+  const pm = new THREE.PMREMGenerator(renderer); world.ENV = scene.environment = pm.fromEquirectangular(t).texture; pm.dispose(); applyTime(); });
+const hemi = new THREE.HemisphereLight(0xcfe3ff, 0x5d7a3c, 1); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff0d8, 2.6); sun.castShadow = true;
+sun.shadow.mapSize.set(MOBILE ? 1024 : 2048, MOBILE ? 1024 : 2048); Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 600 });
+sun.shadow.autoUpdate = false; sun.shadow.bias = -.0004; sun.shadow.normalBias = .05; scene.add(sun, sun.target);
+
+// ── Өндрийн газрын зураг (Blender-ээс) ──
+let HM = null;
+function hallLocal(X, Z) { const Hh = world.hall; if (!Hh) return null; const v = new THREE.Vector3(X, Hh.y, Z).applyMatrix4(Hh.inv); return v; }
+function hallBlock(X, Z) { const Hh = world.hall, v = hallLocal(X, Z); if (!v) return false; const ax = Math.abs(v.x), az = Math.abs(v.z);
+  if (ax > Hh.hw + .5 || az > Hh.hl + .5) return false; const inside = ax < Hh.hw - .85 && az < Hh.hl - .25, door = v.z > Hh.hl - .7 && ax < 1.15; return !(inside || door); }
+function Hw(X, Z) { const v = hallLocal(X, Z); if (v && Math.abs(v.x) < world.hall.hw + .6 && Math.abs(v.z) < world.hall.hl + .6) return Math.max(H(X, Z), world.hall.y);
+  const h = H(X, Z), P = world.pier; return P && X > P.min.x && X < P.max.x && Z > P.min.z && Z < P.max.z ? Math.max(h, P.max.y) : h; }   // гүүр = алхаж болох гадарга
+function H(X, Z) {                                                  // three (X, Z) → газрын өндөр
+  if (!HM) return 0; const x = X, y = -Z, fx = (x - HM.x0) / HM.step, fy = (y - HM.y0) / HM.step;
+  const i = Math.max(0, Math.min(HM.nx - 2, Math.floor(fx))), j = Math.max(0, Math.min(HM.ny - 2, Math.floor(fy))), u = fx - i, v = fy - j, g = (a, b) => HM.h[b * HM.nx + a];
+  return (g(i, j) * (1 - u) + g(i + 1, j) * u) * (1 - v) + (g(i, j + 1) * (1 - u) + g(i + 1, j + 1) * u) * v;
+}
+
+// ── Ус: Gerstner давалгаа (салхи, давалгааны огцом байдал, swell), эрэгт хугарах хөөс, цагаан дэлбэн, гүнээр өнгө ──
+const uT = { value: 0 }, uWind = { value: .4 };
+const uOc = { value: 0 }, uClar = { value: 1 }, uHM = { value: null }, uHMb = { value: new THREE.Vector4(-240, -210, 420, 420) }, waterN = tex('waternormals.jpg');
+const uCloudSh = { value: .35 }, uBoat = { value: new THREE.Vector4(0, 0, 0, 0) }, uWave = { value: new THREE.Vector4(1, 0, .1, .8) }, uSw = { value: .4 }, uSurf = { value: .4 }, uPer = { value: 8 }, uCaps = { value: .5 }, uCam = { value: new THREE.Vector3() }, uCaus = { value: 1 };
+const WAVES = [[0, 9, .38], [.45, 5.5, .24], [-.5, 3.4, .14], [.9, 15, .3], [-1.1, 2.2, .08]];   // [чигийн зөрүү, долгионы урт м, далайц]
+const GLSL_WAVES = `uniform vec4 uWave; uniform float uSw; uniform vec3 uCam;
+  vec3 gerstner(vec2 xz, float t, float att, out vec3 nrm){ vec3 d = vec3(0.); vec3 n = vec3(0., 1., 0.); float ang = atan(uWave.y, uWave.x);
+    ${WAVES.map(([o, L, a]) => `{ float an = ang + ${o.toFixed(2)}; vec2 D = vec2(cos(an), sin(an)); float k = 6.2832 / ${L.toFixed(2)}, c = sqrt(9.81 / k), A = uWave.z * ${a.toFixed(2)} * att;
+      float f = k * (dot(D, xz) - c * t), Q = min(uWave.w / (k * max(A, 1e-4) * 5.), 1.) * A; d.xz += Q * D * cos(f); d.y += A * sin(f); n.xz -= D * k * A * cos(f); n.y -= Q * k * sin(f); }`).join('\n    ')}
+    { float an = ang + .3; vec2 D = vec2(cos(an), sin(an)); float k = 6.2832 / 28., c = sqrt(9.81 / k), A = uSw * .25 * att; float f = k * (dot(D, xz) - c * t); d.y += A * sin(f); n.xz -= D * k * A * cos(f); }
+    nrm = normalize(n); return d; }`;
+function waveH(x, z, t) { if (!HM) return 0; const ang = Math.atan2(uWave.value.y, uWave.value.x), g = H(x, z), att = Math.min(1, Math.max(0, (.2 - g) / 2)); let y = 0;
+  for (const [o, L, a] of WAVES) { const an = ang + o, k = 6.2832 / L, c = Math.sqrt(9.81 / k); y += uWave.value.z * a * att * Math.sin(k * (Math.cos(an) * x + Math.sin(an) * z - c * t)); }
+  const an = ang + .3, k = 6.2832 / 28, c = Math.sqrt(9.81 / k); return y + uSw.value * .25 * att * Math.sin(k * (Math.cos(an) * x + Math.sin(an) * z - c * t)); }
+const GLSL_GROUND = `uniform sampler2D uHM; uniform vec4 uHMb;
+  float ground(vec2 xz){ vec2 uv = vec2((xz.x - uHMb.x) / uHMb.z, (-xz.y - uHMb.y) / uHMb.w); if (any(lessThan(uv, vec2(0.))) || any(greaterThan(uv, vec2(1.)))) return -20.; return texture2D(uHM, uv).r * 40. - 20.; }`;
+const waterM = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, roughness: .06, metalness: 0, envMapIntensity: .6 });
+waterM.onBeforeCompile = sh => { Object.assign(sh.uniforms, { uT, uWind, uHM, uHMb, uClar, uOc, uWave, uSw, uSurf, uPer, uCaps, uCam, uBoat, uN: { value: waterN } });
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
+      uniform float uT; ${GLSL_WAVES} ${GLSL_GROUND} varying vec3 vW; varying float vH; vec3 gD; vec3 gN;`)
+    .replace('#include <beginnormal_vertex>', `vec3 wp0 = (modelMatrix * vec4(position, 1.)).xyz; float dep0 = .2 - ground(wp0.xz);
+      float att = smoothstep(0., 2.2, dep0) * (1. - smoothstep(200., 290., distance(wp0.xz, uCam.xz))); gD = gerstner(wp0.xz, uT, att, gN);
+      vec3 objectNormal = gN;
+      #ifdef USE_TANGENT
+      vec3 objectTangent = vec3(1., 0., 0.);
+      #endif`)
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += gD; vH = gD.y;')
+    .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvW = (modelMatrix * vec4(transformed,1.)).xyz;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      uniform float uT, uWind, uClar, uSurf, uPer, uCaps, uOc; uniform sampler2D uN; uniform vec4 uWave, uBoat; ${GLSL_GROUND} varying vec3 vW; varying float vH;
+      float hh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(hh(i), hh(i + vec2(1, 0)), f.x), mix(hh(i + vec2(0, 1)), hh(i + 1.), f.x), f.y); }`)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      float dep = max(0., .2 - ground(vW.xz)); vec3 shallow = vec3(.36, .86, .80), mid = vec3(.05, .55, .70), deep = vec3(.02, .18, .42);
+      diffuseColor.rgb = mix(mix(shallow, mid, smoothstep(.0, 2.2 * uClar, dep)), deep, smoothstep(2. * uClar, 14. * uClar, dep));
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(.3, .5, .2))) * vec3(.62, .72, .78), uOc * .7);   /* бүрхэг өдөр нуур саарал хөх */
+      float nz = vn(vW.xz * 1.3 + uT * .3) * .6 + vn(vW.xz * 4.1 - uT * .5) * .4;
+      float edge = 1. - smoothstep(.0, .12 + uSurf * .1, dep + (nz - .5) * .08);                                   // ус газрын зааг
+      float line = fract(dep * 1.25 / max(.3, uSurf + .2) - uT / uPer + nz * .25);                               // эрэг рүү гүйх хугарлын шугам
+      float surf = smoothstep(.72, .97, line) * (1. - smoothstep(.0, 1.4 + uSurf * 2., dep)) * smoothstep(.0, .08, uSurf) * smoothstep(.35, .8, nz + .3);
+      float caps = smoothstep(.45, .95, vH / max(.02, uWave.z * 1.1)) * uCaps * smoothstep(.55, .8, nz) * smoothstep(1.5, 4., dep);   // цагаан дэлбэн
+      vec2 bv = uBoat.zw; float bsp = length(bv); vec2 bd = bv / max(bsp, 1e-3), rel = vW.xz - uBoat.xy; float along = -dot(rel, bd), side = abs(dot(rel, vec2(-bd.y, bd.x)));
+      float wake = step(-.6, along) * (1. - smoothstep(2., 11., along)) * (1. - smoothstep(.12 + along * .28, .35 + along * .34, side)) * smoothstep(.3, 1.6, bsp) * smoothstep(.25, .7, nz + along * .03);   // каякны мөр
+      float fo = clamp(edge * .85 + surf * .6 + caps * .75 + wake * .7, 0., 1.);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.96, .98, 1.), fo);
+      diffuseColor.a = clamp(mix(.18, .93, smoothstep(.0, 3.5 * uClar, dep)) + fo * .6, 0., 1.);`)
+    .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      vec2 q = vW.xz * .045; vec3 n1 = texture2D(uN, q + vec2(uT * .012, uT * .008)).xyz * 2. - 1., n2 = texture2D(uN, q * 2.3 - vec2(uT * .01, -uT * .014)).xyz * 2. - 1.;
+      vec3 base = normalize((inverse(viewMatrix) * vec4(normal, 0.)).xyz);
+      vec3 nw = normalize(base + vec3((n1.x + n2.x), 0., (n1.y + n2.y)) * (.12 + .3 * uWind));
+      normal = normalize((viewMatrix * vec4(nw, 0.)).xyz);`); };
+// камерыг дагах нягт тор (1 м) + алсын хавтгай цагираг
+const water = new THREE.Group(); scene.add(water);
+{ const g = new THREE.PlaneGeometry(600, 600, 300, 300).rotateX(-Math.PI / 2); const m = new THREE.Mesh(g, waterM); m.renderOrder = 2; m.frustumCulled = false; water.add(m);
+  for (const [w, h, x, z] of [[6600, 3000, 0, -1800], [6600, 3000, 0, 1800], [3000, 600, -1800, 0], [3000, 600, 1800, 0]]) {   // торын гадна талын хүрээ (давхцалгүй)
+    const r = new THREE.Mesh(new THREE.PlaneGeometry(w, h).rotateX(-Math.PI / 2), waterM); r.position.set(x, 0, z); r.renderOrder = 2; r.frustumCulled = false; water.add(r); } }
+water.position.y = .2;
+
+// ── Үүл: зөөлөн sprite бөөгнөрөл ──
+const cloudTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = g.createRadialGradient(64, 64, 6, 64, 64, 64);
+  r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.55, 'rgba(255,255,255,.75)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+const clouds = new THREE.Group(); scene.add(clouds);
+const cloudM = new THREE.SpriteMaterial({ map: cloudTex, color: 0xffffff, transparent: true, depthWrite: false, fog: false });
+{ const rnd = (() => { let s = 9; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+  for (let i = 0; i < 16; i++) { const c = B(-100 + rnd() * 900, -300 + rnd() * 1300, 120 + rnd() * 60);
+    for (let j = 0; j < 9; j++) { const s = new THREE.Sprite(cloudM); s.position.copy(c).add(new THREE.Vector3((rnd() - .5) * 90, (rnd() - .3) * 22, (rnd() - .5) * 50)); const k = 40 + rnd() * 50; s.scale.set(k * 1.5, k, 1); clouds.add(s); } } }
+
+// ── Asset ачаалах ──
+const loader = new GLTFLoader(), load = p => new Promise((ok, no) => loader.load(A + p, ok, undefined, no));
+const ZONES = [], world = { notes: [] };
+let DATA = {}, HOME = {};
+const today = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+const panel = html => { $('pcx').innerHTML = html; $('panel').classList.add('on'); };
+
+async function build() {
+  const [ter, stat, wj, hm] = await Promise.all([load('terrain.glb'), load('static.glb'), fetch(A + 'world.json').then(r => r.json()), fetch(A + 'height.json').then(r => r.json())]);
+  HM = hm;
+  { const G = new Uint8Array(hm.nx * hm.ny * 4); for (let i = 0; i < hm.nx * hm.ny; i++) { const v = Math.max(0, Math.min(255, Math.round((hm.h[i] + 20) / 40 * 255))); G[i * 4] = G[i * 4 + 1] = G[i * 4 + 2] = v; G[i * 4 + 3] = 255; }
+    const t = new THREE.DataTexture(G, hm.nx, hm.ny); t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; uHM.value = t;
+    uHMb.value.set(hm.x0, hm.y0, hm.step * (hm.nx - 1), hm.step * (hm.ny - 1)); }
+  const TU = { uT, uCaus, uCloudSh, gD: { value: tex('aerial_grass_rock_diff_1k.jpg', 1) }, gN: { value: tex('aerial_grass_rock_nor_gl_1k.jpg') }, sD: { value: tex('coast_sand_01_diff_1k.jpg', 1) },
+    sN: { value: tex('coast_sand_01_nor_gl_1k.jpg') }, rD: { value: tex('lichen_rock_diff_1k.jpg', 1) }, rN: { value: tex('lichen_rock_nor_gl_1k.jpg') } };
+  ter.scene.traverse(o => { if (!o.isMesh) return; world.ter = o; o.receiveShadow = true; const m = o.material; m.vertexColors = true; m.roughness = .92; m.color.set(0xffffff);
+    m.onBeforeCompile = sh => { Object.assign(sh.uniforms, TU);
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP; varying vec3 vWN;')
+        .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWP = (modelMatrix * vec4(transformed,1.)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+        uniform sampler2D gD, gN, sD, sN, rD, rN; uniform float uT, uCaus, uCloudSh; varying vec3 vWP; varying vec3 vWN; vec3 TW;
+        float th(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float tn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(th(i), th(i + vec2(1, 0)), f.x), mix(th(i + vec2(0, 1)), th(i + 1.), f.x), f.y); }
+        float fbm(vec2 p){ return tn(p) * .5 + tn(p * 2.07) * .25 + tn(p * 4.13) * .125 + tn(p * 8.3) * .0625; }
+        float cloudSh(vec2 xz){ return smoothstep(.48, .78, fbm((xz + uT * vec2(4., 1.6)) / 85.)) * uCloudSh; }
+        float caus(vec2 p){ p *= .55; vec2 i = p; float c = 1.; for (int n = 0; n < 3; n++) { float t = uT * .5 * (1. - 3.5 / float(n + 1)); i = p + vec2(cos(t - i.x) + sin(t + i.y), sin(t - i.y) + cos(t + i.x));
+          c += 1. / max(.001, length(vec2(p.x / (sin(i.x + t) / .005 + 1e-3), p.y / (cos(i.y + t) / .005 + 1e-3)))); } c = 1.17 - pow(clamp(c / 3., 0., 4.), 1.4); return clamp(pow(abs(c), 7.), 0., 1.); } 
+        vec3 tri(sampler2D t, vec3 p, vec3 w){ return texture2D(t, p.zy).rgb * w.x + texture2D(t, p.xz).rgb * w.y + texture2D(t, p.xy).rgb * w.z; }`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          vec3 wn = normalize(vWN), bw = pow(abs(wn), vec3(4.)); bw /= bw.x + bw.y + bw.z;
+          float N1 = fbm(vWP.xz / 6.), N2 = fbm(vWP.xz / 38. + 7.);
+          float sand = 1. - smoothstep(.65 + N1 * .7, 1.35 + N1 * .9, vWP.y), rock = clamp(1. - smoothstep(.55 + N1 * .12, .8 + N1 * .1, wn.y) + smoothstep(40. + N2 * 20., 75., vWP.y), 0., 1.);
+          vec2 uvG = vWP.xz / 9., uvS = vWP.xz / 5.;
+          vec3 cg = mix(texture2D(gD, uvG).rgb, texture2D(gD, uvG * .23).rgb, .45), cs = texture2D(sD, uvS).rgb, cr = tri(rD, vWP / 7., bw);
+          // өндрийн холимог: бүтцийн гэрэлтэлтээр зааг нь «шүдлэн» байдлаар (бодит шилжилт)
+          float lg = dot(cg, vec3(.33)), ls = dot(cs, vec3(.33)); sand = smoothstep(.0, 1., clamp(sand + (ls - lg) * .9 * sand * (1. - sand) * 4., 0., 1.));
+          vec3 tc = mix(mix(cg, cs, sand), cr, rock); TW = vec3(1. - max(sand, rock), sand * (1. - rock), rock);
+          tc *= mix(vec3(.82, .86, .78), vec3(1.12, 1.06, .92), N2);                                    // макро хэлбэлзэл
+          tc *= mix(1., .8, TW.x * smoothstep(.3, .7, N1));                                            // өвсний доод сүүдэр
+          diffuseColor.rgb = tc * mix(vec3(1.), vColor.rgb * 1.6, .35) * (1. - cloudSh(vWP.xz) * .45);
+          float wd = .2 - vWP.y; if (wd > 0.) { diffuseColor.rgb *= mix(vec3(1.), vec3(.55, .82, .85), smoothstep(0., 3., wd));                // усан доорх ёроол
+            diffuseColor.rgb += vec3(.85, 1., .95) * caus(vWP.xz) * uCaus * smoothstep(.05, .5, wd) * exp(-wd * .3) * .35; }`)
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+          vec3 ng = texture2D(gN, vWP.xz / 9.).xyz * 2. - 1., ns = texture2D(sN, vWP.xz / 5.).xyz * 2. - 1., nr = texture2D(rN, vWP.xz / 7.).xyz * 2. - 1.;
+          vec3 tn = ng * TW.x + ns * TW.y + nr * TW.z; vec3 pn = normalize(normalize(vWN) + vec3(tn.x, 0., -tn.y) * .9);
+          normal = normalize((viewMatrix * vec4(pn, 0.)).xyz);`); };
+    m.needsUpdate = true; });
+  scene.add(ter.scene);
+  { const GN = MOBILE ? 22000 : 80000, R = 28;
+    const bl = new THREE.BufferGeometry(); { const P = [], I = [];   // нэг instance = 6 иртэй бут (сийрэг харагдахгүй)
+      for (let k = 0; k < 6; k++) { const an = k / 6 * Math.PI * 2 + Math.random() * .8, r = Math.random() * .09, ox = Math.cos(an) * r, oz = Math.sin(an) * r, hk = .55 + Math.random() * .6, lean = .12 + Math.random() * .25, b0 = P.length / 3;
+        for (let i = 0; i <= 3; i++) { const y = i / 3, w = .5 * (1 - y * .9), lx = Math.cos(an) * lean * y * y, lz = Math.sin(an) * lean * y * y, px = -Math.sin(an), pz = Math.cos(an);
+          P.push(ox + lx - px * w * .035, y * hk, oz + lz - pz * w * .035, ox + lx + px * w * .035, y * hk, oz + lz + pz * w * .035); }
+        for (let i = 0; i < 3; i++) { const a = b0 + i * 2; I.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } }
+      bl.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); bl.setIndex(I); }
+    const g = new THREE.InstancedBufferGeometry(); g.index = bl.index; g.attributes.position = bl.attributes.position; g.instanceCount = GN;
+    const off = new Float32Array(GN * 4); for (let i = 0; i < GN; i++) { off[i * 4] = (Math.random() - .5) * 2 * R; off[i * 4 + 1] = (Math.random() - .5) * 2 * R; off[i * 4 + 2] = Math.random(); off[i * 4 + 3] = Math.random() * 6.283; }
+    g.setAttribute('aOff', new THREE.InstancedBufferAttribute(off, 4));
+    world.grassU = { uT, uWind, uCloudSh, uHM, uHMb, uR: { value: R }, uCamG: { value: new THREE.Vector3() }, gD: TU.gD, uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunC: { value: new THREE.Color() }, uAmb: { value: new THREE.Color() }, uFogC: { value: new THREE.Color() }, uDen: { value: 1 }, uSeason: { value: 0 }, uNoG: { value: [new THREE.Vector4(0, 0, 0, 0), new THREE.Vector4(0, 0, 0, 0), new THREE.Vector4(0, 0, 0, 0), new THREE.Vector4(0, 0, 0, 0)] } };
+    const gm = new THREE.ShaderMaterial({ uniforms: world.grassU, side: THREE.DoubleSide,
+      vertexShader: `${GLSL_GROUND} uniform float uT, uWind, uR, uDen; uniform vec3 uCamG; uniform vec4 uNoG[4]; attribute vec4 aOff; varying vec3 vC; varying float vY; varying vec2 vXZ; varying float vD;
+        float h1(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float n1(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(h1(i), h1(i + vec2(1, 0)), f.x), mix(h1(i + vec2(0, 1)), h1(i + 1.), f.x), f.y); }
+        void main(){ vec2 xz = uCamG.xz + mod(aOff.xy - uCamG.xz + uR, 2. * uR) - uR; float gy = ground(xz);
+          float sl = abs(ground(xz + vec2(1.5, 0.)) - gy) + abs(ground(xz + vec2(0., 1.5)) - gy), d = distance(xz, uCamG.xz);
+          float clump = n1(xz * .35), keep = step(aOff.z, uDen * (1. - smoothstep(9., 24., d) * .6)) * smoothstep(1.25, 1.7, gy) * (1. - smoothstep(.7, 1.3, sl)) * (1. - smoothstep(uR * .72, uR, d)) * smoothstep(-.05, .25, clump);
+          for (int q = 0; q < 4; q++) keep *= step(uNoG[q].z, distance(xz, uNoG[q].xy));   // байшин, асрын шалан дээр өвс ургахгүй
+          float H = (.2 + .32 * aOff.z) * (.6 + clump * .8) * keep, W = 1.;
+          float c = cos(aOff.w), s = sin(aOff.w); vec3 p = position; float y = p.y; p.xz = mat2(c, -s, s, c) * p.xz;
+          float wv = sin(uT * (1.6 + uWind) + xz.x * .35 + xz.y * .27) * .5 + sin(uT * 3.1 + xz.x * 1.3) * .2, bend = (.18 + .5 * uWind) * (wv + .55) * y * y;
+          vec3 wp = vec3(xz.x + p.x * (H * 1.6 + .02) + bend * H * .8, gy + y * H, xz.y + p.z * (H * 1.6 + .02) + bend * H * .5); y = clamp(y / 1.15, 0., 1.);
+          vY = y; vXZ = xz; vD = d; vC = vec3(h1(aOff.xy + 3.), clump, 0.);
+          gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.); }`,
+      fragmentShader: `uniform sampler2D gD; uniform vec3 uSun, uSunC, uAmb, uFogC; uniform float uT, uCloudSh, uR, uSeason; varying vec3 vC; varying float vY; varying vec2 vXZ; varying float vD;
+        float h1(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float n1(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(h1(i), h1(i + vec2(1, 0)), f.x), mix(h1(i + vec2(0, 1)), h1(i + 1.), f.x), f.y); }
+        void main(){ vec3 base = mix(texture2D(gD, vXZ / 9.).rgb * 1.1, vec3(.30, .40, .16), .35);                                            // газрын бүтэцтэй ижил өнгөөр эхэлнэ
+          vec3 tip = mix(vec3(.62, .66, .32), vec3(.78, .70, .38), vC.x);
+          base = mix(base, vec3(.36, .31, .18) * (.8 + .4 * vC.x), uSeason * .65); tip = mix(tip, mix(vec3(.66, .55, .34), vec3(.55, .44, .28), vC.x), uSeason);   /* улирал: намар-өвөл хатсан шаргал хүрэн */                                       // үзүүр: шаргал (намрын Хөвсгөл)
+          vec3 col = mix(base * .5, mix(base, tip, .5), smoothstep(0., 1., vY));
+          float cs = smoothstep(.48, .78, n1((vXZ + uT * vec2(4., 1.6)) / 85. * 2.) * .7 + n1((vXZ + uT * vec2(4., 1.6)) / 40.) * .3) * uCloudSh;
+          vec3 L = uAmb * (.55 + .45 * vY) + uSunC * (.45 + .55 * vY) * max(.15, uSun.y) * (1. - cs * .6);
+          vec3 tr = uSunC * pow(vY, 2.) * .25;                                                                   // гэрэл нэвтрэх (translucency)
+          gl_FragColor = vec4(col * L + tr * col, 1.);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }` });
+    const gr = new THREE.Mesh(g, gm); gr.frustumCulled = false; gr.userData.real = 'grass'; scene.add(gr); world.grass = gr; }
+  // барилга, гүүр: Poly Haven бүтцийг world-space triplanar-аар (Blender-ийн UV-гүй загварт ч)
+  const TRI = [[/^(wood|woodDark|frame|door_frame|ger_wood_paint)/, 'brown_planks_05', 1.3, .55], [/^log/, 'bark_brown_02', 1.1, .35], [/^(felt|carpetWhite)/, 'rough_linen', .7, .0],
+    [/^roof/, 'dark_wooden_planks', 1.6, .3], [/^door/, 'brown_planks_05', .9, .75], [/^stone/, 'lichen_rock', 1.4, .3], [/^far_ridge/, 'lichen_rock', 40, .12]];
+  const triDone = new Set();
+  const triTex = (m, base, tile, tint) => { if (triDone.has(m)) return; triDone.add(m);
+    const U = { tD: { value: tex(base + '_diff_1k.jpg', 1) }, tN: { value: tex(base + '_nor_gl_1k.jpg') }, tS: { value: 1 / tile }, tK: { value: tint } }; m.roughness = Math.max(m.roughness ?? .8, .78); m.metalness = 0; m.envMapIntensity = .35;
+    m.onBeforeCompile = sh => { Object.assign(sh.uniforms, U);
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vTP; varying vec3 vTN;')
+        .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvTP = (modelMatrix * vec4(transformed,1.)).xyz; vTN = normalize(mat3(modelMatrix) * objectNormal);');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+        uniform sampler2D tD, tN; uniform float tS, tK; varying vec3 vTP; varying vec3 vTN; vec3 tw3(){ vec3 w = pow(abs(normalize(vTN)), vec3(6.)); return w / (w.x + w.y + w.z); }`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          vec3 W3 = tw3(), p3 = vTP * tS; vec3 tc = texture2D(tD, p3.zy).rgb * W3.x + texture2D(tD, p3.xz).rgb * W3.y + texture2D(tD, p3.xy).rgb * W3.z;
+          diffuseColor.rgb = tc * mix(vec3(1.), diffuseColor.rgb * 1.8, tK) * (tK == 0. ? vec3(1.06, 1., .9) : vec3(1.));`)
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+          vec3 nn = (texture2D(tN, p3.zy).xyz * W3.x + texture2D(tN, p3.xz).xyz * W3.y + texture2D(tN, p3.xy).xyz * W3.z) * 2. - 1.;
+          vec3 pw = normalize(normalize(vTN) + (vec3(nn.x, nn.y, nn.x) * (1. - abs(normalize(vTN)))) * .6); normal = normalize((viewMatrix * vec4(pw, 0.)).xyz);`); };
+    m.needsUpdate = true; };
+  stat.scene.traverse(o => { if (!o.isMesh) return; o.castShadow = o.receiveShadow = true;
+    for (const m of [].concat(o.material)) { const t = TRI.find(r => r[0].test(m.name || '')); if (t) triTex(m, t[1], t[2], t[3]); }
+    const mn = [].concat(o.material)[0]?.name || '';
+    if (/^(larch|pine)/.test(mn)) { o.updateWorldMatrix(true, false); const b = new THREE.Box3().setFromObject(o); world.oldTrees ??= []; world.oldTrees.push([b.getCenter(new THREE.Vector3()), b.max.y - b.min.y, b.min.y, /^larch/.test(mn)]); o.visible = false; }
+    if (/^plant/.test(mn)) { const m = [].concat(o.material)[0]; m.color.set(0x7d7f45); m.roughness = .9; }
+    if (/^Note|^ribbon/i.test(o.name) || /^Note|^ribbon/i.test(o.parent?.name || '')) world.notes.push(o);
+    const m = o.material; if (m && m.emissiveIntensity > 0 && m.emissive && m.emissive.getHex() !== 0) { m.emissiveIntensity = Math.min(.7, Math.max(.4, m.emissiveIntensity)); } });
+  for (const o of world.notes) o.visible = false;                         // спиралийг vault-ийн өдрөөр дахин босгоно
+  scene.add(stat.scene);
+  // мод, хад, өвс, цэцэг — Poly Haven (CC0) бодит загвар, Blender-ээр вэбэд хөнгөлсөн (blender/ph_optimize.py). Хуучин low-poly-ийн байрлал, өндрийг хадгална.
+  const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), bb = new THREE.Box3();
+  const REAL = [[/larch/, 'card', 0xf0c25a], [/pine/, 'card', null], [/rock/, 'rock_moss_set_01', null], [/grass/, 'grass_medium_01', null], [/flower/, 'dandelion_01', null]];
+  const realCache = {};
+  const cardVariants = () => realCache.card ??= Promise.resolve((() => {
+    const wm = TX.load(A + 'real/fir_whorl.png'); wm.colorSpace = THREE.SRGBColorSpace; wm.anisotropy = 8;
+    const crownM = new THREE.MeshStandardMaterial({ map: wm, alphaTest: .4, roughness: .92, side: THREE.DoubleSide });
+    const bark = tex('bark_brown_02_diff_1k.jpg', 1); const barkM = new THREE.MeshStandardMaterial({ map: bark, roughness: .95, color: 0x8a7a6a });
+    return [0, 1, 2].map(vi => { const parts = [], rnd = (q => () => (q = (q * 16807) % 2147483647) / 2147483647)(11 + vi * 7), L = 8 + vi;
+      for (let i = 0; i < L; i++) { const y = .16 + (i / (L - 1)) * .78, r = Math.max(.05, .36 * Math.pow(1 - (y - .1) / .9, .85) * (.88 + rnd() * .24)), seg = 12;
+        const g = new THREE.CircleGeometry(1, seg, 0, Math.PI * 2); g.rotateX(-Math.PI / 2); const P = g.attributes.position;
+        for (let k = 0; k < P.count; k++) { const x = P.getX(k), z = P.getZ(k), d = Math.hypot(x, z); P.setXYZ(k, x * r, y - d * r * (.55 + rnd() * .2), z * r); }   // унжилт
+        g.rotateY(rnd() * 6.28); parts.push(g); }
+      const crown = mergeGeometries(parts.map(g => g.index ? g.toNonIndexed() : g));
+      const n = crown.attributes.normal, ps = crown.attributes.position; for (let k = 0; k < n.count; k++) { const v = new THREE.Vector3(ps.getX(k), (ps.getY(k) - .5) * .5, ps.getZ(k)).normalize(); n.setXYZ(k, v.x * .7, v.y * .7 + .55, v.z * .7); }
+      const trunk = new THREE.CylinderGeometry(.012, .03, 1, 7, 1, true).translate(0, .5, 0).toNonIndexed(); trunk.deleteAttribute('uv'); { const P = trunk.attributes.position, U = []; for (let k = 0; k < P.count; k++) U.push(Math.atan2(P.getZ(k), P.getX(k)) / 6.283 * 2, P.getY(k) * 6); trunk.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); }
+      const geo = mergeGeometries([crown, trunk], true); return { geo, mat: [crownM, barkM], h: 1 }; }); })());
+  const variants = async name => name === 'card' ? cardVariants() : realCache[name] ??= (async () => { const g = await load('real/' + name + '.glb'); g.scene.updateMatrixWorld(true); const out = [];
+    g.scene.traverse(o => { if (!o.isMesh) return; const geo = o.geometry.clone().applyMatrix4(o.matrixWorld); geo.computeBoundingBox(); const b = geo.boundingBox;
+      geo.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); geo.computeBoundingBox(); out.push({ geo, mat: o.material, h: geo.boundingBox.max.y - geo.boundingBox.min.y }); });
+    return out; })();
+  const sway = (mat, k) => { mat.onBeforeCompile = sh => { sh.uniforms.uT = uT; sh.uniforms.uWind = uWind;   // салхинд найгана
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uT; uniform float uWind;').replace('#include <begin_vertex>',
+      `#include <begin_vertex>\n float ph = instanceMatrix[3].x * .37 + instanceMatrix[3].z * .23; float hh = max(position.y, 0.) * ${k.toFixed(3)};\n transformed.x += sin(uT * 1.9 + ph) * hh * (.08 + .12 * uWind); transformed.z += cos(uT * 1.4 + ph * 1.3) * hh * (.05 + .08 * uWind);`); }; };
+  const place = async (name, tint, list, hOf) => { const vs = await variants(name);
+    vs.forEach((v, vi) => { const sub = list.filter((_, i) => i % vs.length === vi); if (!sub.length) return;
+      const isArr = Array.isArray(v.mat), mat = isArr ? v.mat.map(m => m.clone()) : v.mat.clone(), m0 = isArr ? mat[0] : mat;
+      if (tint) m0.color = new THREE.Color(tint); if (!isArr && mat.map) { mat.alphaTest = Math.max(mat.alphaTest, .45); mat.transparent = false; } m0.side = THREE.DoubleSide;
+      const soft = /grass|dandelion|card/.test(name); if (soft) sway(m0, name === 'card' ? .03 : 1);
+      const im = new THREE.InstancedMesh(v.geo, mat, sub.length); im.castShadow = !/grass|dandelion/.test(name); if (name === 'card') im.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: m0.map, alphaTest: .4 }); im.receiveShadow = true;
+      if (name === 'card') { const C = new THREE.Color(); sub.forEach((_, i) => im.setColorAt(i, C.setHSL(.0, 0, .82 + ((i * 37) % 23) / 23 * .3))); }
+      sub.forEach(([x, y, z, rz, s], i) => { const k = hOf(s) / v.h; Q.setFromAxisAngle(up, rz); M4.compose(B(x, y, z), Q, S.set(k * (name === 'card' ? .78 : 1), k * (.9 + ((i * 7) % 5) * .05), k * (name === 'card' ? .78 : 1))); im.setMatrixAt(i, M4); });
+      im.userData.real = name; im.computeBoundingSphere(); scene.add(im); }); };
+  for (const [file, list] of Object.entries(wj.instances)) {
+    const g = await load(file); bb.setFromObject(g.scene); const h0 = bb.max.y - bb.min.y;      // хуучин загварын өндөр → бодит загварын масштаб
+    const [, name, tint] = REAL.find(r => r[0].test(file)) || [];
+    if (!name) { g.scene.traverse(o => { if (!o.isMesh) return; const im = new THREE.InstancedMesh(o.geometry, o.material, list.length); list.forEach(([x, y, z, rz, s], i) => { Q.setFromAxisAngle(up, rz); M4.compose(B(x, y, z), Q, S.set(s, s, s)).multiply(o.matrixWorld); im.setMatrixAt(i, M4); }); scene.add(im); }); continue; }
+    const hk = /flower/.test(file) ? .35 : /grass/.test(file) ? .6 : /larch|pine/.test(file) ? 1.15 : 1;
+    const clear = name === 'card' ? [[wj.meta.ger, 17], ...Object.values(wj.meta.zones).map(z => [z, 8])] : [];   // хуарангийн задгай талбай
+    await place(name, tint, list.filter(([x, y]) => clear.every(([c, r]) => Math.hypot(x - c[0], y - c[1]) > r)), s => h0 * s * hk);
+  }
+  // static.glb дахь хуучин конус модыг бодит impostor модоор солих
+  for (const [c, h, y0, lar] of world.oldTrees || []) { const bp = [c.x, -c.z, y0, Math.random() * 6.28, 1]; await place('card', lar ? 0xf0c25a : null, [bp], () => h * 1.1); }
+  // нягт өвс, цэцэг: хуаран орчимд (Tidewater шиг газар хоосон биш) — өндөр/налуугаар шүүнэ
+  { const rnd = (() => { let q = 7; return () => (q = (q * 16807) % 2147483647) / 2147483647; })(), G = wj.meta.ger, gs = [], ds = [];
+    for (let i = 0; i < (MOBILE ? 3000 : 9000); i++) { const r = 4 + Math.sqrt(rnd()) * 85, a = rnd() * Math.PI * 2, x = G[0] + Math.cos(a) * r, y = G[1] + Math.sin(a) * r, P = B(x, y), h = H(P.x, P.z);
+      if (h < 1.25 || h > 28 || Math.abs(H(P.x + 1, P.z) - h) + Math.abs(H(P.x, P.z + 1) - h) > .9) continue; (rnd() < .07 ? ds : gs).push([x, y, h, rnd() * 6.28, .7 + rnd() * .7]); }
+    await place('grass_medium_01', null, gs, s => .32 * s); await place('dandelion_01', null, ds, s => .22 * s); }
+  // vault өгөгдөл
+  try { DATA = await (await fetch('/api/garden')).json(); } catch {}
+  try { HOME = await (await fetch('/api/home')).json(); } catch {}
+  await lifeSpiral(wj.meta.zones.fire);
+  // бүсүүд (Blender координатаас)
+  const Z = wj.meta.zones, G = wj.meta.ger, door = B(G[0] + 3.0 * G[3] + 1.6, G[1], G[2]);
+  ZONES.push(
+    { key: 'ger', name: 'Миний гэр', sub: 'орох · PC', p: door, r: 3.2, go: enterGer },
+    { name: 'Төслүүд', sub: `${DATA.projects?.length ?? 0} төсөл`, p: B(...Z.projects), r: 7, go: () => panel(`<h2>Төслүүд</h2><p class="sub">02-Projects</p><ul>` + (DATA.projects || []).map(p => `<li><span class="st ${esc(p.status)}">${esc(p.status)}</span>${esc(p.name)}</li>`).join('') + '</ul>') },
+    { name: 'Задгай номын сан', sub: 'судалгааны hub', p: B(...Z.openlib), r: 6, go: () => panel(`<h2>Задгай номын сан</h2><p class="sub">Судалгааны hub-ууд</p><ul>` + (HOME.library?.hubs || []).map(h => `<li>${esc(h)}</li>`).join('') + '</ul>') },
+    { name: 'Түүдэг гал', sub: 'амьдралын спираль', p: B(...Z.fire), r: 4, go: enterLife },
+    { name: 'Гүүр · Inbox', sub: `${DATA.inbox?.count ?? 0} note`, p: B(...Z.pier), r: 6, go: () => panel(`<h2>Гүүр · Inbox</h2><p class="sub">Нуурын эрэг рүү хөвж ирсэн санаанууд</p><ul>` + (DATA.inbox?.recent || []).map(t => `<li>${esc(t)}</li>`).join('') + '</ul>') },
+    { name: 'Хүслийн хад', sub: 'зорилго', p: B(...Z.pier).add(new THREE.Vector3(4, 0, 0)), r: 5, go: () => panel(`<h2>Хүслийн хад</h2><p class="sub">Нуурын дундах хад · 03-Areas/Goals</p><ul>` + (DATA.goals || []).map(g => `<li>${esc(g)}</li>`).join('') + '</ul>') },
+  );
+  // ── Төслийн WIDE HUD: Төслүүдийн байшингийн гадаа агаарт хөвөх муруй дэлгэц — сүүлийн Inbox→task, Output зураг/бичлэг төслөөр нь ──
+  { const P0 = B(...Z.projects), G0 = B(G[0], G[1], G[2]), dir = new THREE.Vector3(G0.x - P0.x, 0, G0.z - P0.z).normalize();
+    const pos = P0.clone().addScaledVector(dir, 9); pos.y = Math.max(H(pos.x, pos.z), 1.5) + 4.6;
+    const CW = 4096, CH = 1152, cv = document.createElement('canvas'); cv.width = CW; cv.height = CH; const g = cv.getContext('2d');
+    const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 8;
+    const R = 11, ARC = 1.3, geo = new THREE.CylinderGeometry(R, R, 3.6, 64, 1, true, Math.PI - ARC / 2, ARC); geo.scale(-1, 1, 1);
+    const mat = new THREE.MeshBasicMaterial({ map: tx, transparent: true, side: THREE.DoubleSide, toneMapped: false, depthWrite: false, opacity: .96 });
+    const hud = new THREE.Mesh(geo, mat), grp = new THREE.Group(); hud.position.z = R; grp.add(hud); grp.position.copy(pos); grp.lookAt(P0.x, pos.y, P0.z); grp.rotateY(Math.PI); scene.add(grp);
+    hud.renderOrder = 5; world.hud = { grp, y: pos.y, mat };
+    const rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
+    const clip = (s, w) => { s = String(s); while (g.measureText(s).width > w && s.length > 2) s = s.slice(0, -2); return s; };
+    const imgOf = m => new Promise(res => { if (m.kind === 'image') { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = m.src; }
+      else { const v = document.createElement('video'); v.muted = true; v.preload = 'auto'; v.src = m.src; v.onloadeddata = () => { v.currentTime = Math.min(1.2, (v.duration || 2) / 3); }; v.onseeked = () => res(v); v.onerror = () => res(null); setTimeout(() => res(null), 8000); } });
+    const cover = (im, x, y, w, h) => { const iw = im.videoWidth || im.naturalWidth, ih = im.videoHeight || im.naturalHeight, s = Math.max(w / iw, h / ih);
+      g.save(); rr(x, y, w, h, 14); g.clip(); g.drawImage(im, x + (w - iw * s) / 2, y + (h - ih * s) / 2, iw * s, ih * s); g.restore(); };
+    const draw = async F => { const P = F.projects.filter(p => p.media.length || p.tasks.length).slice(0, 5);
+      g.clearRect(0, 0, CW, CH); const bg = g.createLinearGradient(0, 0, 0, CH); bg.addColorStop(0, 'rgba(10,22,34,.80)'); bg.addColorStop(1, 'rgba(6,12,20,.62)'); g.fillStyle = bg; rr(8, 8, CW - 16, CH - 16, 40); g.fill();
+      g.strokeStyle = 'rgba(140,220,255,.55)'; g.lineWidth = 4; g.stroke();
+      g.fillStyle = '#9fe6ff'; g.font = '600 30px Inter, sans-serif'; g.fillText('ТӨСЛИЙН HUD  ·  сүүлийн Inbox, Output, бичлэг', 60, 74);
+      g.fillStyle = 'rgba(159,230,255,.6)'; g.font = '26px Inter, sans-serif'; g.textAlign = 'right'; g.fillText(new Date().toLocaleString('mn-MN') + '  ·  E — gallery', CW - 60, 74); g.textAlign = 'left';
+      const colW = (CW - 120) / Math.max(1, P.length), jobs = [];
+      P.forEach((p, i) => { const x = 60 + i * colW, w = colW - 40;
+        g.fillStyle = 'rgba(140,220,255,.08)'; rr(x, 104, w, CH - 150, 24); g.fill();
+        g.fillStyle = '#fff'; g.font = '700 40px Inter, sans-serif'; g.fillText(clip(p.name, w - 40), x + 22, 160);
+        g.fillStyle = '#9fe6ff'; g.font = '24px Inter, sans-serif'; g.fillText(`${p.tasks.length} task · ${p.media.length} зураг/бичлэг`, x + 22, 196);
+        const M = p.media.slice(0, 4), tw = (w - 44 - 12) / 2, th = tw * .62;
+        M.forEach((m, k) => { const tx_ = x + 22 + (k % 2) * (tw + 12), ty = 220 + Math.floor(k / 2) * (th + 12);
+          g.fillStyle = 'rgba(255,255,255,.06)'; rr(tx_, ty, tw, th, 14); g.fill();
+          jobs.push(imgOf(m).then(im => { if (im) cover(im, tx_, ty, tw, th); if (m.kind === 'video') { g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.arc(tx_ + tw / 2, ty + th / 2, 34, 0, 7); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(tx_ + tw / 2 - 11, ty + th / 2 - 17); g.lineTo(tx_ + tw / 2 + 18, ty + th / 2); g.lineTo(tx_ + tw / 2 - 11, ty + th / 2 + 17); g.fill(); } tx.needsUpdate = true; })); });
+        let ty = 220 + (M.length ? Math.ceil(M.length / 2) * (th + 12) + 30 : 10); g.font = '28px Inter, sans-serif';
+        for (const t of p.tasks.slice(0, M.length > 2 ? 4 : 12)) { if (ty > CH - 80) break; g.fillStyle = t.status === 'done' ? '#7ee0a0' : t.status === 'in-progress' ? '#ffd27a' : '#9fe6ff'; g.beginPath(); g.arc(x + 32, ty - 9, 7, 0, 7); g.fill();
+          g.fillStyle = 'rgba(255,255,255,.88)'; g.fillText(clip(t.title, w - 70), x + 50, ty); ty += 44; } });
+      tx.needsUpdate = true; await Promise.all(jobs); tx.needsUpdate = true; };
+    const load = () => fetch('/api/feed').then(r => r.json()).then(F => { world.feed = F; return draw(F); }).catch(() => {});
+    load(); setInterval(load, 5 * 60e3);
+    ZONES.push({ name: 'Төслийн HUD', sub: 'сүүлийн Inbox, Output, бичлэг · gallery', p: pos.clone().setY(0).add(new THREE.Vector3(0, H(pos.x, pos.z), 0)), r: 7, go: () => openFeed() }); }
+  // ── Номын сангийн их танхим (Trinity College «Long Room», Admont-ийн санаагаар): торхон тааз, 2 давхар тавиур, галерей, том цонх ──
+  { const P0 = B(...Z.library), bb2 = new THREE.Box3(), cc = new THREE.Vector3();
+    stat.scene.updateMatrixWorld(true); stat.scene.traverse(o => { if (!o.isMesh || !o.visible) return; bb2.setFromObject(o).getCenter(cc); if (Math.hypot(cc.x - P0.x, cc.z - P0.z) < 9 && bb2.max.y - bb2.min.y < 12) o.visible = false; }); }
+  { const P0 = B(...Z.library), gc = B(...wj.meta.ger), toG = new THREE.Vector3(gc.x - P0.x, 0, gc.z - P0.z).normalize();
+    const HW = 5.6, HL = 11, WALL = 6.6, C0 = P0.clone().addScaledVector(toG, -5);
+    let fy = -1e9; for (let ix = -1; ix <= 1; ix++) for (let iz = -1; iz <= 1; iz++) fy = Math.max(fy, H(C0.x + ix * HW, C0.z + iz * HL));       // шал = газрын хамгийн өндөр цэг (булагдахгүй)
+    const L = new THREE.Group(); L.position.set(C0.x, fy + .35, C0.z); L.lookAt(L.position.x + toG.x, L.position.y, L.position.z + toG.z); scene.add(L); world.library = L; L.updateMatrixWorld(true);
+    world.hall = { inv: L.matrixWorld.clone().invert(), hw: HW, hl: HL, y: L.position.y };
+    const wood = new THREE.MeshStandardMaterial({ name: 'wood_lib', color: 0x8a6440 }); triTex(wood, 'brown_planks_05', 1, .5);
+    const dark = new THREE.MeshStandardMaterial({ name: 'wood_libd', color: 0x4a3322 }); triTex(dark, 'brown_planks_05', .8, .75);
+    const floorM = new THREE.MeshStandardMaterial({ name: 'floor_lib', color: 0x6b4a32 }); triTex(floorM, 'dark_wooden_planks', 1.2, .4);
+    const stone = new THREE.MeshStandardMaterial({ name: 'stone_lib', color: 0xb8ad9a }); triTex(stone, 'lichen_rock', 2.5, .55);
+    const plaster = new THREE.MeshStandardMaterial({ name: 'stone_plaster', color: 0xcabda4, roughness: .92 }); triTex(plaster, 'lichen_rock', 3, .7);
+    const bx = (w, h, d, x, y, z, m, par = L) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = b.receiveShadow = true; par.add(b); return b; };
+    bx(HW * 2 + 1.2, 6, HL * 2 + 1.2, 0, -3.05, 0, stone);                                                          // чулуун суурь
+    bx(HW * 2, .1, HL * 2, 0, 0, 0, floorM);                                                                         // шал
+    bx(.4, WALL, HL * 2, -HW - .2, WALL / 2, 0, plaster); bx(.4, WALL, HL * 2, HW + .2, WALL / 2, 0, plaster);       // хажуу хана
+    bx(HW * 2 + .8, WALL, .4, 0, WALL / 2, -HL - .2, plaster);                                                      // арын хана
+    bx(HW - 1.3, WALL, .4, -(HW + 1.3) / 2 - .0, WALL / 2, HL + .2, plaster); bx(HW - 1.3, WALL, .4, (HW + 1.3) / 2, WALL / 2, HL + .2, plaster);   // урд хана (хаалгатай)
+    bx(2.6, WALL - 3.4, .4, 0, 3.4 + (WALL - 3.4) / 2, HL + .2, plaster); bx(2.9, .25, .5, 0, 3.3, HL + .25, dark);   // хаалганы дээд хэсэг
+    // торхон тааз + хавирга
+    { const vault = new THREE.Mesh(new THREE.CylinderGeometry(HW + .2, HW + .2, HL * 2 + .8, 32, 1, true, Math.PI / 2, Math.PI), wood); vault.rotation.x = Math.PI / 2; vault.position.y = WALL; vault.material = wood.clone(); vault.material.side = THREE.DoubleSide; L.add(vault);
+      const rib = new THREE.TorusGeometry(HW + .12, .1, 6, 28, Math.PI); for (let z = -HL; z <= HL + .01; z += 2.75) { const r = new THREE.Mesh(rib, dark); r.position.set(0, WALL, z); L.add(r); }
+      for (const z of [-HL - .2, HL + .2]) { const lun = new THREE.Mesh(new THREE.CircleGeometry(HW + .2, 32, 0, Math.PI), plaster); lun.position.set(0, WALL, z); lun.material = plaster.clone(); lun.material.side = THREE.DoubleSide; L.add(lun); } }
+    // арын том нуман цонх (гадна гэрэл орж ирнэ)
+    { const g = new THREE.Group(); g.position.set(0, 0, -HL + .02); L.add(g); const glass = new THREE.MeshStandardMaterial({ color: 0x9fb4c6, roughness: .08, metalness: .7, envMapIntensity: .8 });   /* шил — гэрэлтэхгүй, тусгал */
+      const p1 = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 4.4), glass); p1.position.set(0, 3.6, 0); g.add(p1); const p2 = new THREE.Mesh(new THREE.CircleGeometry(1.6, 24, 0, Math.PI), glass); p2.position.set(0, 5.8, 0); g.add(p2);
+      for (const x of [-1.6, -.53, .53, 1.6]) bx(.08, 4.4, .08, x, 3.6, HL * 0 - HL + .06, dark); for (const y of [2.2, 3.6, 5]) bx(3.3, .07, .08, 0, y, -HL + .06, dark);
+      const sun_ = new THREE.SpotLight(0xfff1d6, 30, 30, .55, .7, 1.2); sun_.position.set(0, 5, -HL + .5); sun_.target.position.set(0, 0, 0); L.add(sun_, sun_.target); (world.hallLights ??= []).push(sun_); }
+    // шат (галерей): 2 талд, тавиурын дээр
+    const GY = 3.25;
+    for (const s of [-1, 1]) { bx(1.25, .14, HL * 2 - .2, s * (HW - .62), GY, 0, dark);
+      const rail = bx(.07, .07, HL * 2 - .4, s * (HW - 1.25), GY + 1.0, 0, dark); }
+    { const n = Math.floor((HL * 2 - .6) / .3), bal = new THREE.InstancedMesh(new THREE.CylinderGeometry(.025, .03, 1, 6), dark, n * 2), M = new THREE.Matrix4(); let k = 0;
+      for (const s of [-1, 1]) for (let i = 0; i < n; i++) { M.makeTranslation(s * (HW - 1.25), GY + .5, -HL + .3 + i * .3); bal.setMatrixAt(k++, M); } L.add(bal); }
+    for (const s of [-1, 1]) for (let z = -10.925; z < HL; z += 2.75) bx(.3, GY, .3, s * (HW - 1.25), GY / 2, z, dark);       // галерейн багана
+    { for (const s of [-1, 1]) { const lad = new THREE.Group(); lad.position.set(s * (HW - 1.15), 0, 4.2 * s); lad.rotation.z = s * .18; L.add(lad);           // модон шат (чимэглэл)
+        bx(.05, 3.4, .05, 0, 1.7, -.22, dark, lad); bx(.05, 3.4, .05, 0, 1.7, .22, dark, lad); for (let y = .3; y < 3.3; y += .32) bx(.04, .04, .44, 0, y, 0, dark, lad); } }
+    // уншлагын урт ширээнүүд + ногоон чийдэн + сандал
+    const lampM = new THREE.MeshStandardMaterial({ color: 0x1f6b3a, emissive: 0x2c8a4a, emissiveIntensity: .6, roughness: .3, metalness: .4 });
+    for (const z of [-6.5, -1.5, 3.5]) { bx(1.5, .08, 3.6, 0, .8, z, wood); for (const dx of [-.62, .62]) for (const dz of [-1.6, 1.6]) bx(.08, .78, .08, dx, .39, z + dz, dark);
+      for (const dz of [-.9, .9]) { const l = new THREE.Mesh(new THREE.SphereGeometry(.16, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), lampM); l.position.set(0, 1.18, z + dz); l.scale.set(1.4, .7, .8); L.add(l); bx(.03, .34, .03, 0, 1.0, z + dz, dark); }
+      for (const s of [-1, 1]) for (const dz of [-1.1, 0, 1.1]) { bx(.45, .05, .45, s * 1.15, .48, z + dz, dark); bx(.05, .55, .45, s * 1.37, .75, z + dz, dark); } }
+    // лааны суурьтай дэнлүү (chandelier) + гэрэл
+    const bulb = new THREE.MeshBasicMaterial({ color: 0xffd28a });
+    for (const z of [-7, 0, 7]) { const ch = new THREE.Group(); ch.position.set(0, WALL + 1.2, z); L.add(ch); bx(.03, 1.8, .03, 0, .9, 0, dark, ch);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(.7, .03, 6, 24), dark); ring.rotation.x = Math.PI / 2; ch.add(ring);
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, b_ = new THREE.Mesh(new THREE.SphereGeometry(.05, 8, 6), bulb); b_.position.set(Math.cos(a) * .7, .08, Math.sin(a) * .7); ch.add(b_); }
+      const pl = new THREE.PointLight(0xffc98a, 10, 12, 1.8); pl.position.set(0, -.2, 0); ch.add(pl); (world.hallLights ??= []).push(pl); }
+    // тавиурууд: 2 давхар × 2 тал × 7 багц
+    const CW = 2.4, rh = .42, cases = [];
+    const mkCase = (x, y, z, ry, rows) => { const c = new THREE.Group(); c.position.set(x, y, z); c.rotation.y = ry; c.userData.case = true; c.userData.rows = rows; L.add(c);
+      bx(CW, rows * rh + .1, .04, 0, (rows * rh) / 2, -.2, dark, c); bx(.06, rows * rh + .12, .44, -CW / 2, (rows * rh) / 2, 0, wood, c); bx(.06, rows * rh + .12, .44, CW / 2, (rows * rh) / 2, 0, wood, c);
+      for (let r = 0; r <= rows; r++) bx(CW, .035, .44, 0, r * rh, 0, wood, c); bx(CW + .12, .14, .5, 0, rows * rh + .1, .02, dark, c); cases.push(c); return c; };
+    for (const fl of [0, 1]) for (const s of [-1, 1]) for (let z = -HL + 1.45 + 1.375 * 0; z < HL - 1; z += 2.75) mkCase(s * (HW - .25), fl ? GY + .08 : .06, z + 1.375 - 1.375, s < 0 ? Math.PI / 2 : -Math.PI / 2, fl ? 6 : 7);
+    world.libBooks = []; world.libUI = null;
+    fetch('/api/books').then(r => r.json()).then(Bk => {
+      const PAL = { newsletter: [0x14213d, 0x1d2b4f, 0x0f1a30], books: [0x3b2a20, 0x4a3426, 0x2f2118], decisions: [0x7a2e2a, 0x8c3b2f, 0x5e2a26], knowledge: [0x2f4f6e, 0x34607d, 0x26405a], references: [0x3f5a3a, 0x4d6b44, 0x334a30], research: [0x6e5326, 0x80622e, 0x5a4420], glossary: [0x4a3a5e, 0x5a4870, 0x3c2f4d] };
+      const all = []; Bk.shelves.forEach((sh, si) => sh.books.forEach(b => all.push({ ...b, sh: sh.key, shn: sh.name, si })));
+      const geo = new THREE.BoxGeometry(1, 1, 1); geo.translate(0, .5, 0);
+      const mat = new THREE.MeshStandardMaterial({ roughness: .75 }); { const t = tex('rough_linen_diff_1k.jpg', 1); mat.map = t; }
+      const atlas = spineAtlas(all), spM = spineMaterial(atlas), mats = [mat, mat, mat, mat, spM, mat], cellOf = new Map(all.map((b, i) => [b.id, i]));
+      geo.setAttribute('aCell', new THREE.InstancedBufferAttribute(Float32Array.from(all, (_, i) => i), 1));
+      const im = new THREE.InstancedMesh(geo, mats, all.length); im.castShadow = false; im.receiveShadow = true; im.userData.books = all;
+      const M = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), C = new THREE.Color(), tmp = new THREE.Object3D(), LM = L.matrixWorld;
+      // хэсэг бүр шинэ тавиураас эхэлнэ; доод давхарт ойр, ихээр уншдаг нь
+      let ci = 0, row = 0, cx = -CW / 2 + .06, prev = null; const secOfCase = [];
+      const place = (th, hh, dp, tilt) => { const c = cases[Math.min(ci, cases.length - 1)], rows = c.userData.rows;
+        if (cx + th > CW / 2 - .06) { row++; cx = -CW / 2 + .06; if (row >= rows) { ci++; row = 0; } } const cc_ = cases[Math.min(ci, cases.length - 1)];
+        tmp.position.set(cx + th / 2, (cc_.userData.rows - 1 - row) * rh + .018, .02); tmp.rotation.set(0, 0, tilt); tmp.scale.set(th, hh, dp); tmp.updateMatrix(); cc_.updateMatrix();
+        M.multiplyMatrices(cc_.matrix, tmp.matrix).premultiply(LM); cx += th + .002; return ci < cases.length; };
+      all.forEach((b, i) => { if (b.sh !== prev) { if (prev !== null && (row > 0 || cx > -CW / 2 + .07)) { ci++; row = 0; cx = -CW / 2 + .06; } prev = b.sh; secOfCase[ci] = b.shn; }
+        place(.024 + Math.min(.045, Math.log10(b.size + 10) * .008), .27 + ((i * 13) % 7) * .012, .2 + ((i * 7) % 5) * .012, ((i * 31) % 13 === 0) ? .07 : 0);
+        im.setMatrixAt(i, M); const pal = PAL[b.sh] || [0x666666]; C.set(pal[i % pal.length]).multiplyScalar(.85 + ((i * 17) % 9) * .04); im.setColorAt(i, C); if (!secOfCase[ci]) secOfCase[ci] = b.shn; });
+      im.computeBoundingSphere(); im.userData.real = 'books'; scene.add(im); world.libBooks = im;
+      // үлдсэн тавиурыг хуучин арьсан хавтастай «архивын» номоор дүүргэнэ (Long Room шиг бүрэн)
+      { const fill = []; const rnd = (q_ => () => (q_ = (q_ * 16807) % 2147483647) / 2147483647)(42); let guard = 0;
+        while (ci < cases.length && guard++ < 14000) { const th = .03 + rnd() * .05; if (!place(th, .28 + rnd() * .12, .22, rnd() < .06 ? .09 : 0)) break; fill.push(M.clone()); }
+        const fm = new THREE.MeshStandardMaterial({ roughness: .6, map: mat.map }), fi = new THREE.InstancedMesh(geo.clone().deleteAttribute('aCell'), fm, fill.length);
+        const LEATHER = [0x5a2a1a, 0x3d2a1c, 0x2a1d14, 0x6b3a22, 0x22301f, 0x3a2531, 0x7a5a2a]; fill.forEach((m, i) => { fi.setMatrixAt(i, m); fi.setColorAt(i, C.set(LEATHER[i % 7]).multiplyScalar(.75 + rnd() * .4)); });
+        fi.computeBoundingSphere(); scene.add(fi); }
+      // тавиур бүрийн дээр хэсгийн нэр (гуулин самбар)
+      cases.forEach((c, k) => { const name = secOfCase[k] || 'Архив', cv = document.createElement('canvas'); cv.width = 512; cv.height = 64; const g = cv.getContext('2d');
+        const gr = g.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, '#d8b46a'); gr.addColorStop(1, '#8a6a2e'); g.fillStyle = gr; g.fillRect(0, 0, 512, 64); g.fillStyle = '#2a1c0c'; g.font = '600 34px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(name.toUpperCase(), 256, 34);
+        const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; const pl = new THREE.Mesh(new THREE.PlaneGeometry(1.4, .18), new THREE.MeshStandardMaterial({ map: t, metalness: .5, roughness: .4 })); pl.position.set(0, c.userData.rows * rh + .1, .28); c.add(pl); });
+      { const pick = [all.find(b => b.sh === 'newsletter'), [...all].filter(b => b.sh === 'knowledge' || b.sh === 'decisions').sort((a, b) => b.date.localeCompare(a.date))[0], all.find(b => b.sh === 'books')].filter(Boolean);
+        const TL = new THREE.TextureLoader(); TL.setCrossOrigin('anonymous');
+        pick.forEach(async (b, k) => { const u = await coverURL(b); const t = TL.load(u); t.colorSpace = THREE.SRGBColorSpace;
+          const pl = new THREE.Mesh(new THREE.PlaneGeometry(.34, .5), new THREE.MeshStandardMaterial({ map: t, roughness: .6 })); pl.position.set(0, .81 + .25, 3.5 - .55 + k * .55); pl.rotation.y = Math.PI / 2 * 0; pl.rotation.x = -.22; pl.userData.book = b; L.add(pl);
+          pl.rotation.set(-.22, 0, 0); pl.position.set(-.38 + k * .38, 1.07, 5.0); const back = new THREE.Mesh(new THREE.BoxGeometry(.36, .52, .02), dark); back.position.set(0, 0, -.012); pl.add(back); }); }
+      // задгай номын сангийн Kenney тавиурууд — судалгаа, лавлагаа, глоссари
+      const open = []; stat.scene.traverse(o => { if (o.isMesh && /^bookcaseOpen\(Clone\)/.test(o.name)) open.push(new THREE.Box3().setFromObject(o)); });
+      const rb = all.filter(b => b.sh === 'research' || b.sh === 'glossary' || b.sh === 'references'); if (open.length && rb.length) {
+        const geo2 = geo.clone(); geo2.setAttribute('aCell', new THREE.InstancedBufferAttribute(Float32Array.from(rb, b => cellOf.get(b.id)), 1));
+        const im2 = new THREE.InstancedMesh(geo2, mats, rb.length); im2.userData.books = rb; im2.userData.real = 'books';
+        open.sort((a, b) => a.min.x - b.min.x); const per = Math.ceil(rb.length / open.length), perL = Math.max(1, Math.ceil(per / 3));
+        rb.forEach((b, i) => { const bb_ = open[Math.min(open.length - 1, Math.floor(i / per))], j = i % per, lv = Math.floor(j / perL) + 1, w = .042, th = .032 + ((i * 7) % 3) * .003;
+          const y = bb_.min.y + .06 + lv * (bb_.max.y - bb_.min.y - .1) / 4, hh = .26 + ((i * 13) % 5) * .012;
+          M.compose(new THREE.Vector3(bb_.min.x + .08 + (j % perL) * w + th / 2, y, (bb_.min.z + bb_.max.z) / 2 + .02), q.identity(), sc.set(th, hh, .22)); im2.setMatrixAt(i, M);
+          const pal = PAL[b.sh]; C.set(pal[i % pal.length]).multiplyScalar(.85 + ((i * 17) % 9) * .04); im2.setColorAt(i, C); });
+        im2.computeBoundingSphere(); scene.add(im2); world.libBooks2 = im2;
+        if (world.grassU) { const b0 = open[0], b1 = open[open.length - 1]; world.grassU.uNoG.value[3].set((b0.min.x + b1.max.x) / 2, (b0.min.z + b1.max.z) / 2, (b1.max.x - b0.min.x) / 2 + .8, 0); } } });
+    // хаалганы өмнөх уншлагын тавцан = «Нүүр хуудас» (Wikipedia шиг)
+    { const lec = new THREE.Group(); lec.position.set(0, 0, HL - 2.2); L.add(lec); bx(.5, 1.05, .4, 0, .52, 0, dark, lec); const top = bx(.7, .05, .5, 0, 1.12, -.05, wood, lec); top.rotation.x = -.35; }
+    if (world.grassU) { const u = world.grassU.uNoG.value, gp = B(...wj.meta.ger); u[0].set(L.position.x, L.position.z, HL + 1.5, 0); u[1].set(gp.x, gp.z, 5.4, 0); }
+    ZONES.push({ name: 'Номын сан', sub: 'Нүүр хуудас · хайх, онцлох, санамсаргүй', p: L.localToWorld(new THREE.Vector3(0, 0, HL - 1.2)), r: 2.2, go: () => openWikiHome() }); }
+  // ── Миний оффис: эрэг дээрх гадаа ширээ + Mac (itge.e 2026-10-20). Дэлгэц = /control (Architect-ийн Удирдлагын өрөө) ──
+  { let best = null; const P0 = B(...Z.pier);
+    for (let r = 6; r < 26 && !best; r += 1.5) for (let a = 0; a < 6.28; a += .3) { const x = P0.x + Math.cos(a) * r, z = P0.z + Math.sin(a) * r, h = H(x, z);
+      if (h > 1.5 && h < 4 && Math.abs(H(x + 1.5, z) - h) + Math.abs(H(x, z + 1.5) - h) < .35) { best = new THREE.Vector3(x, h, z); break; } }
+    const O = new THREE.Group(); O.position.copy(best || P0); O.lookAt(P0.x, O.position.y, P0.z); scene.add(O);
+    const wood = new THREE.MeshStandardMaterial({ name: 'wood_office', color: 0xb08860 }); triTex(wood, 'brown_planks_05', .9, .4);
+    const box = (w, h, d, x, y, z, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = b.receiveShadow = true; O.add(b); return b; };
+    box(1.6, .06, .8, 0, .76, 0, wood); for (const [x, z] of [[-.72, -.33], [.72, -.33], [-.72, .33], [.72, .33]]) box(.06, .76, .06, x, .38, z, wood);   // ширээ
+    box(.5, .05, .5, 0, .45, -.75, wood); box(.5, .5, .05, 0, .72, -.98, wood); for (const [x, z] of [[-.22, -.53], [.22, -.53], [-.22, -.97], [.22, -.97]]) box(.04, .45, .04, x, .225, z, wood);   // сандал
+    const alu = new THREE.MeshStandardMaterial({ color: 0xc9ccd1, metalness: .85, roughness: .28 });
+    box(.62, .018, .43, 0, .8, -.05, alu);                                                        // MacBook-ийн доод тал
+    const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 660; const g2 = cv.getContext('2d');
+    const draw = (st) => { const g = g2; g.fillStyle = '#0d1420'; g.fillRect(0, 0, 1024, 660); g.fillStyle = '#e8eef7'; g.font = '600 46px Inter, system-ui'; g.fillText('Удирдлагын өрөө', 60, 110);
+      g.font = '28px Inter, system-ui'; g.fillStyle = '#8fa3bd'; g.fillText('/control · агентууд ✋ ⏳ 🟢 💤', 60, 165);
+      (st || []).slice(0, 8).forEach((r, i) => { g.fillStyle = '#e8eef7'; g.font = '30px Inter, system-ui'; g.fillText(r, 60, 240 + i * 50); });
+      g.fillStyle = '#ffcf6b'; g.font = '600 30px Inter, system-ui'; g.fillText('E — нээх', 60, 610); scr.needsUpdate = true; };
+    const scr = new THREE.CanvasTexture(cv); scr.colorSpace = THREE.SRGBColorSpace;
+    const lid = new THREE.Group(); lid.position.set(0, .81, -.265); lid.rotation.x = -.28; O.add(lid);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(.62, .42, .012), alu); back.position.set(0, .21, -.007); lid.add(back);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(.58, .375), new THREE.MeshBasicMaterial({ map: scr, toneMapped: false })); screen.position.set(0, .21, .0005); lid.add(screen);
+    draw(); fetch('/api/control').then(r => r.ok ? r.json() : null).then(d => { if (!d) return; const rows = [];
+      for (const x of (d.sessions || []).filter(x => !x.private).sort((a, b) => (a.state === 'idle') - (b.state === 'idle')).slice(0, 8)) rows.push(`${({ needs_you: '✋', working: '🟢', shell: '⏳', idle: '💤' })[x.state] || '•'}  ${x.title || x.id || ''}`.slice(0, 46)); draw(rows); }).catch(() => {});
+    world.office = O; if (world.grassU) world.grassU.uNoG.value[2].set(O.position.x, O.position.z, 1.3, 0);
+    ZONES.push({ name: 'Миний оффис', sub: 'Mac · Удирдлагын өрөө', p: O.position.clone(), r: 2.6, go: () => { if (WK.pov) document.exitPointerLock?.();
+      panel(`<h2>Удирдлагын өрөө</h2><p class="sub">Эрэг дээрх Mac · агентуудын төлөв</p><iframe src="/control" style="width:100%;height:68vh;border:0;border-radius:10px;background:#0d1420"></iframe><p class="sub"><a href="/control" target="_blank">Бүтэн дэлгэцээр нээх</a></p>`); } }); }
+  { const pr = stat.scene.getObjectByName('Pier'); if (pr) { world.pier = new THREE.Box3().setFromObject(pr); const P = world.pier, m = new THREE.MeshStandardMaterial({ name: 'wood_post', color: 0x6a5240 }); triTex(m, 'bark_brown_02', .8, .4);
+      const g = new THREE.CylinderGeometry(.09, .11, 1, 7); const n = Math.floor((P.max.x - P.min.x) / 2.2) + 1, im = new THREE.InstancedMesh(g, m, n * 2), M = new THREE.Matrix4(); let i = 0;
+      for (let k = 0; k < n; k++) for (const z of [P.min.z + .12, P.max.z - .12]) { const x = P.min.x + .3 + k * 2.2, y0 = Math.min(H(x, z), -1.5); M.compose(new THREE.Vector3(x, (P.max.y + .25 + y0) / 2, z), new THREE.Quaternion(), new THREE.Vector3(1, P.max.y + .25 - y0, 1)); im.setMatrixAt(i++, M); }
+      im.castShadow = true; scene.add(im); } }
+  // ── Каяк (Tidewater-ийн завь шиг): E = суух, нуураар сэлүүрдэнэ, эрэгт ойртоод E = буух ──
+  world.kayak = stat.scene.getObjectByName('Kayak');
+  if (world.kayak) { const k = world.kayak; k.updateMatrixWorld(true); const kp = new THREE.Vector3(); k.getWorldPosition(kp); scene.attach(k);
+    ZONES.push({ name: 'Каяк', sub: 'суух · нуураар', p: k.position, r: 3.2, go: () => boardKayak() }); }
+  // дүр
+  try { const g = await (new Promise((ok, no) => loader.load(A + 'char/Soldier.glb', ok, undefined, no))), m = g.scene; m.rotation.y = Math.PI;
+    m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } }); const b = new THREE.Box3().setFromObject(m); m.scale.setScalar(1);   /* Soldier.glb аль хэдийн метрээр (~1.8 м); skinned bbox буруу хэмждэг */ me.add(m);
+    ANIM.mixer = new THREE.AnimationMixer(m); const MAP = { Idle: 'idle', Walk: 'walk', Run: 'sprint' }; for (const c of g.animations) ANIM.acts[MAP[c.name] || c.name] = ANIM.mixer.clipAction(c); play('idle', 0);
+  } catch (e) { me.add(new THREE.Mesh(new THREE.CapsuleGeometry(.3, 1, 4, 8), new THREE.MeshLambertMaterial({ color: 0xd2502f }))); }
+  WK.p.copy(door).add(new THREE.Vector3(3, 0, 1)); WK.yaw = -Math.PI / 2;
+  world.G = G; applyTime(); if (!matchMedia('(pointer: coarse)').matches) setPOV(true, true);   // хулганатай бол FPS-ээр эхэлнэ
+  { const gl = new THREE.PointLight(0xffb070, 7, 10, 2); gl.position.copy(B(G[0], G[1], G[2] + 2.6)); scene.add(gl);   // гэрийн дулаан гэрэл (зуух, чийдэн)
+    const pc = new THREE.PointLight(0xbfd8ff, 6, 4, 2); pc.position.copy(B(G[0] - 2.3, G[1], G[2] + 1.3)); scene.add(pc); }
+  $('load').style.opacity = 0; setTimeout(() => $('load').remove(), 1000);
+}
+
+// ── Амьдралын спираль (Ross Spiral-ийн аргаар, Хөвсгөлийн тэнгэрт) ──
+// • логарифм спираль r = R0·2^(a/2π): 1 эргэлт = 7 хоног, хуучин нь төв рүү жижгэрнэ
+// • домэйн бүр = гол спиралийг тойрон мушгирсан утас; цэг = лог / атом / task
+// • нум = «өнгөрснөөс → өнөөдөр»: шинэ note хуучныг [[wikilink]]-ээр иш татсан. ≥28 хоног = улаан-шар (сарын өмнөх шийдвэр өнөөдрийг тодорхойлж байна)
+const LDOMS = [['architect', 0x4f8aa6, 'Architect'], ['wiki', 0x5c9a6a, 'Wiki · судалгаа'], ['project', 0xd8a440, 'Төсөл'], ['creative', 0xd27257, 'Creative'],
+  ['gtd', 0x9a7ad0, 'GTD'], ['atom', 0xe0607a, 'Атом · шийдвэр'], ['task', 0x7fa6c4, 'Дууссан task'], ['other', 0xb7b7b0, 'Бусад']];
+const LDI = Object.fromEntries(LDOMS.map((d, i) => [d[0], i]));
+const LIFE = { items: [], edges: [], byId: {}, days: [], sel: null, group: new THREE.Group(), C: new THREE.Vector3(), R0: .1, G: 1.55, mode: false, az: 2.3, el: .26, dist: 135 };
+const lA = (di, frac) => (di + frac) / 7 * Math.PI * 2;
+function lPos(a, dom) { const TAU = Math.PI * 2, r = LIFE.R0 * Math.pow(LIFE.G, a / TAU), r2 = Math.max(.35, r * .075), off = LDI[dom] * TAU / LDOMS.length, a2 = a * 3 + off, R = r + r2 * Math.cos(a2);
+  return new THREE.Vector3(R * Math.cos(a), lY(a) - r2 * Math.sin(a2), R * Math.sin(a)); }
+// өндөр: түүдэг галаас (хамгийн хуучин өдөр) тэнгэр рүү (өнөөдөр) өргөснө
+const lY = a => 2.5 + 72 * Math.pow(Math.max(0, a) / LIFE.aMax, .9);
+const gapCol = g => g >= 28 ? 0xff5a36 : g >= 7 ? 0xffb340 : 0xfff1c2;
+async function lifeSpiral(G) {
+  let L = { items: [], edges: [] }; try { L = await (await fetch('/api/days?life=1')).json(); } catch {}
+  LIFE.days = [...new Set(L.items.map(i => i.date))].sort(); const d0 = LIFE.days[0];
+  const dIdx = Object.fromEntries(LIFE.days.map((d, i) => [d, i]));
+  const aMax = lA(LIFE.days.length, 0); LIFE.aMax = aMax; LIFE.R0 = 30 / Math.pow(LIFE.G, aMax / (Math.PI * 2));
+  LIFE.group.position.copy(B(G[0], G[1], G[2])); LIFE.C.copy(LIFE.group.position).add(new THREE.Vector3(0, 36, 0)); scene.add(LIFE.group);
+  // цэгүүд
+  const perDay = {}; L.items.forEach(it => (perDay[it.date] ??= []).push(it));
+  for (const [d, list] of Object.entries(perDay)) list.forEach((it, k) => { let frac;
+    if (it.t) { const [h, m] = it.t.split(':').map(Number); frac = (h + m / 60) / 24; } else frac = .08 + .84 * (k + .5) / list.length;
+    it.a = lA(dIdx[d], frac); it.p = lPos(it.a, it.domain in LDI ? it.domain : 'other'); it.di = dIdx[d]; LIFE.byId[it.id] = it; });
+  LIFE.items = L.items; LIFE.edges = L.edges;
+  const deg = {}; L.edges.forEach(([s, t]) => { deg[s] = (deg[s] || 0) + 1; deg[t] = (deg[t] || 0) + 1; });
+  // ── харагдац: түүдэг галаас дэгдсэн оч — нэг ид шид (charter) ──
+  const glowV = `attribute vec3 aCol; attribute float aSize; attribute float aState; attribute float aSeed; uniform float uT; varying vec3 vCol; varying float vA;
+    void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.); float tw = .82 + .18 * sin(uT * 2.3 + aSeed * 40.);
+      float k = aState > 1.5 ? 1.9 : aState > .5 ? 1.5 : .9; gl_PointSize = aSize * k * tw * 520. / -mv.z; gl_Position = projectionMatrix * mv;
+      vCol = aCol * (aState > 1.5 ? 1.25 : aState > .5 ? 1. : .38); vA = aState > .5 ? 1. : .45; }`;
+  const glowF = `varying vec3 vCol; varying float vA; void main(){ float d = length(gl_PointCoord - .5) * 2.; if (d > 1.) discard;
+      float core = exp(-d * d * 9.), halo = exp(-d * d * 2.6) * .35; gl_FragColor = vec4(vCol * (core * .9 + halo * .6), (core + halo) * vA); }`;
+  const N = L.items.length, pos = new Float32Array(N * 3), col = new Float32Array(N * 3), size = new Float32Array(N), st = new Float32Array(N), seed = new Float32Array(N), C = new THREE.Color();
+  L.items.forEach((it, i) => { it.p.toArray(pos, i * 3); C.set(LDOMS[LDI[it.domain] ?? 7][1]).lerp(new THREE.Color(0xffd9a0), .25); C.toArray(col, i * 3);
+    size[i] = (it.kind === 'task' ? 1.25 : it.kind === 'atom' ? 1.05 : .85) * (1 + Math.min(.8, (deg[it.id] || 0) * .15)); seed[i] = Math.random(); });
+  const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); pg.setAttribute('aCol', new THREE.BufferAttribute(col, 3));
+  pg.setAttribute('aSize', new THREE.BufferAttribute(size, 1)); pg.setAttribute('aState', new THREE.BufferAttribute(st, 1)); pg.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  const pts = new THREE.Points(pg, new THREE.ShaderMaterial({ uniforms: { uT }, vertexShader: glowV, fragmentShader: glowF, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  pts.renderOrder = 8; LIFE.pts = pts; LIFE.group.add(pts);
+  // цагийн утас: доор утаа шиг бүдэг, дээш гэрэлтэнэ
+  { const P = [], T = []; for (let a = 0; a <= aMax; a += .02) { const r = LIFE.R0 * Math.pow(LIFE.G, a / (Math.PI * 2)); P.push(r * Math.cos(a), lY(a), r * Math.sin(a)); T.push(a / aMax); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aT', new THREE.Float32BufferAttribute(T, 1));
+    LIFE.group.add(new THREE.Line(g, new THREE.ShaderMaterial({ uniforms: { uT }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      vertexShader: `attribute float aT; varying float vT; void main(){ vT = aT; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+      fragmentShader: `uniform float uT; varying float vT; void main(){ float f = .5 + .5 * sin(vT * 90. - uT * 1.5); vec3 c = mix(vec3(1., .45, .18), vec3(1., .88, .62), vT);
+        gl_FragColor = vec4(c * (.25 + .9 * vT) * (.75 + .25 * f), .2 + .55 * vT); }` }))); }
+  // оч: галаас спиралиар өгсөж, дээр очоод уусна
+  { const n = 700, P = new Float32Array(n * 3), S = new Float32Array(n); for (let i = 0; i < n; i++) S[i] = Math.random();
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('aSeed', new THREE.BufferAttribute(S, 1));
+    LIFE.embers = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: { uT, uR0: { value: LIFE.R0 }, uG: { value: LIFE.G }, uA: { value: aMax } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      vertexShader: `attribute float aSeed; uniform float uT, uR0, uG, uA; varying float vH;
+        void main(){ float u = fract(aSeed * 7.31 + uT * (.012 + aSeed * .01)); float a = u * uA; float r = uR0 * pow(uG, a / 6.2832);
+          float j = (fract(aSeed * 91.7) - .5) * (1.2 + r * .22), y = 2.5 + 72. * pow(u, .9) + (fract(aSeed * 53.3) - .5) * 2.;
+          vec3 p = vec3((r + j) * cos(a + aSeed * .3), y, (r + j) * sin(a + aSeed * .3)); vH = u;
+          vec4 mv = modelViewMatrix * vec4(p, 1.); gl_PointSize = (1.2 + fract(aSeed * 13.) * 2.2) * 420. / -mv.z; gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `varying float vH; void main(){ float d = length(gl_PointCoord - .5) * 2.; if (d > 1.) discard; float a = exp(-d * d * 5.) * (1. - smoothstep(.75, 1., vH)) * smoothstep(0., .04, vH);
+        gl_FragColor = vec4(mix(vec3(1., .42, .12), vec3(1., .85, .6), vH) * .7 * a, a * .7); }` }));
+    LIFE.embers.renderOrder = 8; LIFE.embers.frustumCulled = false; LIFE.group.add(LIFE.embers); }
+  // огноо: жижиг, нам гүм serif
+  const label = (txt, col) => { const cv = document.createElement('canvas'), x = cv.getContext('2d'); cv.width = 256; cv.height = 64; x.font = 'italic 500 28px "Cormorant Garamond", Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.shadowColor = 'rgba(0,0,0,.6)'; x.shadowBlur = 6; x.fillStyle = col; x.fillText(txt, 128, 32); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, opacity: .8, depthWrite: false, fog: false })); sp.renderOrder = 10; return sp; };
+  for (let di = LIFE.days.length - 1; di >= 0; di -= 7) { const a = lA(di, .5), r = LIFE.R0 * Math.pow(LIFE.G, a / (Math.PI * 2)); if (r < 5) break;
+    const now = di === LIFE.days.length - 1, sp = label(now ? 'өнөөдөр' : LIFE.days[di].slice(5).replace('-', '.'), now ? '#ffe2a8' : '#f3e6cf');
+    sp.position.set((r + 3.5) * Math.cos(a), lY(a) + 1.8, (r + 3.5) * Math.sin(a)); const k = now ? 3.2 : 2.4; sp.scale.set(k * 4, k, 1); LIFE.group.add(sp); }
+  // түүдэг гал: гэрэл + дөл (спиралийн эх)
+  { const fl = new THREE.PointLight(0xff8a3a, 0, 28, 1.6); fl.position.set(0, 1.4, 0); LIFE.group.add(fl); LIFE.fireL = fl;
+    const fm = new THREE.ShaderMaterial({ uniforms: { uT }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      vertexShader: `varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+      fragmentShader: `uniform float uT; varying vec2 vU; float n(vec2 p){ return fract(sin(dot(p, vec2(12.9, 78.2))) * 43758.5); }
+        float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(n(i), n(i + vec2(1, 0)), f.x), mix(n(i + vec2(0, 1)), n(i + 1.), f.x), f.y); }
+        void main(){ vec2 u = vU; float w = vn(vec2(u.x * 4., u.y * 3. - uT * 3.)) * .5 + vn(vec2(u.x * 9., u.y * 6. - uT * 5.)) * .25;
+          float sh = 1. - smoothstep(.0, .5 - u.y * .42, abs(u.x - .5 + (w - .37) * .25 * u.y)); float a = sh * smoothstep(1., .25, u.y + w * .35) * smoothstep(0., .08, u.y);
+          vec3 c = mix(vec3(1., .95, .7), vec3(1., .35, .08), smoothstep(.05, .7, u.y)); gl_FragColor = vec4(c * a * 1.1, a * .85); }` });
+    for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.6), fm); m.position.y = 1.3; m.rotation.y = i * Math.PI / 3; m.renderOrder = 9; LIFE.group.add(m); } }
+  // өнөөдрийн титэм: оройд аяархан амьсгалах гэрлийн цагираг
+  { const rT = LIFE.R0 * Math.pow(LIFE.G, aMax / (Math.PI * 2)), P = [], T = []; for (let i = 0; i <= 256; i++) { const a = i / 256 * Math.PI * 2; P.push(rT * Math.cos(a), lY(aMax), rT * Math.sin(a)); T.push(i / 256); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aT', new THREE.Float32BufferAttribute(T, 1));
+    const m = new THREE.Line(g, new THREE.ShaderMaterial({ uniforms: { uT }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      vertexShader: `attribute float aT; varying float vT; void main(){ vT = aT; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+      fragmentShader: `uniform float uT; varying float vT; void main(){ float b = .35 + .25 * sin(uT * 1.2) + .9 * pow(.5 + .5 * sin(vT * 6.2832 * 3. - uT * .8), 12.); gl_FragColor = vec4(vec3(1., .86, .58) * b, b); }` }));
+    m.renderOrder = 9; LIFE.group.add(m); }
+  // одод: бүрэнхийд аажим гарна
+  { const n = 1800, P = new Float32Array(n * 3), S = new Float32Array(n); for (let i = 0; i < n; i++) { const u = Math.random() * 2 - 1, t = Math.random() * Math.PI * 2, el = Math.abs(u) * .9 + .08, R = 1800;
+      P[i * 3] = R * Math.cos(t) * Math.sqrt(1 - el * el); P[i * 3 + 1] = R * el; P[i * 3 + 2] = R * Math.sin(t) * Math.sqrt(1 - el * el); S[i] = Math.random(); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('aSeed', new THREE.BufferAttribute(S, 1));
+    LIFE.starU = { value: 0 };
+    LIFE.stars = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: { uT, uS: LIFE.starU }, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
+      vertexShader: `attribute float aSeed; uniform float uT; varying float vB; void main(){ vB = (.4 + .6 * aSeed) * (.75 + .25 * sin(uT * (1. + aSeed * 3.) + aSeed * 50.));
+        gl_PointSize = 1. + aSeed * aSeed * 2.4; gl_Position = projectionMatrix * modelViewMatrix * vec4(position + cameraPosition, 1.); }`,
+      fragmentShader: `uniform float uS; varying float vB; void main(){ float d = length(gl_PointCoord - .5) * 2.; gl_FragColor = vec4(vec3(.9, .93, 1.) * vB * uS * (1. - d), 1.); }` }));
+    LIFE.stars.frustumCulled = false; LIFE.stars.renderOrder = -2; scene.add(LIFE.stars); }
+  LIFE.arcs = new THREE.Group(); LIFE.group.add(LIFE.arcs);
+  selectDay(LIFE.days[LIFE.days.length - 1]);
+}
+// нум = өнгөрсөн → өнөөдөр урсах гэрлийн утас (толгой нь хуучнаас шинэ рүү гүйнэ)
+const arcMat = gap => new THREE.ShaderMaterial({ uniforms: { uT, uC: { value: new THREE.Color(gapCol(gap)) }, uS: { value: Math.random() } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  vertexShader: `attribute float aT; varying float vT; void main(){ vT = aT; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+  fragmentShader: `uniform float uT, uS; uniform vec3 uC; varying float vT; void main(){ float p = fract(uT * .35 + uS - vT); float I = .22 + 2.2 * exp(-p * 9.);
+    float e = smoothstep(0., .06, vT) * smoothstep(1., .94, vT); gl_FragColor = vec4(uC * I * e, e * (.35 + .65 * exp(-p * 6.))); }` });
+function arc(a, b, gap) { const mid = a.clone().add(b).multiplyScalar(.5); const k = 1.3 + Math.min(1.2, gap * .025); mid.x *= k; mid.z *= k;
+  const P = new THREE.QuadraticBezierCurve3(a, mid, b).getPoints(64), g = new THREE.BufferGeometry().setFromPoints(P);
+  g.setAttribute('aT', new THREE.Float32BufferAttribute(P.map((_, i) => i / 64), 1)); const l = new THREE.Line(g, arcMat(gap)); l.renderOrder = 9; return l; }
+function selectDay(ds) {
+  LIFE.sel = ds; LIFE.arcs.children.forEach(o => { o.geometry.dispose(); o.material.dispose(); }); LIFE.arcs.clear();
+  const inc = LIFE.edges.filter(e => LIFE.byId[e[1]]?.date === ds), out = LIFE.edges.filter(e => LIFE.byId[e[0]]?.date === ds);
+  for (const [s, t, g] of [...inc, ...out]) { const A = LIFE.byId[s], Bt = LIFE.byId[t]; if (A && Bt) LIFE.arcs.add(arc(A.p, Bt.p, g)); }
+  const rel = new Set(); [...inc, ...out].forEach(e => { rel.add(e[0]); rel.add(e[1]); });
+  const st = LIFE.pts.geometry.attributes.aState; LIFE.items.forEach((it, i) => { st.array[i] = it.date === ds ? 2 : rel.has(it.id) ? 1 : 0; }); st.needsUpdate = true;
+  if (LIFE.mode) { lifePanel(); lifeLabelsBuild(); }
+}
+// ойлголтын шошго: сонгосон өдрийн үйлдлүүд + түүнтэй холбоотой хуучин үйлдлүүд (дэлгэцэн дээр текстээр)
+const LBL = document.createElement('div'); LBL.id = 'lifelbl'; document.body.appendChild(LBL); let lblItems = [];
+const LEG = document.createElement('div'); LEG.id = 'lifeleg'; LEG.className = 'st-glass'; document.body.appendChild(LEG);
+function lifeLabelsBuild() { const ds = LIFE.sel, inc = LIFE.edges.filter(e => LIFE.byId[e[1]]?.date === ds), rel = new Map();
+  inc.sort((a, b) => b[2] - a[2]).slice(0, 8).forEach(e => { rel.set(e[0], e[2]); rel.set(e[1], 0); });
+  LIFE.items.filter(i => i.date === ds && i.kind !== 'log').slice(0, 6).forEach(i => rel.has(i.id) || rel.set(i.id, 0));
+  lblItems = [...rel].map(([id, gap]) => { const it = LIFE.byId[id]; const el = document.createElement('div'); const col = '#' + LDOMS[LDI[it.domain] ?? 7][1].toString(16).padStart(6, '0');
+    el.className = 'll' + (gap >= 28 ? ' old' : ''); el.innerHTML = `<i style="background:${col}"></i><span>${esc(it.text.replace(/\[\[|\]\]/g, '').replace(/^.*?→\s*/, '').slice(0, 42))}</span>${gap ? `<small>${gap} хоногийн өмнө</small>` : ''}`; return { it, el }; });
+  LBL.replaceChildren(...lblItems.map(x => x.el));
+  LEG.innerHTML = `<b>Спираль юуг харуулдаг вэ</b><p>Галаас дээш = цаг (1 эргэлт = 7 хоног, оройд нь өнөөдөр). Цэг бүр = нэг үйлдэл.</p>${LDOMS.map(d => `<span><i style="background:#${d[1].toString(16).padStart(6, '0')}"></i>${d[2]}</span>`).join('')}<p class="lg2"><i class="ln o"></i> ≥28 хоногийн өмнөх үйлдэл өнөөдөртэй холбогдсон · <i class="ln"></i> ойрын</p>`; }
+function lifeLabels() { if (!lblItems.length) return; const v = new THREE.Vector3(), W = innerWidth, Hh = innerHeight;
+  for (const { it, el } of lblItems) { v.copy(it.p); LIFE.group.localToWorld(v); v.project(camera); const ok = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05;
+    el.style.display = ok ? '' : 'none'; if (ok) el.style.transform = `translate(${(v.x * .5 + .5) * W + 8}px, ${(-v.y * .5 + .5) * Hh - 10}px)`; } }
+function lifePanel() {
+  const ds = LIFE.sel, today = LIFE.items.filter(i => i.date === ds), inc = LIFE.edges.filter(e => LIFE.byId[e[1]]?.date === ds), out = LIFE.edges.filter(e => LIFE.byId[e[0]]?.date === ds);
+  const rooted = new Set(inc.map(e => e[1])), old = inc.filter(e => e[2] >= 28), oldRoots = new Set(old.map(e => e[1]));
+  const pct = today.length ? Math.round(rooted.size / today.length * 100) : 0, pctOld = today.length ? Math.round(oldRoots.size / today.length * 100) : 0;
+  const idx = LIFE.days.indexOf(ds), cnt = {}; today.forEach(i => cnt[i.domain] = (cnt[i.domain] || 0) + 1);
+  const row = e => { const s = LIFE.byId[e[0]], t = LIFE.byId[e[1]]; return `<li><span style="color:#${gapCol(e[2]).toString(16).padStart(6, '0')};text-shadow:0 0 1px #000">●</span> <small>${esc(s.date)} · ${e[2]} хоногийн өмнө</small><br><b>${esc(s.text.replace(/\[\[|\]\]/g, '').slice(0, 70))}</b> → ${esc(t.text.replace(/\[\[|\]\]/g, '').slice(0, 70))}</li>`; };
+  panel(`<h2>Амьдралын спираль</h2><p class="sub">Нэг эргэлт = 7 хоног · нум = өнгөрсөн үйлдэл өнөөдрийг тодорхойлсон холбоос</p>
+    <div class="row" style="margin:0 0 10px"><button id="lprev">◀</button><button id="lnow">Өнөөдөр</button><button id="lnext">▶</button></div>
+    <h3 style="margin:4px 0">${esc(ds)} · ${today.length} үйлдэл</h3>
+    <p style="font-size:13px;margin:6px 0">Өнөөдрийн үйлдлийн <b>${pct}%</b> нь өмнөх зүйлд тулгуурласан · <b style="color:#d4472c">${pctOld}%</b> нь <b>сар гаруйн өмнөх</b> үйлдэлтэй холбогдсон.</p>
+    <p class="sub">${LDOMS.filter(d => cnt[d[0]]).map(d => `<span style="color:#${d[1].toString(16).padStart(6, '0')}">●</span> ${d[2]} ${cnt[d[0]]}`).join(' · ')}</p>
+    ${old.length ? `<p><b>Сарын өмнөхөөс ирсэн (${old.length})</b></p><ul>${old.slice(0, 12).map(row).join('')}</ul>` : '<p class="sub">Энэ өдөр сарын өмнөх үйлдэлтэй шууд холбоогүй.</p>'}
+    ${inc.length - old.length ? `<p><b>Ойрын өмнөхөөс (${inc.length - old.length})</b></p><ul>${inc.filter(e => e[2] < 28).sort((a, b) => b[2] - a[2]).slice(0, 10).map(row).join('')}</ul>` : ''}
+    ${out.length ? `<p><b>Энэ өдөр дараа нь хэрэг болсон (${out.length})</b></p><ul>${out.slice(0, 8).map(e => { const t = LIFE.byId[e[1]]; return `<li><small>${esc(t.date)}</small> ${esc(t.text.replace(/\[\[|\]\]/g, '').slice(0, 80))}</li>`; }).join('')}</ul>` : ''}
+    <p class="sub">Чирж эргүүлэх · дугуй = ойртох · цэг дээр дарвал тэр өдөр · Esc = буцах</p>`);
+  $('lprev').onclick = () => selectDay(LIFE.days[Math.max(0, idx - 1)]); $('lnext').onclick = () => selectDay(LIFE.days[Math.min(LIFE.days.length - 1, idx + 1)]);
+  $('lnow').onclick = () => selectDay(LIFE.days[LIFE.days.length - 1]);
+}
+function enterLife() { setTimeout(lifeLabelsBuild, 50); document.body.classList.add('lifeon'); if (WK.pov) setPOV(false); LIFE.mode = true; document.body.classList.add('life'); LIFE.tod = TOD; TOD = '21.2'; /* оч харагдахаар бүрэнхий */ applyTime(); me.visible = true; hint('Амьдралын спираль · Esc = буцах', true); lifePanel(); }
+function exitLife() { lblItems = []; LBL.replaceChildren(); document.body.classList.remove('lifeon'); LIFE.mode = false; document.body.classList.remove('life'); if (LIFE.tod) TOD = LIFE.tod; applyTime(); hint('', false); $('panel').classList.remove('on'); }
+// hover / click цэг
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(); let lifeHover = -1;
+renderer.domElement.addEventListener('pointermove', e => { if (!LIFE.mode || !LIFE.pts) return; mouse.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(mouse, camera);
+  ray.params.Points.threshold = 1.1; const h = ray.intersectObject(LIFE.pts)[0]; lifeHover = h ? h.index : -1;
+  if (h) { const it = LIFE.items[lifeHover]; hint(`<b>${esc(it.date)}</b>${esc((it.t ? it.t + ' · ' : '') + it.text.replace(/\[\[|\]\]/g, '').slice(0, 90))}`, true); } });
+renderer.domElement.addEventListener('click', () => { if (LIFE.mode && lifeHover >= 0) selectDay(LIFE.items[lifeHover].date); });
+
+// ── Цаг, цаг агаар (Улаанбаатар, Open-Meteo) ──
+let TOD = 'live', WX = null;
+const KEYS = [[0, 0x0b1430, 0x1c2a52, .15, 0x8aa2ff, .25], [5.5, 0x1c2a58, 0xf2a37a, .45, 0xffa070, .5], [8, 0x5d9be0, 0xe8f0f6, 1, 0xfff0d8, 2.4], [13, 0x3f86d8, 0xdbeaf6, 1.15, 0xfff6e8, 2.8],
+  [17, 0x4a8bd6, 0xf5ddb8, .95, 0xffd7a0, 2.3], [19.5, 0x48468e, 0xf2a07a, .5, 0xff9a62, .9], [21.5, 0x111a3c, 0x2c3766, .18, 0x8aa2ff, .25], [24, 0x0b1430, 0x1c2a52, .15, 0x8aa2ff, .25]];
+function hourNow() { const d = new Date(Date.now() + (8 * 60 + new Date().getTimezoneOffset()) * 6e4); return d.getHours() + d.getMinutes() / 60; }   // Монголын цаг (UTC+8)
+// Нарны бодит байрлал: Улаанбаатар (47.92° N, 106.92° E), өнөөдрийн огноо + сонгосон цаг (UTC+8) → өндөр (el), азимут (az, хойдоос цагийн зүүний дагуу)
+const LOCS = { ub: ['Улаанбаатар', 47.92, 106.92, ''], khatgal: ['Хатгал', 50.45, 100.16, '?at=khuvsgul'] };   // нийтийн төвийн цэг
+let LOC = (() => { try { return LOCS[localStorage.getItem('khuvsgul.loc')] ? localStorage.getItem('khuvsgul.loc') : 'ub'; } catch { return 'ub'; } })();
+function setLoc(k) { LOC = k; try { localStorage.setItem('khuvsgul.loc', k); } catch {} weather(); }
+function sunPos(h) { const D = new Date(Date.now() + 8 * 36e5), base = Date.UTC(D.getUTCFullYear(), D.getUTCMonth(), D.getUTCDate()), t = base + (h - 8) * 36e5;
+  const d = (t - Date.UTC(2000, 0, 1, 12)) / 864e5, rad = Math.PI / 180, lat = LOCS[LOC][1] * rad, lon = LOCS[LOC][2];
+  const g = (357.529 + .98560028 * d) * rad, q = 280.459 + .98564736 * d, L = (q + 1.915 * Math.sin(g) + .02 * Math.sin(2 * g)) * rad, e = (23.439 - 3.6e-7 * d) * rad;
+  const ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L)), dec = Math.asin(Math.sin(e) * Math.sin(L)), gmst = (18.697374558 + 24.06570982441908 * d) % 24;
+  const ha = ((gmst * 15 + lon) * rad - ra), el = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(ha));
+  const az = Math.atan2(-Math.sin(ha), Math.tan(dec) * Math.cos(lat) - Math.sin(lat) * Math.cos(ha)); return { el, az }; }
+// сарын үе: 0 = шинэ, .5 = тэргэл (2000-01-06 18:14 UTC шинэ сараас, 29.53 хоног) · SET.moonPhase < 0 бол бодит
+function moonPhase() { if (SET.moonPhase >= 0) return SET.moonPhase; const d = (Date.now() - Date.UTC(2000, 0, 6, 18, 14)) / 864e5 / 29.530588; return d - Math.floor(d); }
+let MOON = null, MOON_PH = -1;
+function drawMoon(ph) { if (Math.abs(ph - MOON_PH) < .004) return; MOON_PH = ph; const c = MOON.material.map.image, g = c.getContext('2d'), r = 120, X = 128;
+  g.clearRect(0, 0, 256, 256); const glow = g.createRadialGradient(X, X, r * .9, X, X, 128); glow.addColorStop(0, 'rgba(200,215,255,.18)'); glow.addColorStop(1, 'rgba(200,215,255,0)'); g.fillStyle = glow; g.fillRect(0, 0, 256, 256);
+  const R_ = r * .86, L = [Math.sin(ph * 2 * Math.PI), -Math.cos(ph * 2 * Math.PI)], D = g.getImageData(0, 0, 256, 256), px = D.data;   /* терминатор: бөмбөрцгийн нормаль · нарны чиглэл */
+  for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) { const nx = (x - X) / R_, ny = (y - X) / R_, q = nx * nx + ny * ny; if (q > 1) continue; const nz = Math.sqrt(1 - q);
+    const lit = THREE.MathUtils.smoothstep(nx * L[0] + nz * L[1], -.04, .08), sp = 1 - .16 * Math.exp(-((nx + .3) ** 2 + (ny + .25) ** 2) * 9) - .2 * Math.exp(-((nx - .22) ** 2 + (ny - .1) ** 2) * 7) - .12 * Math.exp(-((nx + .05) ** 2 + (ny - .45) ** 2) * 14), e = Math.min(1, (1 - q) * 6), v = (24 + 214 * lit * sp) | 0, i = (y * 256 + x) * 4;
+    px[i] = v; px[i + 1] = v + 2; px[i + 2] = Math.min(255, v + 10); px[i + 3] = 255 * e * (.25 + .75 * Math.max(lit, .12)); }
+  g.putImageData(D, 0, 0);
+  g.globalCompositeOperation = 'source-over'; MOON.material.map.needsUpdate = true; }
+
+// ── Ордууд: J2000 RA(ц)/Dec(°) → тухайн газрын (UB/Хатгал) тэнгэрийн бодит байрлал (одны цагаар), шугамаар холбосон ──
+const ORDS = [
+  ['Долоон бурхан', [[11.062, 61.75, 1.8], [11.031, 56.38, 2.4], [11.897, 53.69, 2.4], [12.257, 57.03, 3.3], [12.900, 55.96, 1.8], [13.399, 54.93, 2.2], [13.792, 49.31, 1.9]], [[0, 1], [1, 2], [2, 3], [3, 0], [3, 4], [4, 5], [5, 6]]],
+  ['Алтан гадас', [[2.530, 89.26, 2.0], [17.537, 86.59, 4.3], [16.766, 82.04, 4.2], [15.734, 77.79, 4.3], [14.845, 74.16, 2.1], [15.345, 71.83, 3.0], [16.292, 75.76, 4.9]], [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 3]]],
+  ['Кассиопей', [[0.153, 59.15, 2.3], [0.675, 56.54, 2.2], [0.945, 60.72, 2.4], [1.430, 60.24, 2.7], [1.907, 63.67, 3.4]], [[0, 1], [1, 2], [2, 3], [3, 4]]],
+  ['Орион', [[5.919, 7.41, .5], [5.418, 6.35, 1.6], [5.533, -.30, 2.2], [5.603, -1.20, 1.7], [5.679, -1.94, 1.8], [5.796, -9.67, 2.1], [5.242, -8.20, .1], [5.585, 9.93, 3.4]], [[0, 7], [7, 1], [0, 4], [1, 2], [2, 3], [3, 4], [4, 5], [2, 6]]],
+  ['Хун', [[20.690, 45.28, 1.3], [20.370, 40.26, 2.2], [20.770, 33.97, 2.5], [19.750, 45.13, 2.9], [19.512, 27.96, 3.1]], [[0, 1], [1, 4], [3, 1], [1, 2]]],
+  ['Лир', [[18.616, 38.78, 0], [18.746, 37.60, 4.3], [18.835, 33.36, 3.5], [18.982, 32.69, 3.3], [18.908, 36.90, 4.3]], [[0, 1], [1, 2], [2, 3], [3, 4], [4, 1]]],
+  ['Арслан', [[10.140, 11.97, 1.4], [10.122, 16.76, 3.5], [10.333, 19.84, 2.0], [10.278, 23.42, 3.4], [9.764, 23.77, 3.0], [11.235, 20.52, 2.6], [11.818, 14.57, 2.1], [11.237, 15.43, 3.3]], [[0, 1], [1, 2], [2, 3], [3, 4], [2, 5], [5, 6], [6, 7], [7, 0], [7, 5]]],
+  ['Скорпион', [[16.490, -26.43, 1.0], [16.006, -22.62, 2.3], [16.091, -19.81, 2.6], [15.981, -26.11, 2.9], [16.836, -34.29, 2.3], [17.560, -37.10, 1.6], [17.622, -42.99, 1.9], [16.353, -25.59, 2.9]], [[2, 1], [1, 3], [1, 7], [7, 0], [0, 4], [4, 6], [6, 5]]],
+  ['Бух', [[4.599, 16.51, .9], [4.330, 15.63, 3.6], [4.477, 15.87, 3.5], [4.382, 17.54, 3.8], [5.438, 28.61, 1.7], [5.627, 21.14, 3.0], [3.791, 24.11, 2.9]], [[0, 2], [2, 1], [1, 3], [3, 6], [0, 5], [2, 4]]],
+];
+const ORD = { g: new THREE.Group(), lab: [], pts: null, ln: null };
+{ const pos = [], siz = [], lp = []; ORDS.forEach(([n, S, L]) => { S.forEach(([, , m]) => { pos.push(0, 0, 0); siz.push(Math.max(1.4, 5.2 - m * 1.05)); }); L.forEach(() => lp.push(0, 0, 0, 0, 0, 0));
+    const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d'); g.font = '500 30px Inter, sans-serif'; g.fillStyle = 'rgba(190,210,255,.9)'; g.textAlign = 'center'; g.fillText(n, 128, 42);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, fog: false, opacity: .0 })); sp.scale.set(160, 40, 1); ORD.lab.push(sp); ORD.g.add(sp); });
+  const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); pg.setAttribute('aS', new THREE.Float32BufferAttribute(siz, 1));
+  ORD.pts = new THREE.Points(pg, new THREE.ShaderMaterial({ uniforms: { uO: { value: 0 } }, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
+    vertexShader: 'attribute float aS; uniform float uO; varying float vA; void main(){ vA = uO; gl_PointSize = aS * 2.2; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+    fragmentShader: 'varying float vA; void main(){ float d = length(gl_PointCoord - .5); float a = smoothstep(.5, .0, d); a = a * a; gl_FragColor = vec4(vec3(.85, .9, 1.) * (a + smoothstep(.12, .0, d)), a * vA); }' }));
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
+  ORD.ln = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x8fb4ff, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
+  ORD.g.add(ORD.pts, ORD.ln); ORD.g.renderOrder = -1; ORD.g.traverse(o => { o.frustumCulled = false; o.renderOrder = -1; }); scene.add(ORD.g); }
+function ordPlace(h) { const D = new Date(Date.now() + 8 * 36e5), t = Date.UTC(D.getUTCFullYear(), D.getUTCMonth(), D.getUTCDate()) + (h - 8) * 36e5, d = (t - Date.UTC(2000, 0, 1, 12)) / 864e5, rad = Math.PI / 180;
+  const lst = (18.697374558 + 24.06570982441908 * d + LOCS[LOC][2] / 15) % 24, la = LOCS[LOC][1] * rad, rot = SET.sunAz * rad, R_ = 1800;
+  const dir = (ra, de) => { const H_ = (lst - ra) * 15 * rad, dd = de * rad, el = Math.asin(Math.sin(la) * Math.sin(dd) + Math.cos(la) * Math.cos(dd) * Math.cos(H_)),
+      az = Math.atan2(-Math.sin(H_) * Math.cos(dd), Math.cos(la) * Math.sin(dd) - Math.sin(la) * Math.cos(dd) * Math.cos(H_));
+    return new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).applyAxisAngle(new THREE.Vector3(0, 1, 0), rot).multiplyScalar(R_); };
+  const P = ORD.pts.geometry.attributes.position, Lp = ORD.ln.geometry.attributes.position; let i = 0, j = 0;
+  ORDS.forEach(([, S, L], k) => { const V = S.map(([ra, de]) => dir(ra, de)), c = new THREE.Vector3(); V.forEach(v => { P.setXYZ(i++, v.x, v.y, v.z); c.add(v); });
+    L.forEach(([a, b]) => { Lp.setXYZ(j++, V[a].x, V[a].y, V[a].z); Lp.setXYZ(j++, V[b].x, V[b].y, V[b].z); });
+    c.divideScalar(V.length); let lo = V.reduce((m, v) => v.y < m.y ? v : m, V[0]); ORD.lab[k].position.copy(c).setY(Math.min(c.y, lo.y) - 70); ORD.lab[k].userData.up = c.y > 40; });
+  P.needsUpdate = Lp.needsUpdate = true; }
+function applyTime() {
+  const h = TOD === 'live' ? hourNow() : +TOD; let k = 0; while (k < KEYS.length - 2 && KEYS[k + 1][0] <= h) k++;
+  const [h0, t0, z0, i0, s0, e0] = KEYS[k], [h1, t1, z1, i1, s1, e1] = KEYS[k + 1], f = (h - h0) / (h1 - h0), C = (a, b) => new THREE.Color(a).lerp(new THREE.Color(b), f);
+  const cloudy = SET.clouds >= 0 ? SET.clouds : WX ? Math.min(1, (WX.cloud || 0) / 100) : .35; uCloudSh.value = Math.min(.85, cloudy * 1.2);
+  const gloom = Math.max(0, cloudy - .45) / .55;   // бүрхэг/шуурга: тэнгэр харанхуйлна
+  skyU.top.value.copy(C(t0, t1)).lerp(new THREE.Color(0x9aa6b4), cloudy * .5).lerp(new THREE.Color(0x4a525c), gloom * .8); skyU.hor.value.copy(C(z0, z1)).lerp(new THREE.Color(0x7c848c), gloom * .7);
+  cloudM.color.setScalar((1 - gloom * .5) * (.22 + .78 * THREE.MathUtils.smoothstep(Math.sin(sunPos(h).el), -.12, .12))); skyU.night.value = (h < 5.5 || h > 21) ? 1 : 0;
+  { const day = HDR && Math.sin(sunPos(h).el) > .1 && cloudy < .62; scene.background = day ? HDR : null; if (day) { scene.backgroundIntensity = .95; } sky.visible = !day; clouds.visible = !day; }
+  const SP = sunPos(h), el = Math.sin(SP.el), az = SP.az; world.sunEl = el;
+  const dayK = THREE.MathUtils.smoothstep(el, -.12, .12);                     // 0 = шөнө, 1 = өдөр
+  scene.environment = dayK > .5 ? world.ENV || null : null;                   // шөнө HDRI-ийн өдрийн гэрлээр газар гэрэлтэхгүй
+  if (typeof cloudM !== 'undefined') cloudM.userData.night = 1 - dayK;
+  const dir = new THREE.Vector3(Math.sin(az) * Math.cos(SP.el), Math.max(.04, el), -Math.cos(az) * Math.cos(SP.el)).normalize()   // +x = зүүн, −z = хойд.applyAxisAngle(new THREE.Vector3(0, 1, 0), SET.sunAz * Math.PI / 180);
+  skyU.sunDir.value.copy(dir); skyU.sunCol.value.copy(C(s0, s1)).multiplyScalar(THREE.MathUtils.smoothstep(el, -.03, .03));   // жаргасан нар тэнгэрт/усанд гэрэлтэхгүй
+  sun.color.copy(C(s0, s1)); sun.intensity = THREE.MathUtils.lerp(e0, e1, f) * (1 - cloudy * .45) * (.12 + .88 * THREE.MathUtils.smoothstep(el, -.04, .06)); world.sunDir = dir;   // нар жаргахад гэрэл унтарна (сарны бага гэрэл)
+  hemi.intensity = THREE.MathUtils.lerp(i0, i1, f); hemi.color.copy(skyU.top.value).lerp(new THREE.Color(0xffffff), .4);
+  scene.fog.color.copy(skyU.hor.value); renderer.setClearColor(skyU.hor.value);
+  cloudM.color.copy(new THREE.Color(0xffffff).lerp(C(z0, z1), .35)).multiplyScalar((1 - gloom * .5) * (.12 + .88 * dayK));   /* шөнө үүл бараан */ cloudM.opacity = .55 + cloudy * .4;
+  const night = h < 6 || h > 20.5; for (const o of world.notes) o.visible = false; world.night = night;
+  bloom.strength = night ? .32 : .3; renderer.toneMappingExposure = night ? 1.05 : 1;
+  if (scene.background === HDR && HDR) { hemi.intensity *= .3; bloom.strength = .08; renderer.toneMappingExposure = .78; }   // HDRI орчин гэрэлтүүлэгтэй давхардахгүй
+  { const ph = moonPhase(), ill = (1 - Math.cos(ph * 2 * Math.PI)) / 2, MP = sunPos(h - ph * 24.84 - SET.moonShift), mel = Math.sin(MP.el);
+    const md = new THREE.Vector3(Math.sin(MP.az) * Math.cos(MP.el), Math.max(.06, mel), -Math.cos(MP.az) * Math.cos(MP.el)).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), SET.sunAz * Math.PI / 180);
+    const up = THREE.MathUtils.smoothstep(mel, -.02, .1), mk = (1 - dayK) * up * (.15 + .85 * ill) * (1 - cloudy * .7) * SET.moonI;
+    world.moon = { dir: md, ph, ill, vis: (1 - dayK * .85) * up * (1 - gloom), el: mel };
+    if (mk > .02 && dayK < .5) { world.sunDir = md; sun.color.set(0xb9cbff); sun.intensity = 1.1 * mk; hemi.intensity = Math.max(hemi.intensity, .18 + .35 * mk); hemi.color.set(0x8fa3c8); }
+    if (MOON) drawMoon(ph); }
+  { ordPlace(h); const o = (1 - dayK) * (1 - gloom) * (1 - cloudy * .6) * (SET.ords ? 1 : 0); ORD.g.visible = o > .02; ORD.pts.material.uniforms.uO.value = o; ORD.ln.material.opacity = .32 * o; ORD.lab.forEach(l => l.material.opacity = l.userData.up ? .55 * o : 0); }
+  { const oc = THREE.MathUtils.smoothstep(cloudy, .62, .97) * dayK; uOc.value = THREE.MathUtils.smoothstep(cloudy, .5, .95); if (oc > 0) { sun.intensity *= 1 - oc * .85; hemi.intensity *= 1 + oc * .7; hemi.color.lerp(new THREE.Color(0xc9ced4), oc);
+      const g_ = new THREE.Color(0x9aa1a8); skyU.top.value.lerp(g_, oc * .85); skyU.hor.value.lerp(new THREE.Color(0xb3b8bd), oc * .8); scene.fog.color.copy(skyU.hor.value); renderer.setClearColor(skyU.hor.value); cloudM.opacity = Math.min(1, cloudM.opacity + oc * .3); } }   /* бодит бүрхэг: тархсан гэрэл, хурц сүүдэргүй, жигд саарал тэнгэр */
+  if (world.grassU) { const d = new Date(), m = d.getMonth() + d.getDate() / 31, temp = WX ? WX.temp : 10; world.grassU.uSeason.value = Math.min(1, Math.max(0, (Math.abs(m - 6.5) - 2) / 2.5) * .8 + Math.max(0, (8 - temp) / 16) * .5); }   /* сар, температураар өвсний улирал */
+  renderer.toneMappingExposure *= Math.pow(2, SET.ev); bloom.strength *= SET.bloom; renderer.toneMappingExposure *= 1 - gloom * .25; sun.intensity *= 1 - gloom * .5; hemi.userData.base = hemi.intensity;
+}
+async function weather() {
+  try { WX = await (await fetch('/api/weather' + LOCS[LOC][3])).json();
+    $('wx').innerHTML = `${LOCS[LOC][0]} · <b>${Math.round(WX.temp)}°</b> · ${esc(WX.label || '')} · салхи ${Math.round(WX.wind || 0)} км/ц`;
+    if (!WX_LOCK) uWind.value = Math.min(1.2, .25 + (WX.wind || 0) / 25);
+  } catch { $('wx').textContent = LOCS[LOC][0] + ' · цаг агаар ачаалсангүй'; }
+  applyTime(); if (WS.mode === 'live') setWeather('live'); else renderWX();
+}
+window.__tod = 1; window.__k = { get world() { return world; }, get WK() { return WK; }, get SET() { return SET; }, applyTime, setTOD: v => { TOD = v; applyTime(); }, openFeed: s => openFeed(s), exitGer: () => exitGer(), get POV() { return POV; } };
+document.querySelectorAll('#tod button').forEach(b => b.onclick = () => { TOD = b.dataset.t; document.querySelectorAll('#tod button').forEach(x => x.classList.toggle('on', x === b)); applyTime(); });
+
+// ── Дүр, удирдлага ──
+const me = new THREE.Group(); scene.add(me);
+// ── POV: V товч, хулгана түгжээд харна (Tidewater: мэдрэмж .0022, pitch ±1.5) ──
+const POV = { yaw: 0, pitch: 0, y: 0, vy: 0, e: new THREE.Euler(), sens: +(localStorage.getItem('khuvsgul.sens') || .0022) };
+// ── Номын хавтас: хэсэг бүр өөрийн хэв маягтай үүсгэсэн хавтас; newsletter = жинхэнэ постер; унших ном = Open Library-ийн хавтас ──
+const SECSTYLE = { newsletter: ['#14213d', '#fca311', 'INAI'], books: ['#3b2a20', '#e9c46a', 'НОМ'], decisions: ['#5a1f1b', '#f2d0a4', 'ШИЙДВЭР'], knowledge: ['#1d3557', '#a8dadc', 'АТОМ'],
+  references: ['#2d4a2b', '#dde5b6', 'ЛАВЛАГАА'], research: ['#4a3618', '#f4d58d', 'СУДАЛГАА'], glossary: ['#3b2b4f', '#e0c3fc', 'ГЛОССАРИ'] };
+function wrapText(g, text, x, y, maxW, lh, maxL) { const words = String(text).split(/\s+/); let line = '', n = 0;
+  for (const w of words) { const t = line ? line + ' ' + w : w; if (g.measureText(t).width > maxW && line) { g.fillText(line, x, y + n * lh); line = w; if (++n >= maxL - 1) { line = words.slice(words.indexOf(w)).join(' '); break; } } else line = t; }
+  if (g.measureText(line).width > maxW) { while (line.length > 1 && g.measureText(line + '…').width > maxW) line = line.slice(0, -1); line += '…'; } g.fillText(line, x, y + n * lh); }
+function coverCanvas(b, W = 360, H = 540) { const [bg, fg, tag] = SECSTYLE[b.sh] || SECSTYLE.knowledge, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, bg); gr.addColorStop(1, '#0b0b0b'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 1400; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * .035})`; g.fillRect(Math.random() * W, Math.random() * H, 1, 1); }          // цаасны ширхэг
+  g.strokeStyle = fg; g.globalAlpha = .55; g.lineWidth = 2; g.strokeRect(18, 18, W - 36, H - 36); g.globalAlpha = 1;
+  g.fillStyle = fg; g.font = '600 14px Inter, system-ui'; g.fillText(tag + ' · ' + (b.date || '').slice(0, 7), 34, 52);
+  g.font = '600 34px Georgia, "Noto Serif", serif'; wrapText(g, b.title, 34, 130, W - 68, 40, 7);
+  if (b.author) { g.font = 'italic 18px Georgia, serif'; g.fillText(b.author, 34, H - 80); }
+  g.font = '500 12px Inter'; g.globalAlpha = .7; g.fillText('Second Brain · Хөвсгөлийн номын сан', 34, H - 44); g.globalAlpha = 1; return c; }
+const coverCache = new Map();
+async function coverURL(b) { if (coverCache.has(b.id)) return coverCache.get(b.id); let u = null;
+  if (b.sh === 'newsletter' && b.cover) u = `/api/nl?no=${b.id.slice(3)}&f=cover`;
+  else if (b.sh === 'books') { try { const r = await (await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(b.title)}&author=${encodeURIComponent(b.author || '')}&limit=1&fields=cover_i`)).json(); const id = r.docs?.[0]?.cover_i; if (id) u = `https://covers.openlibrary.org/b/id/${id}-L.jpg`; } catch {} }
+  if (!u) u = coverCanvas(b).toDataURL('image/jpeg', .85); coverCache.set(b.id, u); return u; }
+// нурууны atlas: 2048², нүд 16×128 → 2048 ном. Нуруун дээр нэр, хэсгийн өнгө
+function spineAtlas(all) { const c = document.createElement('canvas'); c.width = c.height = 2048; const g = c.getContext('2d'), CW = 16, CH = 128, cols = 128;
+  all.forEach((b, i) => { const x = (i % cols) * CW, y = Math.floor(i / cols) * CH, [bg, fg] = SECSTYLE[b.sh] || SECSTYLE.knowledge, k = .82 + ((i * 17) % 9) * .045;
+    g.fillStyle = bg; g.fillRect(x, y, CW, CH); g.globalAlpha = .18 + ((i * 7) % 4) * .05; g.fillStyle = '#000'; g.fillRect(x, y, CW, CH); g.globalAlpha = 1;
+    g.fillStyle = fg; g.fillRect(x, y + 8, CW, 1.5); g.fillRect(x, y + CH - 10, CW, 1.5);
+    g.save(); g.translate(x + CW / 2 + 4, y + CH - 14); g.rotate(-Math.PI / 2); g.font = '600 10.5px Inter, system-ui'; g.fillStyle = fg; let t = b.title; while (t.length > 2 && g.measureText(t).width > CH - 26) t = t.slice(0, -2); g.fillText(t, 0, 0); g.restore(); });
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.generateMipmaps = true; return t; }
+function spineMaterial(atlas) { const m = new THREE.MeshStandardMaterial({ map: atlas, roughness: .7 });
+  m.onBeforeCompile = sh => { sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aCell; varying vec2 vSp;')
+      .replace('#include <uv_vertex>', '#include <uv_vertex>\nvSp = (vec2(mod(aCell, 128.), floor(aCell / 128.)) + vec2(uv.x, 1. - uv.y)) / vec2(128., 16.); vSp.y = 1. - vSp.y;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vSp;').replace('#include <map_fragment>', 'diffuseColor *= texture2D(map, vSp);').replace('#include <color_fragment>', ''); };
+  return m; }
+// ── Ном унших: цаасан хуудас шиг, markdown-ийг энгийн HTML болгоно; [[холбоос]] дарвал тэр номыг нээнэ ──
+const READER = document.createElement('div'); READER.id = 'reader'; document.body.appendChild(READER);
+function md(src) { const e = s => esc(s); const inl = s => e(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*(?!\s)(.+?)\*/g, '$1<i>$2</i>').replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]/g, (m, t, a) => `<a class="wl" data-t="${e(t.split('/').pop())}">${e(a || t.split('/').pop())}</a>`).replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const out = []; let list = null, code = false;
+  for (const raw of src.split('\n')) { const l = raw.replace(/\s+$/, '');
+    if (l.startsWith('```')) { code = !code; out.push(code ? '<pre>' : '</pre>'); continue; } if (code) { out.push(e(l) + '\n'); continue; }
+    const li = l.match(/^\s*[-*]\s+(\[.\]\s*)?(.*)$/); if (li) { if (!list) { out.push('<ul>'); list = 1; } out.push(`<li>${li[1] ? (li[1].includes('x') ? '☑ ' : '☐ ') : ''}${inl(li[2])}</li>`); continue; }
+    if (list) { out.push('</ul>'); list = null; }
+    const h = l.match(/^(#{1,4})\s+(.*)$/); if (h) { out.push(`<h${h[1].length + 1}>${inl(h[2])}</h${h[1].length + 1}>`); continue; }
+    if (/^\s*>/.test(l)) { out.push(`<blockquote>${inl(l.replace(/^\s*>\s?(\[!\w+\]\s*)?/, ''))}</blockquote>`); continue; }
+    if (/^\|/.test(l)) { if (/^\|[\s:-|]+\|$/.test(l)) continue; out.push(`<div class="tr">${l.split('|').slice(1, -1).map(c => `<span>${inl(c.trim())}</span>`).join('')}</div>`); continue; }
+    out.push(l.trim() ? `<p>${inl(l)}</p>` : ''); }
+  if (list) out.push('</ul>'); return out.join(''); }
+async function openBook(id) { document.exitPointerLock?.(); READER.classList.add('on'); READER.innerHTML = '<div class="pg"><p class="ld">Нээж байна…</p></div>';
+  try { const b = await (await fetch('/api/book?path=' + encodeURIComponent(id))).json(); if (b.error) throw new Error(b.error);
+    const meta = (world.libBooks?.userData?.books || []).find(x => x.id === id) || { id, title: b.title, sh: '', date: b.date, author: b.author };
+    if (b.html) { READER.innerHTML = `<div class="pg nl"><button class="x" data-r="close">Хаах · Esc</button><div class="meta">${esc(b.section)}</div><h1>${esc(b.title)}</h1><iframe src="${esc(b.html)}" title="${esc(b.title)}"></iframe><footer><a href="${esc(b.html)}" target="_blank">Шинэ цонхонд нээх</a> · <button data-r="shelf">← Тавиур руу</button></footer></div>`; return; }
+    READER.innerHTML = `<div class="pg"><button class="x" data-r="close">Хаах · Esc</button><div class="hero"><img class="cv" alt=""><div><div class="meta">${esc(b.section)} · ${esc(b.date)}${b.type ? ' · ' + esc(b.type) : ''}</div><h1>${esc(b.title)}</h1>${b.author ? `<p class="au">${esc(b.author)}</p>` : ''}</div></div><article>${md(b.body)}</article>
+      <footer><button data-r="shelf">← Тавиур руу</button></footer></div>`; READER.scrollTop = 0; coverURL(meta).then(u => { const im = READER.querySelector('.cv'); if (im) im.src = u; }); wikiEnhance(id, b);
+    try { const seen = JSON.parse(localStorage.getItem('khuvsgul.read') || '[]'); if (!seen.includes(id)) { seen.push(id); localStorage.setItem('khuvsgul.read', JSON.stringify(seen.slice(-500))); } } catch {}
+  } catch (e) { READER.innerHTML = `<div class="pg"><button class="x" data-r="close">Хаах</button><p>Ном нээгдсэнгүй: ${esc(e.message)}</p></div>`; } }
+function closeReader() { READER.classList.remove('on'); }
+READER.addEventListener('click', e => { const a = e.target.closest('[data-r],.wl'); if (!a) return;
+  if (a.dataset.r === 'close') return closeReader(); if (a.dataset.r === 'shelf') { closeReader(); return openShelfBrowser(); }
+  if (a.classList.contains('wl')) { const t = a.dataset.t, b = (world.libBooks?.userData?.books || []).find(x => x.id.endsWith('/' + t + '.md') || x.title === t.replace(/^\d{4}-\d{2}-\d{2}\s*-\s*/, '')); if (b) openBook(b.id); else a.classList.add('miss'); } });
+function openShelfBrowser(q = '') { const all = world.libBooks?.userData?.books || []; let seen = []; try { seen = JSON.parse(localStorage.getItem('khuvsgul.read') || '[]'); } catch {}
+  document.exitPointerLock?.(); READER.classList.add('on');
+  let draw = (qq) => { const f = all.filter(b => !qq || b.title.toLowerCase().includes(qq.toLowerCase())), by = {}; f.forEach(b => (by[b.shn] ??= []).push(b));
+    READER.querySelector('.list').innerHTML = Object.entries(by).map(([n, bs]) => `<h3>${esc(n)} <small>${bs.length}</small></h3><ul>${bs.slice(0, 80).map(b => `<li data-id="${esc(b.id)}" class="${seen.includes(b.id) ? 'seen' : ''}"><img class="th" data-cv="${esc(b.id)}" alt=""><span>${esc(b.title)}${b.author ? ` <em>· ${esc(b.author)}</em>` : ''}</span><small>${esc(b.date)}</small></li>`).join('')}</ul>`).join('') || '<p>Олдсонгүй</p>'; };
+  READER.innerHTML = `<div class="pg"><button class="x" data-r="close">Хаах · Esc</button><div class="meta">Хөвсгөлийн номын сан · ${all.length} ном · уншсан ${seen.length}</div><h1>Тавиур</h1><input class="q" placeholder="Номын нэрээр хайх…" value="${esc(q)}"><div class="list"></div></div>`;
+  const fillCv = () => READER.querySelectorAll('img.th[data-cv]:not([src])').forEach((im, n) => { if (n > 60) return; const b = all.find(x => x.id === im.dataset.cv); if (b) coverURL(b).then(u => im.src = u); });
+  const draw0 = draw; draw = qq => { draw0(qq); fillCv(); }; draw(q); READER.querySelector('.q').addEventListener('input', e => draw(e.target.value)); READER.querySelector('.list').addEventListener('click', e => { const li = e.target.closest('li[data-id]'); if (li) openBook(li.dataset.id); }); }
+// ── Төслийн gallery (HUD дээр E): төслөөр шүүх · зураг томруулах · бичлэг тоглуулах · task-ууд ──
+async function openFeed(sel) { document.exitPointerLock?.(); READER.classList.add('on');
+  const F = world.feed || await fetch('/api/feed').then(r => r.json()).catch(() => ({ projects: [] })); world.feed = F;
+  const P = F.projects, cur = sel ? P.filter(p => p.name === sel) : P, ago = s => { const d = (Date.now() / 1e3 - s) / 3600; return d < 1 ? 'дөнгөж сая' : d < 24 ? Math.round(d) + ' цагийн өмнө' : Math.round(d / 24) + ' өдрийн өмнө'; };
+  READER.innerHTML = `<div class="pg feed"><button class="x" data-r="close">Хаах · Esc</button>
+    <h1>Төслийн gallery</h1><p class="sub2">Сүүлийн Inbox → task, төслүүдийн Output зураг, Claude сешнээр хийсэн бичлэг · төслөөр нь</p>
+    <div class="chips"><a data-fp="" class="${sel ? '' : 'on'}">Бүгд</a>${P.map(p => `<a data-fp="${esc(p.name)}" class="${p.name === sel ? 'on' : ''}">${esc(p.name)} <small>${p.media.length + p.tasks.length}</small></a>`).join('')}</div>
+    ${cur.map(p => `<section class="fp"><h2>${esc(p.name)}</h2>
+      ${p.media.length ? `<div class="gal">${p.media.map(m => `<figure data-m="${esc(m.src)}" data-k="${m.kind}">${m.kind === 'video' ? `<video src="${esc(m.src)}#t=1" muted preload="metadata"></video><b>▶</b>` : `<img loading="lazy" src="${esc(m.src)}" alt="">`}<figcaption>${esc(m.name)}<small>${ago(m.mtime)}${m.from !== p.name ? ' · ' + esc(m.from) : ''}</small></figcaption></figure>`).join('')}</div>` : ''}
+      ${p.tasks.length ? `<ul class="tl">${p.tasks.map(t => `<li><i class="${esc(t.status)}"></i>${esc(t.title)} <small>${esc(t.status)} · ${ago(t.mtime)}</small></li>`).join('')}</ul>` : ''}</section>`).join('')}</div>`;
+  READER.scrollTop = 0; }
+READER.addEventListener('click', e => { const f = e.target.closest('[data-fp]'); if (f) return openFeed(f.dataset.fp || undefined);
+  const m = e.target.closest('figure[data-m]'); if (!m) return; const lb = document.createElement('div'); lb.className = 'lb';
+  lb.innerHTML = m.dataset.k === 'video' ? `<video src="${esc(m.dataset.m)}" controls autoplay></video>` : `<img src="${esc(m.dataset.m)}" alt="">`;
+  lb.addEventListener('click', ev => { if (ev.target === lb) lb.remove(); }); READER.appendChild(lb); });
+// ── Нүүр хуудас (Wikipedia-ийн «Main Page» бүтэц): хайлт · онцлох нийтлэл · шинэ · энэ өдөр · ангилал · tag · санамсаргүй ──
+function openWikiHome() { const all = world.libBooks?.userData?.books || []; document.exitPointerLock?.(); READER.classList.add('on');
+  const notes = all.filter(b => b.sh !== 'newsletter' && b.sh !== 'books'), byDate = [...notes].sort((a, b) => b.date.localeCompare(a.date));
+  const feat = byDate.find(b => b.sh === 'knowledge') || byDate[0], nl = all.find(b => b.sh === 'newsletter'), read = all.filter(b => b.sh === 'books');
+  const d = new Date(), md_ = (d.getMonth() + 1 + '').padStart(2, '0') + '-' + (d.getDate() + '').padStart(2, '0'), onDay = notes.filter(b => b.date.slice(5) === md_ && b.date.slice(0, 4) + '' !== '' && b.date !== byDate[0]?.date).slice(0, 6);
+  const lastMonth = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10), monthAgo = notes.filter(b => b.date === lastMonth).slice(0, 5);
+  const tags = {}; notes.forEach(b => (b.tags || []).forEach(t => tags[t] = (tags[t] || 0) + 1)); const topTags = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 28);
+  const secs = {}; all.forEach(b => (secs[b.shn] ??= 0, secs[b.shn]++));
+  const li = b => `<li><a data-open="${esc(b.id)}">${esc(b.title)}</a> <small>${esc(b.date)}</small></li>`;
+  READER.innerHTML = `<div class="pg wiki"><button class="x" data-r="close">Хаах · Esc</button>
+    <div class="wk-top"><div class="wk-logo">📚</div><div><h1>Хөвсгөлийн номын сан</h1><p class="sub2">Чөлөөт мэдлэгийн сан · <b>${all.length}</b> нийтлэл · ${Object.keys(secs).length} ангилал</p></div></div>
+    <input class="q" placeholder="Номын сангаас хайх… (нэр, tag)"><div class="wk-res"></div>
+    <div class="wk-grid">
+      <section class="wk-feat"><h2>Онцлох нийтлэл</h2><div class="ft"><img class="cv" data-cv="${esc(feat?.id || '')}" alt=""><div><h3><a data-open="${esc(feat?.id || '')}">${esc(feat?.title || '')}</a></h3><p class="ex">Ачаалж байна…</p><a data-open="${esc(feat?.id || '')}">Цааш унших →</a></div></div></section>
+      <section class="wk-new"><h2>Шинээр нэмэгдсэн</h2><ul>${byDate.slice(0, 8).map(li).join('')}</ul></section>
+      <section><h2>Сарын өмнө энэ өдөр</h2><ul>${monthAgo.map(li).join('') || '<li class="mute">Сарын өмнө энэ өдөр note алга</li>'}</ul><h2>Он жилийн энэ өдөр</h2><ul>${onDay.map(li).join('') || '<li class="mute">—</li>'}</ul></section>
+      <section><h2>INAI Newsletter</h2>${nl ? `<div class="ft"><img class="cv" data-cv="${esc(nl.id)}" alt=""><div><h3><a data-open="${esc(nl.id)}">${esc(nl.title)}</a></h3><p class="mute">${esc(nl.date)}</p></div></div>` : ''}
+        <h2>Унших ном</h2><div class="rd">${read.slice(0, 8).map(b => `<a data-open="${esc(b.id)}" title="${esc(b.title)}"><img class="cv" data-cv="${esc(b.id)}" alt=""></a>`).join('')}</div></section>
+      <section class="wk-cat"><h2>Ангилал</h2><div class="chips">${Object.entries(secs).map(([n, c]) => `<a data-sec="${esc(n)}">${esc(n)} <small>${c}</small></a>`).join('')}</div>
+        <h2>Сэдвүүд</h2><div class="chips tags">${topTags.map(([t, c]) => `<a data-tag="${esc(t)}">#${esc(t)} <small>${c}</small></a>`).join('')}</div>
+        <p><button data-r="rand">🎲 Санамсаргүй нийтлэл</button> <button data-r="shelf">Бүх тавиур</button></p></section>
+    </div></div>`;
+  READER.scrollTop = 0;
+  READER.querySelectorAll('img.cv[data-cv]').forEach(im => { const b = all.find(x => x.id === im.dataset.cv); if (b) coverURL(b).then(u => im.src = u); });
+  if (feat) fetch('/api/book?path=' + encodeURIComponent(feat.id)).then(r => r.json()).then(x => { const t = (x.body || '').replace(/^---[\s\S]*?---/, '').replace(/^#.*$/gm, '').replace(/\[\[([^\]|]+)(\|[^\]]+)?\]\]/g, '$1').replace(/[*_`>]/g, '').trim(); const ex = READER.querySelector('.ex'); if (ex) ex.textContent = t.slice(0, 420) + (t.length > 420 ? '…' : ''); });
+  const q = READER.querySelector('.q'), res = READER.querySelector('.wk-res');
+  const show = list => { res.innerHTML = list.length ? `<ul>${list.slice(0, 40).map(li).join('')}</ul>` : ''; };
+  q.addEventListener('input', () => { const v = q.value.trim().toLowerCase(); show(v ? all.filter(b => b.title.toLowerCase().includes(v) || (b.tags || []).some(t => t.toLowerCase().includes(v))) : []); }); q.focus(); }
+READER.addEventListener('click', e => { const a = e.target.closest('[data-open],[data-sec],[data-tag],[data-r="rand"],[data-r="home"]'); if (!a) return; const all = world.libBooks?.userData?.books || [];
+  if (a.dataset.open) return openBook(a.dataset.open);
+  if (a.dataset.r === 'rand') { const n = all.filter(b => b.sh !== 'newsletter'); return openBook(n[Math.floor(Math.random() * n.length)].id); }
+  if (a.dataset.r === 'home') return openWikiHome();
+  const list = a.dataset.sec ? all.filter(b => b.shn === a.dataset.sec) : all.filter(b => (b.tags || []).includes(a.dataset.tag)); const res = READER.querySelector('.wk-res');
+  if (res) { res.innerHTML = `<h3>${esc(a.dataset.sec || '#' + a.dataset.tag)} · ${list.length}</h3><ul>${list.slice(0, 120).map(b => `<li><a data-open="${esc(b.id)}">${esc(b.title)}</a> <small>${esc(b.date)}</small></li>`).join('')}</ul>`; res.scrollIntoView({ behavior: 'smooth' }); } });
+// нийтлэлийг Wikipedia шиг: агуулгын хүснэгт + мэдээллийн хайрцаг + «Энд холбогдсон хуудсууд»
+function wikiEnhance(id, b) { const art = READER.querySelector('article'); if (!art) return;
+  const hs = [...art.querySelectorAll('h2,h3,h4')]; if (hs.length >= 2) { const toc = document.createElement('nav'); toc.className = 'toc'; toc.innerHTML = '<b>Агуулга</b><ol>' + hs.map((h, i) => { h.id = 'h' + i; return `<li class="l${h.tagName[1]}"><a href="#h${i}">${h.textContent}</a></li>`; }).join('') + '</ol>'; art.prepend(toc);
+    toc.addEventListener('click', e => { const a = e.target.closest('a'); if (a) { e.preventDefault(); READER.querySelector(a.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth' }); } }); }
+  const meta = (world.libBooks?.userData?.books || []).find(x => x.id === id) || {};
+  const box = document.createElement('aside'); box.className = 'ibox'; box.innerHTML = `<img class="cv2" alt=""><table>${[['Ангилал', b.section], ['Огноо', b.date], ['Төрөл', b.type], ['Зохиогч', b.author], ['Tag', (meta.tags || []).map(t => '#' + t).join(' ')]].filter(r => r[1]).map(r => `<tr><th>${r[0]}</th><td>${esc(r[1])}</td></tr>`).join('')}</table>`;
+  art.prepend(box); coverURL(Object.assign({ sh: '', title: b.title, date: b.date, author: b.author }, meta)).then(u => box.querySelector('img').src = u);
+  const hero = READER.querySelector('.hero .cv'); if (hero) hero.closest('.hero').classList.add('nocv');
+  fetch('/api/backlinks?path=' + encodeURIComponent(id)).then(r => r.json()).then(x => { if (!x.links?.length) return; const s_ = document.createElement('section'); s_.className = 'bl';
+    s_.innerHTML = `<h2>Энд холбогдсон хуудсууд <small>${x.links.length}</small></h2><ul>${x.links.map(l => `<li><a data-open="${esc(l.id)}">${esc(l.title)}</a></li>`).join('')}</ul>`; art.after(s_); });
+  const f = READER.querySelector('footer'); if (f && !f.querySelector('[data-r="home"]')) f.insertAdjacentHTML('afterbegin', '<button data-r="home">⌂ Нүүр хуудас</button> '); }
+// ── Inspect: төвийн цэгээр харсан зүйл (≤14 м) → нэр, тайлбар; E = дэлгэрэнгүй ──
+const INFO = [
+  [/Ger|ger_|felt/i, 'Миний гэр', 'Монгол гэр · дотор нь ширээ, PC (vault-ийн өдрийн лог, атом бичих)', () => enterGer()],
+  [/Home|log|cabin/i, 'Модон байшин', 'Шинэсэн дүнзэн байшин · Төслүүдийн өрөө', () => ZONES.find(z => z.name === 'Төслүүд')?.go()],
+  [/Pier/i, 'Гүүр', 'Inbox — нуурын эрэг рүү хөвж ирсэн note-ууд', () => ZONES.find(z => /Гүүр/.test(z.name))?.go()],
+  [/Kayak/i, 'Каяк', 'E — суугаад нуураар сэлүүрдэх, загас барих', () => boardKayak()],
+  [/khadag|WishRock|ovoo/i, 'Хүслийн хад · хадаг', 'Хөх хадаг уясан овоо — зорилгууд', () => ZONES.find(z => /Хүслийн/.test(z.name))?.go()],
+  [/office|wood_office/i, 'Миний оффис', 'Mac · Удирдлагын өрөө (/control)', () => ZONES.find(z => z.name === 'Миний оффис')?.go()],
+  [/^card$/, 'Сибирь шинэс', 'Larix sibirica · Хөвсгөлийн ойн гол мод. Намар шаргална, өвөл навчаа гөвдөг цорын ганц шилмүүст'],
+  [/rock_moss|boulder|stone/i, 'Хагтай хад', 'Хөвсгөлийн эргийн боржин · хаг, хөвд'],
+];
+const look = { t: 0, hit: null, el: $('look'), ray: new THREE.Raycaster(), c: new THREE.Vector2(0, 0) }; look.ray.far = 60;
+function inspectTick(dt) { if (!WK.pov || WK.inGer || LIFE.mode || document.pointerLockElement !== renderer.domElement) { look.el.classList.remove('on'); look.hit = null; return; }
+  if ((look.t -= dt) > 0) return; look.t = .12; look.ray.setFromCamera(look.c, camera);
+  const objs = scene.children.filter(o => o.visible && o !== me && !o.isLight && o !== water && !(o.isInstancedMesh && /grass|dandelion|card|rock|fir/.test(o.userData.real || '') && !o.userData.books) && o.userData.real !== 'grass' && !o.isPoints && o !== sky && o !== clouds);
+  const h = look.ray.intersectObjects(objs, true).find(h => h.object.visible && !h.object.isSprite && !h.object.isLine); let info = null; look.hitD = h ? h.distance : 30;
+  if (h && h.distance < 6 && h.object.userData.book) { const b = h.object.userData.book; info = ['book', '✨ Шинэ: ' + b.title, b.shn || b.sh, () => openBook(b.id)]; }
+  else if (h && h.distance < 6 && h.object.userData.books && h.instanceId != null) { const b = h.object.userData.books[h.instanceId]; info = ['book', b.title, b.shn, () => openBook(b.id)]; look.book = b; }
+  else if (h && h.distance < 14) { let o = h.object; const names = []; while (o) { names.push(o.name || '', ...(o.material ? [].concat(o.material).map(m => m.name || '') : []), o.userData.real || ''); o = o.parent; }
+    const key = names.join(' '); info = INFO.find(r => names.some(n => n && r[0].test(n))) || null; }
+  look.hit = info; look.el.classList.toggle('on', !!info); if (info) look.el.innerHTML = info[0] === 'book' ? `<kbd>E</kbd>📖 ${esc(info[1].slice(0, 60))} <small style="opacity:.6">· ${esc(info[2])}</small>` : `<kbd>E</kbd>${esc(info[1])}`; }
+function inspectOpen() { const i = look.hit; if (!i) return false; document.exitPointerLock?.(); if (i[3]) i[3](); else panel(`<h2>${esc(i[1])}</h2><p>${esc(i[2])}</p>`); return true; }
+function boardKayak() { const k = world.kayak; if (!k || WK.boat) return; WK.boat = true; WK.p.set(k.position.x, .2, k.position.z); WK.v.set(0, 0, 0); WK.vy = 0;
+  if (!WK.pov) setPOV(true); POV.yaw = Math.atan2(-Math.cos(k.rotation.y), Math.sin(k.rotation.y)) + Math.PI / 2; hint('WASD = сэлүүрдэх · эрэгт ойртоод <b>E</b> = буух', true); }
+function leaveKayak() { const fx = -Math.sin(POV.yaw), fz = -Math.cos(POV.yaw);
+  for (let d = 1.5; d < 6; d += .5) for (const s of [0, .6, -.6, 1.2, -1.2]) { const x = WK.p.x + (fx * Math.cos(s) - fz * Math.sin(s)) * d, z = WK.p.z + (fz * Math.cos(s) + fx * Math.sin(s)) * d, h = H(x, z);
+    if (h > .35) { WK.boat = false; WK.p.set(x, h, z); WK.v.set(0, 0, 0); hint('', false); return true; } }
+  hint('Эрэг хол байна — ойртоод <b>E</b>', true); return false; }
+function setPOV(on, quiet) { WK.pov = on; POV.yaw = Math.atan2(Math.cos(cam.az), Math.sin(cam.az)); POV.pitch = -.05; POV.y = WK.p.y + 1.62; POV.vy = 0;
+  $('povbtn')?.classList.toggle('on', on); document.body.classList.toggle('pov', on); if (on && !quiet) { renderer.domElement.requestPointerLock?.()?.catch?.(() => {}); hint('Хулгана = харах · Shift = гүйх · Space = үсрэх · R = саваа · J = тэмдэглэл · V = 3-р этгээд', true); setTimeout(() => WK.zone || hint('', false), 3500); }
+  else document.exitPointerLock?.(); }
+renderer.domElement.addEventListener('click', () => { if (WK.pov && !WK.inGer && !LIFE.mode && document.pointerLockElement !== renderer.domElement) renderer.domElement.requestPointerLock?.()?.catch?.(() => {}); });
+const PLAY = $('play'); PLAY.onclick = () => { $('panel').classList.remove('on'); renderer.domElement.requestPointerLock?.()?.catch?.(() => {}); };
+const playUI = () => PLAY.classList.toggle('on', WK.pov && !WK.inGer && !LIFE.mode && document.pointerLockElement !== renderer.domElement && !$('panel').classList.contains('on') && !ST.classList.contains('on') && !READER.classList.contains('on'));
+document.addEventListener('pointerlockchange', playUI); setInterval(playUI, 400);
+addEventListener('mousemove', e => { if (!WK.pov || document.pointerLockElement !== renderer.domElement) return; const mx = Math.abs(e.movementX) > 300 ? 0 : e.movementX, my = Math.abs(e.movementY) > 300 ? 0 : e.movementY; POV.dx = (POV.dx || 0) + mx; POV.dy = (POV.dy || 0) + my * (SET.invert ? -1 : 1); });
+// ── хөлийн чимээ: WebAudio noise, гадаргуугаар (элс / өвс) ──
+let AC = null, NB = null;
+function step(land) { if (!AC) return; const sand = H(WK.p.x, WK.p.z) < 1.1, t = AC.currentTime, src = AC.createBufferSource(), bp = AC.createBiquadFilter(), g = AC.createGain();
+  src.buffer = NB; src.playbackRate.value = .9 + Math.random() * .2; bp.type = 'bandpass'; bp.frequency.value = (sand ? 700 : 1500) * (.85 + Math.random() * .3); bp.Q.value = sand ? .7 : 1.1;
+  const v = (land ? .5 : WK.keys.has('shift') ? .28 : .18) * (sand ? 1.2 : 1); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + .008); g.gain.exponentialRampToValueAtTime(.001, t + (sand ? .16 : .1));
+  src.connect(bp).connect(g).connect(AC.destination); src.start(t, Math.random() * .5, .2); }
+addEventListener('keydown', () => { if (AC) return; try { AC = new AudioContext(); NB = AC.createBuffer(1, AC.sampleRate, AC.sampleRate); const d = NB.getChannelData(0); let b = 0; for (let i = 0; i < d.length; i++) { b = b * .6 + (Math.random() * 2 - 1) * .4; d[i] = b; } } catch {} }, { once: false });
+// ── Загас барих (Tidewater-ийн тоглолтын санаа, өөрсдийн хэрэгжүүлэлт) ──
+// R = саваа · хулганаа дарж байгаад суллах = шидэх (удаан дарах тусам хол) · хөвүүр хэд чичирч, дараа нь живнэ → тэр агшинд дар = дэгээдэх
+// · дэгээдсэний дараа: дарж байх = ороох (утасны чангаралт өснө), суллах = сулруулах. Чангаралт дүүрвэл утас тасарна.
+const FISH = [ // Хөвсгөл нуурын загас (кг)
+  ['Хөвсгөлийн хариус', 'Thymallus nigrescens · зөвхөн энэ нууранд', .15, .6, .5], ['Зэвэг', 'Brachymystax lenok', .5, 3.5, .2], ['Алгана', 'Perca fluviatilis', .1, .9, .45],
+  ['Цурхай', 'Esox lucius', .8, 6, .12], ['Шивэр', 'Leuciscus leuciscus', .05, .35, .55], ['Гутаар', 'Lota lota', .4, 2.5, .08]];
+const FS = { rod: false, st: 'idle', charge: 0, t: 0, bob: new THREE.Vector3(), vel: new THREE.Vector3(), tension: 0, dist: 0, fish: null, nib: 0, bite: 0, log: [] };
+try { FS.log = JSON.parse(localStorage.getItem('khuvsgul.fish') || '[]'); } catch {}
+const rod = new THREE.Group(); camera.add(rod); scene.add(camera); rod.position.set(.28, -.26, -.55); rod.rotation.set(.55, -.18, .08); rod.visible = false;
+{ const blank = new THREE.Mesh(new THREE.CylinderGeometry(.004, .011, 1.5, 6), new THREE.MeshStandardMaterial({ color: 0x2b2f36, roughness: .4, metalness: .3 })); blank.position.y = .75; rod.add(blank);
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(.016, .014, .26, 8), new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: .9 })); grip.position.y = .1; rod.add(grip);
+  const reel = new THREE.Mesh(new THREE.CylinderGeometry(.032, .032, .03, 14), new THREE.MeshStandardMaterial({ color: 0xb8bcc2, metalness: .9, roughness: .3 })); reel.rotation.z = Math.PI / 2; reel.position.set(.03, .22, 0); rod.add(reel); }
+const tip = new THREE.Object3D(); tip.position.y = 1.5; rod.add(tip);
+const bobber = new THREE.Group(); scene.add(bobber); bobber.visible = false;
+{ const r = new THREE.Mesh(new THREE.SphereGeometry(.05, 12, 8, 0, 6.29, 0, 1.6), new THREE.MeshStandardMaterial({ color: 0xd8322a, roughness: .5 })); bobber.add(r);
+  const w = new THREE.Mesh(new THREE.SphereGeometry(.05, 12, 8, 0, 6.29, 1.57, 1.6), new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: .5 })); bobber.add(w);
+  const st = new THREE.Mesh(new THREE.CylinderGeometry(.006, .006, .09, 6), new THREE.MeshStandardMaterial({ color: 0xd8322a })); st.position.y = .08; bobber.add(st); }
+const lineGeo = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 24 }, () => new THREE.Vector3()));
+const fline = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xe8e8e8, transparent: true, opacity: .7 })); fline.frustumCulled = false; fline.visible = false; scene.add(fline);
+const ripple = new THREE.Mesh(new THREE.RingGeometry(.08, .11, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false })); scene.add(ripple);
+const fui = document.createElement('div'); fui.id = 'fishui'; fui.innerHTML = '<div class="lab"></div><div class="bar"><i></i></div>'; document.body.appendChild(fui);
+const fsay = (t, ms = 2600) => { hint(t, true); clearTimeout(fsay.h); if (ms) fsay.h = setTimeout(() => hint('', false), ms); };
+function sfx(f, q, v, d) { if (!AC) return; const t = AC.currentTime, s = AC.createBufferSource(), b = AC.createBiquadFilter(), g = AC.createGain(); s.buffer = NB; b.type = 'bandpass'; b.frequency.value = f; b.Q.value = q;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + .01); g.gain.exponentialRampToValueAtTime(.001, t + d); s.connect(b).connect(g).connect(AC.destination); s.start(t, Math.random() * .4, d + .05); }
+function rodToggle() { if (!WK.pov || WK.inGer || LIFE.mode) return fsay('Загас барихын тулд POV (V) горимд ор'); FS.rod = !FS.rod; rod.visible = FS.rod; if (!FS.rod) reset(); else fsay('Хулганаа дараад барь → суллаад шид', 3200); }
+function reset() { FS.st = 'idle'; bobber.visible = fline.visible = false; FS.fish = null; fui.classList.remove('on'); }
+function pickFish() { let r = Math.random() * FISH.reduce((a, f) => a + f[4], 0); for (const f of FISH) if ((r -= f[4]) < 0) return f; return FISH[0]; }
+renderer.domElement.addEventListener('pointerdown', e => { if (!FS.rod || e.button !== 0) return;
+  if (FS.st === 'idle') { FS.st = 'charge'; FS.charge = 0; fui.classList.add('on'); }
+  else if (FS.st === 'wait' || FS.st === 'nibble') { FS.st = 'idle'; reset(); fsay('Эрт татлаа — загас үргэв'); }
+  else if (FS.st === 'bite') { const f = pickFish(); FS.fish = { f, kg: +(f[2] + Math.pow(Math.random(), 1.8) * (f[3] - f[2])).toFixed(2) }; FS.st = 'fight'; FS.tension = .3; FS.reel = true; fui.classList.add('on'); fsay('Дэгээдлээ! Дарж байж ороо, чангарвал суллаад амсхий', 3000); sfx(500, 1, .4, .25); }
+  else if (FS.st === 'fight') FS.reel = true; });
+addEventListener('pointerup', e => { if (!FS.rod || e.button !== 0) return;
+  if (FS.st === 'charge') { const fx = -Math.sin(POV.yaw), fz = -Math.cos(POV.yaw), d = 3 + FS.charge * 19; camera.updateMatrixWorld(); tip.getWorldPosition(FS.bob);
+    FS.vel.set(fx * d * .9, 4 + FS.charge * 2.5, fz * d * .9); FS.st = 'fly'; bobber.visible = fline.visible = true; fui.classList.remove('on'); sfx(2200, .6, .12, .25); }
+  else if (FS.st === 'fight') FS.reel = false; });
+function fishUpdate(dt, t) {
+  rod.visible = FS.rod && WK.pov; if (!FS.rod) return;
+  const L = fui.querySelector('.lab'), BAR = fui.querySelector('.bar i'), tp = new THREE.Vector3(); camera.updateMatrixWorld(); tip.getWorldPosition(tp);
+  rod.rotation.x = .55 + (FS.st === 'charge' ? FS.charge * .7 : 0) + (FS.st === 'fight' ? Math.sin(t * 13) * .03 * FS.tension : 0);
+  if (FS.st === 'charge') { FS.charge = Math.min(1, FS.charge + dt * .7); L.textContent = 'Шидэх хүч'; BAR.style.width = FS.charge * 100 + '%'; BAR.style.background = '#f3c969'; }
+  if (FS.st === 'fly') { FS.vel.y -= 9.81 * dt; FS.bob.addScaledVector(FS.vel, dt); const g = H(FS.bob.x, FS.bob.z);
+    if (FS.bob.y <= Math.max(g, .2)) { if (g > .12) { fsay('Газар унав — дахин шид'); reset(); } else { FS.bob.y = .2; FS.st = 'wait'; FS.t = 2.5 + Math.random() * 6; FS.nib = 2 + (Math.random() * 3 | 0); sfx(700, .8, .35, .35); ripple.position.set(FS.bob.x, .21, FS.bob.z); ripple.material.opacity = .8; ripple.scale.setScalar(1); } } }
+  if (FS.st === 'wait' || FS.st === 'nibble') { FS.t -= dt; FS.bob.y = .2 + waveH(FS.bob.x, FS.bob.z, t) + Math.sin(t * 2) * .008;
+    if (FS.t <= 0) { if (FS.nib-- > 0) { FS.st = 'nibble'; FS.t = .6 + Math.random() * 1.2; FS.bob.y = .17; sfx(900, 2, .12, .12); ripple.position.set(FS.bob.x, .21, FS.bob.z); ripple.material.opacity = .5; ripple.scale.setScalar(1); }
+      else { FS.st = 'bite'; FS.t = .85; sfx(420, .9, .45, .4); ripple.material.opacity = .9; ripple.scale.setScalar(1); } } }
+  if (FS.st === 'bite') { FS.t -= dt; FS.bob.y = .05; if (FS.t <= 0) { fsay('Хоцорлоо — загас мултарлаа'); FS.st = 'wait'; FS.t = 3 + Math.random() * 5; FS.nib = 1 + (Math.random() * 2 | 0); FS.bob.y = .2; } }
+  if (FS.st === 'fight') { const k = FS.fish.kg, pull = (.25 + k * .12) * (.6 + .4 * Math.sin(t * (2 + k)));
+    FS.tension = THREE.MathUtils.clamp(FS.tension + (FS.reel ? .1 + pull * .55 : -.45) * dt, 0, 1.2);
+    const toMe = new THREE.Vector3(WK.p.x - FS.bob.x, 0, WK.p.z - FS.bob.z), d = toMe.length(); FS.bob.addScaledVector(toMe.normalize(), (FS.reel ? 3.2 - k * .3 : -.3 * pull) * dt);
+    FS.bob.y = .12 + Math.sin(t * 9) * .04; L.textContent = `${FS.fish.f[0]}? · ${d.toFixed(1)} м`; BAR.style.width = Math.min(100, FS.tension * 100) + '%'; BAR.style.background = FS.tension > .85 ? '#e2553b' : '#6fd3a6';
+    if (FS.reel && Math.random() < dt * 9) sfx(3200, 4, .05, .04);
+    if (FS.tension >= 1.15) { sfx(5000, 1, .3, .15); fsay('Утас тасарлаа…'); reset(); }
+    else if (d < 1.6 || H(FS.bob.x, FS.bob.z) > .15) { const c = { n: FS.fish.f[0], la: FS.fish.f[1], kg: FS.fish.kg, d: new Date().toISOString().slice(0, 16).replace('T', ' ') };
+      FS.log.unshift(c); try { localStorage.setItem('khuvsgul.fish', JSON.stringify(FS.log.slice(0, 200))); } catch {}
+      sfx(800, .7, .4, .5); panel(`<h2>🎣 ${esc(c.n)}</h2><p class="sub">${esc(c.la)}</p><p style="font-size:28px;margin:8px 0"><b>${c.kg} кг</b></p>
+        <p class="sub">Нийт барьсан: ${FS.log.length} · хамгийн том: ${esc(FS.log.reduce((a, b) => b.kg > a.kg ? b : a).n)} ${FS.log.reduce((a, b) => Math.max(a, b.kg), 0)} кг</p>
+        <ul>${FS.log.slice(1, 8).map(x => `<li>${esc(x.d)} · ${esc(x.n)} · ${x.kg} кг</li>`).join('')}</ul>`); document.exitPointerLock?.(); reset(); } }
+  bobber.position.copy(FS.bob);
+  if (fline.visible) { const P = lineGeo.attributes.position, sag = FS.st === 'fight' ? .05 : .6;
+    for (let i = 0; i < 24; i++) { const u = i / 23; P.setXYZ(i, tp.x + (FS.bob.x - tp.x) * u, tp.y + (FS.bob.y + .05 - tp.y) * u - Math.sin(u * Math.PI) * sag, tp.z + (FS.bob.z - tp.z) * u); } P.needsUpdate = true; }
+  if (ripple.material.opacity > 0) { ripple.scale.multiplyScalar(1 + dt * 2.2); ripple.material.opacity = Math.max(0, ripple.material.opacity - dt * .7); }
+}
+const ANIM = { mixer: null, acts: {}, cur: null };
+function play(n, f = .2) { const a = ANIM.acts[n]; if (!a || ANIM.cur === a) return; a.reset().fadeIn(f).play(); ANIM.cur?.fadeOut(f); ANIM.cur = a; }
+const WK = { p: new THREE.Vector3(), v: new THREE.Vector3(), vy: 0, air: false, jump: false, bob: 0, step: 0, pov: false, yaw: 0, keys: new Set(), joy: [0, 0], zone: null, inGer: false }, cam = { az: 2.3, el: .42, dist: 13 };
+const keyOf = e => ({ KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', KeyE: 'e', KeyV: 'v', KeyR: 'r', KeyJ: 'j', KeyH: 'h', KeyT: 't', KeyF: 'f', KeyC: 'c', Space: ' ', ShiftLeft: 'shift', ShiftRight: 'shift', ArrowUp: 'arrowup', ArrowDown: 'arrowdown', ArrowLeft: 'arrowleft', ArrowRight: 'arrowright', Escape: 'escape' })[e.code] || e.key.toLowerCase();
+addEventListener('keydown', e => { if (/INPUT|TEXTAREA/.test(e.target.tagName)) { if (keyOf(e) === 'escape') exitGer(); return; } const k = keyOf(e);
+  if (k === 'escape' && READER.classList.contains('on')) return closeReader();
+  if (k === 'escape' && ST.classList.contains('on')) return toggleST(false);
+  if (k === 'escape') { if (WK.inGer) return exitGer(); if (LIFE.mode) return exitLife(); return $('panel').classList.remove('on'); }
+  if (k === 'e') { if (WK.boat) return leaveKayak(); if (WK.inGer) return openPC(); if (look.hit?.[0] === 'book' && inspectOpen()) return; if (!WK.zone && inspectOpen()) return; if (WK.zone) { if (WK.pov) document.exitPointerLock?.(); return WK.zone.go(); } }
+  if (k === 'v' && !WK.inGer && !LIFE.mode && !WK.boat) { if (WK.pov && FS.rod) rodToggle(); return setPOV(!WK.pov); }
+  if (k === 'r') return rodToggle();
+  if (k === 'h') return toggleST();
+  if (k === 't') { WXB.classList.toggle('open'); if (WXB.classList.contains('open')) document.exitPointerLock?.(); return renderWX(); }
+  if (k === 'j') return panel(`<h2>🎣 Загасчны тэмдэглэл</h2><p class="sub">${FS.log.length} загас</p><ul>${FS.log.slice(0, 30).map(x => `<li>${esc(x.d)} · ${esc(x.n)} · ${x.kg} кг</li>`).join('') || '<li>Одоохондоо хоосон — R дарж саваагаа ав</li>'}</ul>`);
+  if (k === 'f' && !WK.boat && !WK.inGer) { WK.fly = !WK.fly; WK.vy = 0; hint(WK.fly ? '<b>F</b> Нисэх · хулганаар чиглүүлээд W · Shift хурдан · газарт хүрэхэд буух' : '', WK.fly); return; }
+  if (k === ' ' || k === 'space') { WK.jump = true; WK.keys.add(' '); e.preventDefault(); }
+  if (k === 'c') WK.keys.add('c');
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(k)) { WK.keys.add(k); e.preventDefault(); } });
+addEventListener('keyup', e => WK.keys.delete(keyOf(e))); addEventListener('blur', () => WK.keys.clear());
+$('px').onclick = () => $('panel').classList.remove('on'); $('hint').onclick = () => WK.inGer ? openPC() : WK.zone?.go();
+$('hmin').onclick = () => { const m = $('hud').classList.toggle('min'); $('hmin').textContent = m ? '+' : '–'; };
+$('povbtn').onclick = () => { if (!WK.inGer && !LIFE.mode) setPOV(!WK.pov); };
+$('lifebtn').onclick = () => { if (WK.inGer) exitGer(); LIFE.mode ? exitLife() : enterLife(); };
+$('pcclose').onclick = () => $('pc').classList.remove('on');
+{ let drag = null; renderer.domElement.addEventListener('pointerdown', e => drag = [e.clientX, e.clientY]); addEventListener('pointerup', () => drag = null);
+  addEventListener('pointermove', e => { if (!drag || e.target !== renderer.domElement || WK.inGer || (WK.pov && !LIFE.mode)) return; if (LIFE.mode) { LIFE.az -= (e.clientX - drag[0]) * .005; LIFE.el = THREE.MathUtils.clamp(LIFE.el + (e.clientY - drag[1]) * .004, .02, 1.5); drag = [e.clientX, e.clientY]; return; } cam.az -= (e.clientX - drag[0]) * .006; cam.el = THREE.MathUtils.clamp(cam.el + (e.clientY - drag[1]) * .004, .08, 1.3); drag = [e.clientX, e.clientY]; });
+  renderer.domElement.addEventListener('wheel', e => { if (LIFE.mode) { LIFE.dist = THREE.MathUtils.clamp(LIFE.dist * (1 + Math.sign(e.deltaY) * .1), 20, 260); return; } cam.dist = THREE.MathUtils.clamp(cam.dist * (1 + Math.sign(e.deltaY) * .1), 4, 220); }, { passive: true }); }
+if (matchMedia('(pointer: coarse)').matches) $('joy').classList.add('touch');
+{ const J = $('joy'), K = J.querySelector('i'); let id = null;
+  const mv = e => { const r = J.getBoundingClientRect(); let dx = e.clientX - r.left - 60, dy = e.clientY - r.top - 60; const l = Math.hypot(dx, dy); if (l > 44) { dx *= 44 / l; dy *= 44 / l; } K.style.transform = `translate(${dx}px,${dy}px)`; WK.joy = [dx / 44, dy / 44]; };
+  J.addEventListener('pointerdown', e => { id = e.pointerId; J.setPointerCapture(id); mv(e); }); J.addEventListener('pointermove', e => { if (e.pointerId === id) mv(e); });
+  const up = () => { id = null; WK.joy = [0, 0]; K.style.transform = ''; }; J.addEventListener('pointerup', up); J.addEventListener('pointercancel', up); }
+
+// ── Гэр: орох / PC ──
+const gerCam = { p: new THREE.Vector3(), t: new THREE.Vector3() };
+function enterGer() { const G = world.G, s = G[3], fl = G[2] + .08 * s;
+  gerCam.p.copy(B(G[0] + 2.2, G[1] - 1.9, fl + 1.55)); gerCam.t.copy(B(G[0] - 2.5, G[1] + .2, fl + 1.0));
+  WK.inGer = true; me.visible = false; $('panel').classList.remove('on'); hint('<b>E</b>PC асаах · Esc гарах', true); }
+function exitGer() { WK.inGer = false; me.visible = true; $('pc').classList.remove('on'); hint('', false); WK.zone = null; }
+async function openPC() {
+  $('pc').classList.add('on'); $('pcbody').innerHTML = '<h2>Миний PC</h2><div class="sub">ачаалж байна…</div>';
+  let d = {}; try { d = await (await fetch('/api/day?d=' + today)).json(); } catch {}
+  $('pcbody').innerHTML = `<h2>Миний PC · ${esc(today)}</h2><div class="sub">Гэрийн ширээ · Second Brain</div><div class="cols"><div>
+      <b>Өнөөдрийн урсгал</b><ul>${(d.log || []).slice(-14).reverse().map(l => `<li><small>${esc(l.t)}</small> ${esc(l.actor)} — ${esc(String(l.text).slice(0, 110))}</li>`).join('') || '<li><small>Хоосон</small></li>'}</ul>
+      ${(d.tasks || []).length ? '<b>Дууссан ажил</b><ul>' + d.tasks.map(t => `<li>${esc(t)}</li>`).join('') + '</ul>' : ''}
+      <p><a href="#spiral" onclick="document.getElementById('pc').classList.remove('on');">Амьдралын спираль (түүдэг гал)</a> · <a href="/gallery">Gallery</a> · <a href="/home">Мини хот</a></p></div>
+    <div><b>Шинэ тэмдэглэл (атом, draft)</b><input id="nt" placeholder="Гарчиг"><textarea id="nb" placeholder="Юу бодож байна…"></textarea>
+      <button id="ns">Vault-д хадгалах</button><span id="msg"></span>
+      <p style="margin-top:18px"><b>Идэвхтэй төслүүд</b></p><ul>${(DATA.projects || []).filter(p => p.status === 'active').map(p => `<li>${esc(p.name)}</li>`).join('')}</ul></div></div>`;
+  $('ns').onclick = async () => { const title = $('nt').value.trim(), body = $('nb').value.trim(); if (!title || !body) return $('msg').textContent = 'гарчиг, агуулга хэрэгтэй';
+    try { const r = await fetch('/api/atom', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true, title, body, home: '02-Projects/Inai Operation App/Inai Operation App.md' }) });
+      const j = await r.json(); $('msg').textContent = r.ok ? '✓ хадгалагдлаа' : ('⚠ ' + (j.error || r.status)); if (r.ok) { $('nt').value = ''; $('nb').value = ''; } } catch { $('msg').textContent = '⚠ сүлжээ'; } };
+}
+const hint = (html, on) => { const h = $('hint'); h.innerHTML = html; h.style.display = on ? 'block' : 'none'; };
+
+// ── Post ──
+const composer = new EffectComposer(renderer); composer.addPass(new RenderPass(scene, camera));
+{ const c = document.createElement('canvas'); c.width = c.height = 256; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  MOON = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, fog: false, depthWrite: false, transparent: true, toneMapped: false })); MOON.scale.setScalar(105); MOON.renderOrder = -1; scene.add(MOON); }
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .35, .5, .85); composer.addPass(bloom);
+composer.addPass(new ShaderPass({ uniforms: { tDiffuse: { value: null }, uT: { value: 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uT; varying vec2 vUv; float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
+    void main(){ vec4 c = texture2D(tDiffuse, vUv); c.rgb += (h(vUv * 999. + uT) - .5) * .025; float v = smoothstep(1., .35, length(vUv - .5) * 1.3); c.rgb *= mix(.82, 1., v); gl_FragColor = c; }` }));
+composer.addPass(new OutputPass());
+function size() { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); if (typeof AO !== 'undefined') AO.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+// ── Тохиргоо (H) — Tidewater-ийн тохиргооны бүтэц: таб → бүлэг → гулсуур, нөхцлийн preset, нарны нум (өөрсдийн код) ──
+const SET_RAW = (() => { try { const o = JSON.parse(localStorage.getItem('khuvsgul.set') || '{}'); if ((o.v || 0) < 2) { o.ao = 0; o.mblur = 0; o.v = 2; } return o; } catch { return {}; } })();
+const SET = Object.assign({ v: 2,  cond: 'Сэвэлзээ', wind: 6, windDir: 210, clarity: 1, chop: .8, swell: .4, caps: .4, surf: .45, period: 8, caus: 1, shafts: 1, ao: 0, dof: false, flare: .8, mblur: 0, grass: .85, auto: true, sunAz: 0, advance: false, speed: .05, clouds: -1, haze: 1, ev: 0, moonPhase: -.05, moonShift: 0, moonI: 1, ords: true,
+  fov: 68, sens: 1, smooth: .06, invert: false, bloom: 1, sat: 1, con: 1, vig: .45, grain: .025, scale: 1, shadows: true }, SET_RAW);
+const saveSET = () => { try { localStorage.setItem('khuvsgul.set', JSON.stringify(SET)); } catch {} };
+const COND = { 'Тайван': { wind: 1.2, clarity: 1.6, chop: .3, swell: .1, caps: 0, surf: .1, clouds: -1 }, 'Сэвэлзээ': { wind: 6, clarity: 1, chop: .8, swell: .4, caps: .4, surf: .45, clouds: -1 },
+  'Салхитай': { wind: 13, clarity: .8, chop: 1.1, swell: .8, caps: .7, surf: .85, clouds: .4 }, 'Шуурга': { wind: 24, clarity: .5, chop: 1.4, swell: 1.4, caps: 1, surf: 1.3, clouds: .85 } };
+const GRADE = composer.passes[2];
+const AO = new GTAOPass(scene, camera, innerWidth, innerHeight); AO.blendIntensity = .8; composer.insertPass(AO, 1);
+const SHAFT = new ShaderPass({ uniforms: { tDiffuse: { value: null }, uSun: { value: new THREE.Vector2(.5, .8) }, uStr: { value: 1 }, uCol: { value: new THREE.Color(1, .9, .7) } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uSun; uniform float uStr; uniform vec3 uCol; varying vec2 vUv;
+    void main(){ vec4 c = texture2D(tDiffuse, vUv); if (uStr <= 0.) { gl_FragColor = c; return; } vec2 dlt = (vUv - uSun) / 32. * .9; vec2 uv = vUv; float il = 1., acc = 0.;
+      for (int i = 0; i < 32; i++) { uv -= dlt; vec3 s = texture2D(tDiffuse, clamp(uv, 0., 1.)).rgb; float b = smoothstep(.82, 1.05, dot(s, vec3(.33))); acc += b * il; il *= .955; }
+      acc /= 32.; float fall = 1. - smoothstep(0., 1.1, distance(vUv, uSun)); gl_FragColor = vec4(c.rgb + uCol * acc * uStr * fall * 1.4, c.a); }` });
+const flareTex = (r, a, col) => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(r, `rgba(${col},${a * .35})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); return t; };
+const FLARE = new Lensflare(); { const t0 = flareTex(.2, 1, '255,240,210'), t1 = flareTex(.7, .35, '160,220,255'), t2 = flareTex(.9, .25, '255,190,140');
+  FLARE.addElement(new LensflareElement(t0, 380, 0)); for (const [sz, d, t] of [[60, .45, t1], [90, .62, t2], [140, .8, t1], [70, 1, t2]]) FLARE.addElement(new LensflareElement(t, sz, d)); }
+scene.add(FLARE); FLARE.frustumCulled = false;
+const DOF = new BokehPass(scene, camera, { focus: 12, aperture: .0025, maxblur: .008 }); DOF.enabled = false;
+{ const i = composer.passes.indexOf(GRADE); composer.insertPass(SHAFT, i); composer.insertPass(DOF, i); }
+Object.assign(GRADE.uniforms, { uSat: { value: 1 }, uCon: { value: 1 }, uVig: { value: .45 }, uGr: { value: .025 }, uMB: { value: new THREE.Vector2() } });
+GRADE.material.fragmentShader = `uniform sampler2D tDiffuse; uniform float uT, uSat, uCon, uVig, uGr; uniform vec2 uMB; varying vec2 vUv; float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
+  void main(){ vec4 c = texture2D(tDiffuse, vUv); if (dot(uMB, uMB) > 1e-7) { vec3 a = c.rgb; for (int i = 1; i < 8; i++) a += texture2D(tDiffuse, clamp(vUv - uMB * (float(i) / 7. - .5), 0., 1.)).rgb; c.rgb = a / 8.; } float l = dot(c.rgb, vec3(.2126,.7152,.0722)); c.rgb = mix(vec3(l), c.rgb, uSat); c.rgb = (c.rgb - .5) * uCon + .5;
+    c.rgb += (h(vUv * 999. + uT) - .5) * uGr; float v = smoothstep(1., .35, length(vUv - .5) * 1.3); c.rgb *= mix(1. - .4 * uVig, 1., v); gl_FragColor = c; }`;
+GRADE.material.needsUpdate = true;
+function applySET(key) {
+  uWind.value = SET.wind / 15; WX_LOCK = true; uClar.value = SET.clarity;
+  { const a = SET.windDir * Math.PI / 180; uWave.value.set(Math.cos(a), Math.sin(a), .012 * Math.pow(Math.max(.5, SET.wind), 1.15), SET.chop); }
+  uSw.value = SET.swell; uCaps.value = SET.caps; uSurf.value = SET.surf; uPer.value = SET.period; uCaus.value = SET.caus; AO.enabled = SET.ao > 0; AO.blendIntensity = SET.ao; DOF.enabled = SET.dof; if (world.grassU) world.grassU.uDen.value = SET.grass;
+  GRADE.uniforms.uSat.value = SET.sat; GRADE.uniforms.uCon.value = SET.con; GRADE.uniforms.uVig.value = SET.vig; GRADE.uniforms.uGr.value = SET.grain;
+  POV.sens = .0022 * SET.sens; scene.fog.near = 500 / SET.haze; scene.fog.far = 2600 / SET.haze;
+  if (key === 'scale' || key === 'auto' || !key) { PERF.dyn = 1; renderer.setPixelRatio(DPR0 * SET.scale); size(); }
+  if (key === 'shadows' || !key) { sun.castShadow = SET.shadows; }
+  applyTime(); saveSET();
+}
+let WX_LOCK = false;
+// ── UI ──
+const ST = document.createElement('aside'); ST.id = 'settings'; ST.className = 'st-glass'; document.body.appendChild(ST);
+const TABS = [
+  ['lake', 'Нуур', [['Нуурын байдал', [['preset'], ['wind', 'Салхины хурд', 0, 30, .1, 'м/с', 'Усны гадаргаас 10 м-т. Долгион, хөөсийг тодорхойлно.'], ['windDir', 'Салхины чиг', 0, 360, 1, '°'],
+    ['chop', 'Давалгааны огцом', 0, 1.6, .01, '', 'Хэвтээ шилжилт: хурц орой, өргөн хонхор.'], ['swell', 'Swell', 0, 2, .01, '', 'Холоос ирсэн урт давалгаа.'],
+    ['caps', 'Цагаан дэлбэн', 0, 1, .01, '']]], ['Ус', [['clarity', 'Тунгалаг', .3, 2, .01, '', 'Хөвсгөл дэлхийн хамгийн тунгалаг нууруудын нэг — 20+ м харагдана.']]]]],
+  ['shore', 'Эрэг', [['Хугарал', [['surf', 'Давалгааны өндөр', 0, 1.4, .01, 'м'], ['period', 'Давалгааны үе', 5, 16, .1, 'с']]], ['Caustics', [['caus', 'Хүч', 0, 2, .01, '', 'Гүехэн усны ёроолд тусах гэрлийн тор.']]]]],
+  ['sky', 'Тэнгэр', [['Нар', [['tod'], ['sunAz', 'Нарны азимут', -180, 180, 1, '°', 'Нарны замыг арлын эргэн тойронд эргүүлнэ.'], ['advance', 'Цаг урсгах'], ['speed', 'Цагийн хурд', .002, 1, .002, 'ц/с']]], ['Сар', [['moonPhase', 'Сарны бүтэн', -.05, 1, .01, '', '0 = шинэ сар, .5 = тэргэл, 1 = дахин шинэ. Хамгийн зүүн = бодит өнөөдрийнх.'], ['moonShift', 'Мандалт', -12, 12, .25, 'ц', 'Сар хэдэн цагаар эрт/орой мандахыг шилжүүлнэ.'], ['moonI', 'Сарны гэрэл', 0, 2.5, .01, ''], ['ords', 'Ордууд']]],
+    ['Агаар мандал', [['clouds', 'Үүл', -1, 1, .01, '', '−1 = бодит цаг агаар (Open-Meteo, Улаанбаатар)'], ['haze', 'Манан', .3, 4, .01, ''], ['ev', 'Гэрэлтүүлэг', -3, 3, .1, 'EV']]]]],
+  ['cam', 'Камер', [['Харагдац', [['fov', 'Харах өнцөг', 40, 100, 1, '°']]], ['Хулгана', [['sens', 'Мэдрэмж', .1, 4, .01, '×'], ['smooth', 'Зөөлрүүлэлт', 0, .5, .01, 'с'], ['invert', 'Босоо тэнхлэг урвуу']]]]],
+  ['fx', 'Эффект', [['Дараах боловсруулалт', [['ao', 'Ambient occlusion', 0, 1.5, .01, ''], ['shafts', 'Нарны цацраг', 0, 3, .01, '', 'Манан доторх гэрлийн туяа.'], ['bloom', 'Bloom', 0, 2, .01, ''], ['sat', 'Ханалт', .5, 1.5, .01, ''], ['con', 'Контраст', .8, 1.3, .01, ''], ['vig', 'Vignette', 0, 1, .01, ''], ['grain', 'Film grain', 0, .06, .001, '']]], ['Линз', [['dof', 'Depth of field'], ['flare', 'Lens flare', 0, 2, .01, ''], ['mblur', 'Motion blur', 0, 1, .01, '']]]]],
+  ['perf', 'Гүйцэтгэл', [['Шууд', [['info']]], ['Чанар', [['scale', 'Render scale', .5, 1, .05, '%'], ['auto', 'Автомат нягтрал (60 FPS барина)'], ['shadows', 'Сүүдэр'], ['grass', 'Өвсний нягт', 0, 1, .01, '%'], ['reset']]]]],
+];
+let stTab = localStorage.getItem('khuvsgul.sttab') || 'sky';
+const fmt = (v, st, u) => u === '%' ? Math.round(v * 100) + '%' : (st >= 1 ? Math.round(v) : (+v).toFixed(st < .01 ? 3 : st < .1 ? 2 : 1)) + (u && u !== '%' ? ' ' + u : '');
+function todSVG(h) { const W = 300, Hh = 92, cx = W / 2, hy = 70, R = 118, a = (h - 6) / 12 * Math.PI, x = cx - Math.cos(a) * R, y = hy - Math.sin(a) * 58, up = y < hy;
+  const sky = up ? (h < 8 || h > 17 ? ['#2a3d6e', '#f2a37a'] : ['#3d86d8', '#cfe6f6']) : ['#0b1430', '#1c2a52'];
+  return `<svg viewBox="0 0 ${W} ${Hh}" class="st-tod"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky[0]}"/><stop offset="1" stop-color="${sky[1]}"/></linearGradient>
+    <radialGradient id="tglow"><stop offset="0" stop-color="#fff3c4" stop-opacity=".9"/><stop offset="1" stop-color="#ffb86b" stop-opacity="0"/></radialGradient></defs>
+    <rect width="${W}" height="${hy}" fill="url(#tg)"/><rect y="${hy}" width="${W}" height="${Hh - hy}" fill="${up ? '#2a8fa8' : '#0a2235'}"/>
+    <path d="M${cx - R} ${hy} A${R} 58 0 0 1 ${cx + R} ${hy}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-dasharray="2 4"/>
+    <line x1="0" y1="${hy + .5}" x2="${W}" y2="${hy + .5}" stroke="#fff" stroke-opacity=".3"/>
+    ${up ? `<circle cx="${x}" cy="${y}" r="22" fill="url(#tglow)"/><circle cx="${x}" cy="${y}" r="7" fill="#fff6dc"/>` : `<circle cx="${W - 30}" cy="22" r="6" fill="#e3ecff"/>`}
+    <text x="12" y="20" fill="#fff" font-size="12" font-weight="600" opacity=".9">${h < 5 || h > 21.5 ? 'Шөнө' : h < 7.5 ? 'Үүр' : h < 11 ? 'Өглөө' : h < 15 ? 'Үд' : h < 18.5 ? 'Үдээс хойш' : 'Бүрэнхий'}</text></svg>`; }
+function curHour() { return TOD === 'live' ? hourNow() : +TOD; }
+const moonName = p => (p < .03 || p > .97 ? 'шинэ сар' : p < .22 ? 'хавирган (өсөх)' : p < .28 ? 'хагас (өсөх)' : p < .47 ? 'өсөх' : p < .53 ? 'тэргэл' : p < .72 ? 'хорогдох' : p < .78 ? 'хагас (хорогдох)' : 'хавирган (хорогдох)') + ` · ${Math.round((1 - Math.cos(p * 2 * Math.PI)) * 50)}%`;
+function renderST() {
+  const tab = TABS.find(t => t[0] === stTab) || TABS[1]; const hh = curHour();
+  let html = `<header><b>Тохиргоо</b><span><button data-x="close" title="Хаах (H)">✕</button></span></header><nav>${TABS.map(t => `<button data-tab="${t[0]}" class="${t[0] === tab[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</nav><div class="st-body">`;
+  for (const [fname, rows] of tab[2]) { html += `<section><h4>${fname}</h4>`;
+    for (const r of rows) { const [k, label, mn, mx, st, u, tip] = r;
+      if (k === 'preset') html += `<div class="st-pre">${Object.keys(COND).map(c => `<button data-cond="${c}" class="${SET.cond === c ? 'on' : ''}">${c}</button>`).join('')}</div>`;
+      else if (k === 'tod') html += `<div class="st-row"><label>Өдрийн цаг</label><span class="st-v">${String(Math.floor(hh)).padStart(2, '0')}:${String(Math.floor(hh % 1 * 60)).padStart(2, '0')}${TOD === 'live' ? ' · бодит' : ''}</span></div>${todSVG(hh)}
+        <input type="range" class="st-todbar" data-k="tod" min="0" max="23.98" step=".0167" value="${hh}"><div class="st-scale"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div><button class="st-live" data-x="live">${TOD === 'live' ? '● Бодит цаг' : '○ Бодит цаг руу буцах'}</button>`;
+      else if (k === 'info') html += `<div class="st-row"><label>Frame rate</label><span class="st-v" id="st-fps">—</span></div><div class="st-row"><label>Render size</label><span class="st-v">${Math.round(innerWidth * renderer.getPixelRatio())} × ${Math.round(innerHeight * renderer.getPixelRatio())}</span></div>`;
+      else if (k === 'reset') html += `<button class="st-btn" data-x="reset">Бүх тохиргоог анхны байдалд</button>`;
+      else if (mn === undefined) html += `<div class="st-row"><label>${label}</label><button class="st-tog ${SET[k] ? 'on' : ''}" data-tog="${k}"><i></i></button></div>`;
+      else html += `<div class="st-row"${tip ? ` title="${esc(tip)}"` : ''}><label>${label}</label><span class="st-v">${k === 'clouds' && SET.clouds < 0 || k === 'moonPhase' && SET.moonPhase < 0 ? 'бодит' : k === 'moonPhase' ? moonName(SET.moonPhase) : fmt(SET[k], st, u)}</span></div><input type="range" data-k="${k}" min="${mn}" max="${mx}" step="${st}" value="${SET[k]}">`; }
+    html += `</section>`; }
+  ST.innerHTML = html + `</div><footer>H · хаах &nbsp; Esc · тоглоом руу</footer>`;
+}
+ST.addEventListener('input', e => { const k = e.target.dataset.k; if (!k) return; const v = +e.target.value;
+  if (k === 'tod') { TOD = String(v); applyTime(); } else { SET[k] = v; if (k === 'wind' || k === 'clarity') SET.cond = ''; applySET(k); }
+  const row = e.target.previousElementSibling?.querySelector?.('.st-v'); if (k === 'tod') { renderST(); ST.querySelector('.st-todbar')?.focus(); } else if (row) { const r = TABS.flatMap(t => t[2]).flatMap(f => f[1]).find(r => r[0] === k); row.textContent = (k === 'clouds' || k === 'moonPhase') && v < 0 ? 'бодит' : k === 'moonPhase' ? moonName(v) : fmt(v, r[4], r[5]); } });
+ST.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.tab) { stTab = b.dataset.tab; try { localStorage.setItem('khuvsgul.sttab', stTab); } catch {} return renderST(); }
+  if (b.dataset.cond) { SET.cond = b.dataset.cond; Object.assign(SET, COND[b.dataset.cond]); applySET(); return renderST(); }
+  if (b.dataset.tog) { SET[b.dataset.tog] = !SET[b.dataset.tog]; applySET(b.dataset.tog); return renderST(); }
+  if (b.dataset.x === 'close') return toggleST(false);
+  if (b.dataset.x === 'live') { TOD = 'live'; applyTime(); return renderST(); }
+  if (b.dataset.x === 'reset') { try { localStorage.removeItem('khuvsgul.set'); } catch {} location.reload(); } });
+function toggleST(on = !ST.classList.contains('on')) { ST.classList.toggle('on', on); if (on) { renderST(); document.exitPointerLock?.(); } }
+setInterval(() => { const f = $('st-fps'); if (f) f.textContent = $('fps').textContent; if (SET.advance && ST.classList.contains('on') && stTab === 'sky') { const s = ST.querySelector('.st-todbar'); if (s && document.activeElement !== s) renderST(); } }, 1000);
+// ── Цаг агаар: бороо, цас, аянга, манан + самбар (T) ──
+const WXP = {   // [нэр, тэмдэг, үүл, бороо, цас, манан, салхи м/с, аянга]
+  clear: ['Нартай', '☀️', .05, 0, 0, 1, 3, 0], cloudy: ['Үүлэрхэг', '⛅', .5, 0, 0, 1.2, 5, 0], overcast: ['Бүрхэг', '☁️', .82, 0, 0, 1.8, 6, 0],
+  rain: ['Бороо', '🌧️', .9, 1, 0, 2.4, 9, 0], storm: ['Аадар', '⛈️', 1, 1.7, 0, 3, 19, 1], snow: ['Цас', '🌨️', .86, 0, 1, 2.6, 4, 0], fog: ['Манан', '🌫️', .6, 0, 0, 5, 1, 0] };
+const WS = { mode: (() => { try { return localStorage.getItem('khuvsgul.wx') || 'live'; } catch { return 'live'; } })(), rain: 0, snow: 0, flash: 0, nextBolt: 6, tr: { rain: 0, snow: 0 } };
+const uRain = { value: 0 }, uSnow = { value: 0 }, uPC = { value: new THREE.Vector3() };
+// бороо: камерыг тойрсон 26 м хайрцагт ташуу зураас; байрлалыг shader-т цагаар тооцно (CPU ачаалалгүй)
+const precip = (n, snow) => { const g = new THREE.BufferGeometry(), P = new Float32Array(n * (snow ? 3 : 6)), S = new Float32Array(n * (snow ? 1 : 2));
+  for (let i = 0; i < n; i++) { const x = Math.random() * 26 - 13, y = Math.random() * 16, z = Math.random() * 26 - 13, r = Math.random();
+    if (snow) { P.set([x, y, z], i * 3); S[i] = r; } else { P.set([x, y, z, x, y, z], i * 6); S[i * 2] = r; S[i * 2 + 1] = r + 10; } }
+  g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('aR', new THREE.BufferAttribute(S, 1));
+  const m = new THREE.ShaderMaterial({ uniforms: { uT, uK: snow ? uSnow : uRain, uPC, uWave }, transparent: true, depthWrite: false, fog: false,
+    vertexShader: `uniform float uT, uK; uniform vec3 uPC; uniform vec4 uWave; attribute float aR; varying float vA;
+      void main(){ float r = fract(aR), tail = step(5., aR); vec3 p = position; float sp = ${snow ? '1.3 + r * .8' : '13. + r * 6.'};
+        p.y = mod(p.y - uT * sp + r * 40., 16.); vec2 w = uWave.xy * uWave.z * ${snow ? '7.' : '4.'};
+        p.xz += w * (16. - p.y) * ${snow ? '.12' : '.05'} ${snow ? '+ vec2(sin(uT * .9 + r * 30.), cos(uT * .7 + r * 20.)) * .5' : ''};
+        p.y -= tail * .55; p.xz -= tail * w * .03;
+        vec3 wp = vec3(uPC.x + mod(p.x - uPC.x + 13., 26.) - 13., uPC.y - 5. + p.y, uPC.z + mod(p.z - uPC.z + 13., 26.) - 13.);
+        vA = step(r, uK) * ${snow ? '1.' : '.55'}; vec4 mv = viewMatrix * vec4(wp, 1.); ${snow ? 'gl_PointSize = (2. + r * 3.) * 60. / -mv.z;' : ''} gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying float vA; void main(){ ${snow ? 'float d = length(gl_PointCoord - .5) * 2.; if (d > 1.) discard; gl_FragColor = vec4(vec3(.96), vA * (1. - d * d));' : 'gl_FragColor = vec4(vec3(.78, .84, .9), vA * .5);'} }` });
+  const o = snow ? new THREE.Points(g, m) : new THREE.LineSegments(g, m); o.frustumCulled = false; o.renderOrder = 5; scene.add(o); return o; };
+const RAIN = precip(MOBILE ? 3000 : 9000, false), SNOW = precip(MOBILE ? 2500 : 7000, true);
+let rainSnd = null;
+function wxSound() { if (!AC || !NB) return; if (!rainSnd) { const s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain(); s.buffer = NB; s.loop = true; f.type = 'highpass'; f.frequency.value = 900; g.gain.value = 0; s.connect(f).connect(g).connect(AC.destination); s.start(); rainSnd = g; }
+  rainSnd.gain.setTargetAtTime(Math.min(.22, uRain.value * .14), AC.currentTime, .6); }
+function thunder() { if (!AC) return; const t = AC.currentTime + .4 + Math.random() * 1.5, s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain(); s.buffer = NB; f.type = 'lowpass'; f.frequency.value = 160;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.9, t + .08); g.gain.exponentialRampToValueAtTime(.001, t + 3.2); s.connect(f).connect(g).connect(AC.destination); s.start(t, 0, 3.4); }
+function liveKind() { if (!WX) return 'cloudy'; const k = (WX.kind || '').toLowerCase(); if (/thunder|storm/.test(k)) return 'storm'; if (WX.snow > 0 || /snow/.test(k)) return 'snow'; if (WX.precip > 0 || /rain|drizzle|shower/.test(k)) return 'rain'; if (/fog/.test(k)) return 'fog';
+  return WX.cloud > 75 ? 'overcast' : WX.cloud > 35 ? 'cloudy' : 'clear'; }
+function setWeather(mode) { WS.mode = mode; try { localStorage.setItem('khuvsgul.wx', mode); } catch {} const k = mode === 'live' ? liveKind() : mode, w = WXP[k];
+  SET.clouds = mode === 'live' ? -1 : w[2]; if (mode === 'live' && WX) { SET.wind = Math.min(20, (WX.wind || 0) / 3.6); SET.cond = ''; }   /* бодит салхи → давалгаа */ SET.haze = w[5]; if (mode !== 'live') { SET.wind = w[6]; SET.cond = ''; } WS.tr = { rain: w[3], snow: w[4], bolt: w[7] }; applySET(); renderWX(); }
+function weatherTick(dt, t) { uPC.value.copy(camera.position); const k = Math.min(1, dt * .5);
+  uRain.value += (WS.tr.rain - uRain.value) * k; uSnow.value += (WS.tr.snow - uSnow.value) * k; RAIN.visible = uRain.value > .01; SNOW.visible = uSnow.value > .01; wxSound();
+  if (WS.tr.bolt && (WS.nextBolt -= dt) < 0) { WS.nextBolt = 5 + Math.random() * 12; WS.flash = 1; thunder(); }
+  if (WS.flash > 0) { WS.flash = Math.max(0, WS.flash - dt * 3.5); hemi.intensity = hemi.userData.base * (1 + WS.flash * WS.flash * 9 * (Math.random() > .3 ? 1 : .3)); } else if (hemi.userData.base !== undefined) hemi.intensity = hemi.userData.base * (1 - uRain.value * .25); }
+// самбар: доод зүүн буланд, Tidewater-ийн шилэн хэв маяг
+const WXB = document.createElement('div'); WXB.id = 'wxp'; WXB.className = 'st-glass'; document.body.appendChild(WXB);
+function renderWX() { const k = WS.mode === 'live' ? liveKind() : WS.mode, nightNow = (world.sunEl ?? 1) < 0, w = nightNow && k === 'clear' ? ['Цэлмэг шөнө', '🌙'] : nightNow && k === 'cloudy' ? ['Үүлтэй шөнө', '☁️'] : WXP[k], open = WXB.classList.contains('open'), hh = curHour();
+  WXB.innerHTML = `<button class="wx-head" data-wx="toggle"><span class="wx-ic">${w[1]}</span><span><b>${w[0]}</b><small>${WX ? Math.round(WX.temp) + '° · ' : ''}${WS.mode === 'live' ? LOCS[LOC][0] + ', бодит' : 'гараар'} · ${String(Math.floor(hh)).padStart(2, '0')}:${String(Math.floor(hh % 1 * 60)).padStart(2, '0')}</small></span><kbd>T</kbd></button>
+  ${open ? `<div class="wx-grid">${['live', ...Object.keys(WXP)].map(m => `<button data-wx="${m}" class="${WS.mode === m ? 'on' : ''}"><span>${m === 'live' ? '📡' : WXP[m][1]}</span>${m === 'live' ? 'Бодит' : WXP[m][0]}</button>`).join('')}</div>
+    <div class="wx-q">${Object.entries(LOCS).map(([k, l]) => `<button data-loc="${k}" class="${LOC === k ? 'on' : ''}">📍 ${l[0]}</button>`).join('')}</div>
+    <label class="wx-row">Цаг <input type="range" data-wxt="1" min="0" max="23.98" step=".0167" value="${hh}"></label>
+    <div class="wx-q">${[['Үүр', 6.2], ['Өглөө', 9], ['Үд', 13], ['Орой', 18.2], ['Шөнө', 23]].map(([n, h]) => `<button data-wxh="${h}">${n}</button>`).join('')}<button data-wxh="live">Одоо</button></div>` : ''}`; }
+WXB.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.wx === 'toggle') { WXB.classList.toggle('open'); if (WXB.classList.contains('open')) document.exitPointerLock?.(); return renderWX(); }
+  if (b.dataset.loc) { setLoc(b.dataset.loc); return renderWX(); }
+  if (b.dataset.wx) return setWeather(b.dataset.wx);
+  if (b.dataset.wxh) { TOD = b.dataset.wxh === 'live' ? 'live' : b.dataset.wxh; applyTime(); renderWX(); } });
+WXB.addEventListener('input', e => { if (e.target.dataset.wxt) { TOD = String(+e.target.value); applyTime(); WXB.querySelector('small').textContent = `${String(Math.floor(+e.target.value)).padStart(2, '0')}:${String(Math.floor(+e.target.value % 1 * 60)).padStart(2, '0')}`; } });
+setInterval(() => { if (!WXB.classList.contains('open')) renderWX(); }, 15000);
+size(); addEventListener('resize', size);
+
+const PERF = { dyn: 1, sum: 0, n: 0, sh: 0 };
+const BIRDS = (() => { const g = new THREE.BufferGeometry(), P = [0, 0, .25, -.06, 0, -.2, .06, 0, -.2,  0, 0, .05, -.55, .04, -.08, 0, 0, -.12,  0, 0, .05, .55, .04, -.08, 0, 0, -.12],
+    Wf = [0, 0, 0, 0, 1, 0, 0, 1, 0]; g.setAttribute('position', new THREE.Float32BufferAttribute(P.map(x => x * 1.6), 3)); g.setAttribute('aWing', new THREE.Float32BufferAttribute(Wf, 1)); g.computeVertexNormals();
+  const N = 34, m = new THREE.MeshStandardMaterial({ color: 0x3a3d42, roughness: .8, side: THREE.DoubleSide });
+  m.onBeforeCompile = sh => { sh.uniforms.uT = uT; sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uT; attribute float aWing;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nfloat ph = instanceMatrix[3].x * .7 + instanceMatrix[3].z * .3; transformed.y += aWing * abs(transformed.x) * sin(uT * (7. + mod(ph, 3.)) + ph) * .9;'); };
+  const im = new THREE.InstancedMesh(g, m, N); im.frustumCulled = false; im.castShadow = false; scene.add(im);
+  const flocks = [[0, 46, 120, 9, .05], [1.7, 62, 160, 14, .035], [3.9, 38, 90, 11, .07]], data = [];
+  for (let i = 0; i < N; i++) { const f = i % 3; data.push({ f, o: new THREE.Vector3((Math.random() - .5) * 14, (Math.random() - .5) * 4, (Math.random() - .5) * 14), sp: .8 + Math.random() * .4 }); }
+  return { im, flocks, data, M: new THREE.Matrix4(), Q: new THREE.Quaternion(), V: new THREE.Vector3(), V2: new THREE.Vector3(), S: new THREE.Vector3(1, 1, 1) }; })();
+function birdsTick(t) { const B_ = BIRDS, gc = world.G ? B(world.G[0] + 40, world.G[1] - 40, 0) : new THREE.Vector3();
+  B_.data.forEach((d, i) => { const [ph, h, R, , w] = B_.flocks[d.f], a = t * w * d.sp + ph, c = Math.cos(a), s = Math.sin(a);
+    B_.V.set(gc.x + c * R + d.o.x + Math.sin(t * .3 + i) * 2, h + d.o.y + Math.sin(t * .5 + i) * 1.5, gc.z + s * R * .7 + d.o.z);
+    B_.V2.set(-s * R, 0, c * R * .7).normalize(); B_.Q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), B_.V2); B_.M.compose(B_.V, B_.Q, B_.S); B_.im.setMatrixAt(i, B_.M); });
+  B_.im.instanceMatrix.needsUpdate = true; B_.im.visible = !LIFE.mode && uRain.value < .6; }
+const clock = new THREE.Clock(), V = new THREE.Vector3(), Mx = new THREE.Matrix4(); let fr = 0, last = performance.now(), tick = 0;
+window.khuvsgul = { WK, cam, camera, scene, POV, setPOV, FS, rodToggle, composer, SET, applySET, ZONES, LIFE, enterLife, selectDay, applyTime, set: h => { TOD = String(h); document.querySelectorAll('#tod button').forEach(x => x.classList.toggle('on', x.dataset.t === TOD)); applyTime(); } };
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime; uT.value = REDUCED ? 0 : t;
+  if ((tick += dt) > 60) { tick = 0; if (TOD === 'live') applyTime(); }
+  if (WK.inGer) { camera.position.lerp(gerCam.p, Math.min(1, dt * 3)); camera.lookAt(gerCam.t); }
+  else if (LIFE.mode) { V.set(LIFE.C.x + Math.cos(LIFE.az) * Math.cos(LIFE.el) * LIFE.dist, LIFE.C.y + Math.sin(LIFE.el) * LIFE.dist, LIFE.C.z + Math.sin(LIFE.az) * Math.cos(LIFE.el) * LIFE.dist);
+    camera.position.lerp(V, Math.min(1, dt * 2.5)); camera.lookAt(LIFE.C); if (!REDUCED) LIFE.group.rotation.y += dt * .01; bloom.strength = THREE.MathUtils.lerp(bloom.strength, .35, dt * 2); lifeLabels(); }
+  else {
+    // ── controller (Tidewater-ийн аргаар): хурдыг exp-ээр тэгшилнэ, таталцал, үсрэлт, алхсан зайгаар head-bob ──
+    const K = WK.keys; let f = (K.has('w') || K.has('arrowup') ? 1 : 0) - (K.has('s') || K.has('arrowdown') ? 1 : 0), r = (K.has('d') || K.has('arrowright') ? 1 : 0) - (K.has('a') || K.has('arrowleft') ? 1 : 0);
+    if (WK.joy[0] || WK.joy[1]) { f = -WK.joy[1]; r = WK.joy[0]; }
+    const fx = WK.pov ? -Math.sin(POV.yaw) : -Math.cos(cam.az), fz = WK.pov ? -Math.cos(POV.yaw) : -Math.sin(cam.az), rx = -fz, rz = fx;
+    let mx = fx * f + rx * r, mz = fz * f + rz * r; const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; }
+    const run = K.has('shift'), spd = WK.fly ? (run ? 32 : 11) : WK.boat ? (run ? 5.5 : 3.6) : run ? 6.2 : 3, u = 1 - Math.exp(-(WK.boat ? 1.6 : WK.air ? 2.5 : 14) * dt);
+    WK.v.x += (mx * spd - WK.v.x) * u; WK.v.z += (mz * spd - WK.v.z) * u;
+    const ox = WK.p.x, oz = WK.p.z, nx = ox + WK.v.x * dt, nz = oz + WK.v.z * dt, gh = WK.boat ? H(nx, nz) : Hw(nx, nz);
+    const slope = (gh - (WK.boat ? H(ox, oz) : Hw(ox, oz))) / Math.max(.001, Math.hypot(nx - ox, nz - oz));
+    if (WK.fly && WK.pov) { const cp = Math.cos(POV.pitch); WK.v.x = THREE.MathUtils.lerp(WK.v.x, (fx * cp * f + rx * r) * spd, u); WK.v.z = THREE.MathUtils.lerp(WK.v.z, (fz * cp * f + rz * r) * spd, u); WK.vy = THREE.MathUtils.lerp(WK.vy, Math.sin(POV.pitch) * f * spd, u); }   /* харсан зүг рүүгээ нисэнэ */
+    if (WK.fly ? true : WK.boat ? gh < .05 : (gh > .25 && (slope < 1.1 || world.hall && hallLocal(nx, nz) && Math.abs(hallLocal(nx, nz).z) < world.hall.hl + .7 && Math.abs(hallLocal(nx, nz).x) < 1.2) && !hallBlock(nx, nz))) { WK.p.x = nx; WK.p.z = nz; } else { WK.v.x *= WK.boat ? -.3 : .2; WK.v.z *= WK.boat ? -.3 : .2; }             // усанд, хадан хярт гарахгүй
+    if (WK.jump && !WK.air) { WK.vy = 4.6; WK.air = true; } WK.jump = false;
+    if (WK.boat) { const wy = waveH(WK.p.x, WK.p.z, t), sx = waveH(WK.p.x + .8, WK.p.z, t) - wy, sz = waveH(WK.p.x, WK.p.z + .8, t) - wy; WK.p.y = .22 + wy; WK.tilt = [sx, sz]; WK.vy = 0; WK.air = false; const k = world.kayak, sp = Math.hypot(WK.v.x, WK.v.z);
+      k.position.set(WK.p.x, WK.p.y - .05, WK.p.z); if (sp > .2) WK.kyaw = Math.atan2(-WK.v.z, WK.v.x); k.rotation.set(-WK.tilt[1] * .9, WK.kyaw ?? k.rotation.y, WK.tilt[0] * .9); }
+    if (WK.fly) { WK.jump = false; if (K.has(' ') || K.has('c')) WK.vy += (((K.has(' ') ? 1 : 0) - (K.has('c') ? 1 : 0)) * (run ? 18 : 7) - WK.vy) * (1 - Math.exp(-6 * dt)); WK.p.y = Math.min(260, WK.p.y + WK.vy * dt); }   /* нисэх: таталцалгүй */
+    else WK.vy -= WK.boat ? 0 : 9.81 * dt; if (!WK.fly) WK.p.y += WK.vy * dt; const gy = WK.boat ? -99 : Hw(WK.p.x, WK.p.z);
+    if (WK.p.y <= gy) { if (WK.air && WK.vy < -3) step(true); WK.p.y = gy; WK.vy = 0; WK.air = false; } else WK.air = WK.p.y - gy > .06;
+    const moved = Math.hypot(WK.p.x - ox, WK.p.z - oz), moving = moved / dt > .4;
+    if (!WK.air && !WK.boat) { WK.bob += moved * 2.4; WK.step += moved; if (WK.step > (run ? .9 : .62)) { WK.step = 0; step(); } }
+    if (moving) { const ty = Math.atan2(WK.v.x, WK.v.z); let d = ty - WK.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); WK.yaw += d * Math.min(1, dt * 10); }
+    if (ANIM.mixer) { play(WK.air ? 'idle' : moving ? (run ? 'sprint' : 'walk') : 'idle'); ANIM.mixer.update(dt); }
+    me.position.copy(WK.p); me.rotation.y = WK.yaw;
+    if (WK.pov) {   // нүдний өндөр 1.62 + bob; газрын өндөр солигдоход spring-ээр зөөлөн
+      me.visible = false; const ty = WK.p.y + (WK.boat ? .78 : 1.62) + Math.sin(WK.bob) * .035, w = 11, xx = POV.y - ty; POV.vy += (-w * w * xx - 2 * w * POV.vy) * dt; POV.y += POV.vy * dt;
+      if (Math.abs(xx) > 3 || WK.fly) { POV.y = ty; POV.vy = 0; }
+      camera.position.set(WK.p.x, POV.y, WK.p.z); camera.quaternion.setFromEuler(POV.e.set(POV.pitch, POV.yaw, 0, 'YXZ'));
+      const fov = run && moving ? SET.fov + 8 : SET.fov; if (Math.abs(camera.fov - fov) > .05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix(); }
+    } else {
+      me.visible = true; if (Math.abs(camera.fov - 38) > .05) { camera.fov += (38 - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix(); }
+      V.set(WK.p.x + Math.cos(cam.az) * Math.cos(cam.el) * cam.dist, WK.p.y + 1.3 + Math.sin(cam.el) * cam.dist, WK.p.z + Math.sin(cam.az) * Math.cos(cam.el) * cam.dist);
+      V.y = Math.max(V.y, H(V.x, V.z) + 1.2, 1.2); camera.position.lerp(V, Math.min(1, dt * 5)); camera.lookAt(WK.p.x, WK.p.y + 1.2, WK.p.z); }
+    let best = null, bd = Infinity; for (const z of ZONES) { const d = Math.hypot(z.p.x - WK.p.x, z.p.z - WK.p.z); if (d < z.r && d < bd) { bd = d; best = z; } }
+    if (best !== WK.zone) { WK.zone = best; best ? hint(`<b>E</b>${esc(best.name)} · ${esc(best.sub)}`, true) : hint('', false); }
+  }
+  if (LIFE.fireL) { const on = LIFE.mode ? 1 : 0; LIFE.fireL.intensity = THREE.MathUtils.lerp(LIFE.fireL.intensity, on * (26 + 9 * Math.sin(t * 11) * Math.sin(t * 7.3)), dt * 6);
+    LIFE.starU.value = THREE.MathUtils.lerp(LIFE.starU.value, on, dt * .8); }
+  if (world.hallLights) { const v = hallLocal(WK.p.x, WK.p.z), inside = v && Math.abs(v.x) < world.hall.hw + 1 && Math.abs(v.z) < world.hall.hl + 1; for (const l of world.hallLights) l.visible = !!inside; }   /* дотор байхад л танхимын гэрэл (хананы дундуур гадагш гэрэлтэхгүй) */
+  if (world.hud) { world.hud.grp.position.y = world.hud.y + Math.sin(t * .8) * .08; }   /* HUD агаарт зөөлөн хөвнө */
+  LIFE.group.visible = true;   /* спираль FPV-д ч түүдэг галаас тэнгэрт харагдана; шошго, самбар нь зөвхөн спиралийн горимд */ fishUpdate(dt, t); inspectTick(dt); weatherTick(dt, t); birdsTick(t);
+  if (POV.dx || POV.dy) { const k = SET.smooth > 0 ? 1 - Math.exp(-dt / SET.smooth) : 1, ax = POV.dx * k, ay = POV.dy * k; POV.dx -= ax; POV.dy -= ay; if (Math.abs(POV.dx) < .01) POV.dx = 0; if (Math.abs(POV.dy) < .01) POV.dy = 0;
+    POV.yaw -= ax * POV.sens; POV.pitch = THREE.MathUtils.clamp(POV.pitch - ay * POV.sens, -1.5, 1.5); }
+  if (SET.advance) { TOD = String(((curHour() + dt * SET.speed) % 24 + 24) % 24); SET._a = (SET._a || 0) + dt; if (SET._a > .25) { SET._a = 0; applyTime(); } }   // спираль зөвхөн түүдэг галын горимд
+  ORD.g.position.copy(camera.position);
+  if (MOON && world.moon) { MOON.position.copy(camera.position).addScaledVector(world.moon.dir, 900); MOON.material.opacity = world.moon.vis; MOON.visible = world.moon.vis > .01; }
+  if (world.sunDir) { const c = WK.inGer ? gerCam.p : WK.p; sun.position.copy(c).addScaledVector(world.sunDir, 250); sun.target.position.copy(c); }
+  clouds.position.x = Math.sin(t * .01) * 30;
+  GRADE.uniforms.uT.value = t;
+  { const sp = camera.position.clone().addScaledVector(world.sunDir || new THREE.Vector3(0, 1, 0), 1500).project(camera), vis = sp.z < 1 && Math.abs(sp.x) < 1.6 && Math.abs(sp.y) < 1.6 && (world.sunEl ?? 1) > .03;   // нар жаргасан бол туяа, flare-гүй
+    SHAFT.uniforms.uSun.value.set(sp.x * .5 + .5, sp.y * .5 + .5); SHAFT.uniforms.uStr.value = vis ? SET.shafts * (1 - Math.min(1, Math.hypot(sp.x, sp.y) / 1.6)) : 0; SHAFT.uniforms.uCol.value.copy(sun.color);
+    FLARE.visible = vis && SET.flare > 0 && !WK.inGer; FLARE.position.copy(camera.position).addScaledVector(world.sunDir || new THREE.Vector3(0, 1, 0), 900); FLARE.scale.setScalar(Math.max(.01, SET.flare));
+    { const pv = POV.lastY ?? POV.yaw, pp = POV.lastP ?? POV.pitch, k = SET.mblur * (WK.pov ? 1 : 0) * .35; GRADE.uniforms.uMB.value.set((POV.yaw - pv) * k, -(POV.pitch - pp) * k); POV.lastY = POV.yaw; POV.lastP = POV.pitch; }
+    if (WK.boat) uBoat.value.set(WK.p.x, WK.p.z, WK.v.x, WK.v.z); else uBoat.value.z *= .9, uBoat.value.w *= .9;
+    if (world.grassU) { const G = world.grassU; G.uCamG.value.copy(camera.position); G.uSun.value.copy(world.sunDir || G.uSun.value); G.uSunC.value.copy(sun.color).multiplyScalar(sun.intensity * .55);
+      G.uAmb.value.copy(hemi.color).multiplyScalar(hemi.intensity * (scene.background === HDR ? 2.4 : .9)); }
+    if (DOF.enabled) DOF.uniforms.focus.value = THREE.MathUtils.lerp(DOF.uniforms.focus.value, look.hitD || 12, Math.min(1, dt * 4)); }
+  water.position.set(Math.round(camera.position.x), .2, Math.round(camera.position.z)); uCam.value.copy(camera.position);
+  composer.render();
+  fr++; PERF.sum += dt; PERF.n++; const now = performance.now();
+  if (++PERF.sh % 3 === 0) sun.shadow.needsUpdate = true;
+  if (now - last >= 1000) { const fps = Math.round(fr * 1000 / (now - last)), ms = (now - last) / fr; fr = 0; last = now;
+    if (SET.auto && !document.hidden && fps >= 12) {   // <12 = арын таб/throttle, хэмжилт биш if (fps < 52 && PERF.dyn > .55) PERF.dyn = Math.max(.55, PERF.dyn * (fps < 35 ? .82 : .92)); else if (fps > 59 && PERF.dyn < 1) PERF.dyn = Math.min(1, PERF.dyn * 1.06);
+      const pr = DPR0 * SET.scale * PERF.dyn; if (Math.abs(renderer.getPixelRatio() - pr) > .02) { renderer.setPixelRatio(pr); size(); } }
+    const el = $('fps'); el.className = fps >= 50 ? '' : fps >= 30 ? 'mid' : 'bad'; el.innerHTML = `<b>${fps}</b> fps · ${ms.toFixed(1)} ms · ${Math.round(renderer.getPixelRatio() / DPR0 * 100)}%`; }
+});
+build().then(() => { applySET(); setWeather(WS.mode); if (location.hash === '#spiral') enterLife(); }).then(weather).catch(e => { $('load').textContent = 'Алдаа: ' + e.message; console.error(e); });
+setInterval(weather, 10 * 60e3);
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>
