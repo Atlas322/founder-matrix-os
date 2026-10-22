@@ -329,6 +329,70 @@ class TestGoomSync(unittest.TestCase):
         for secret in ("Гэр", "Хот", "106.9", "Client", "Owner"):
             self.assertNotIn(secret, out + err)
 
+    # hall drafts -> atoms
+    DRAFT = {"title": "Гол санаа: тест?", "date": "2026-10-20", "time": "14:05", "video": "abcdefghijk",
+             "highlights": [{"t": 75, "text": "нэг"}, {"t": None, "text": "цитат"}, {"t": 3700, "text": "хоёр"}],
+             "body": "Тайлбар", "home": "04-Resources/Research"}
+
+    def test_draft_matches_hall_write_atom(self):
+        import sys as _sys
+        from datetime import date as _date, datetime as _dt
+        _sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "fm-office"))
+        import hall_data
+
+        class Fixed(_dt):
+            @classmethod
+            def now(cls, tz=None):
+                return _dt(2026, 10, 20, 14, 5)
+        (self.vault / "04-Resources/Research").mkdir(parents=True)
+        rel = gs.write_draft(self.vault, self.DRAFT)
+        ref_vault = self.tmp / "ref"
+        (ref_vault / "04-Resources/Research").mkdir(parents=True)
+        old = hall_data.datetime
+        hall_data.datetime = Fixed
+        try:
+            ref = hall_data.write_atom(ref_vault, dict(self.DRAFT, confirm=True), today=_date(2026, 10, 20))
+        finally:
+            hall_data.datetime = old
+        self.assertEqual(rel, ref["path"])
+        self.assertEqual((self.vault / rel).read_text(encoding="utf-8"), (ref_vault / ref["path"]).read_text(encoding="utf-8"))
+        self.assertIn("source: gallery-hall", (self.vault / rel).read_text(encoding="utf-8"))
+
+    def test_draft_never_overwrites(self):
+        d = dict(self.DRAFT, home="")
+        a, b, c = (gs.write_draft(self.vault, d) for _ in range(3))
+        self.assertEqual(a, "04-Resources/Atomic/knowledge/2026-10-20 - Гол санаа тест.md")
+        self.assertTrue(b.endswith(" (2).md") and c.endswith(" (3).md"))
+
+    def test_draft_bad_home_rejected(self):
+        for home in ("../outside", "_system/x", "03-Areas/Finances/Private", "02-Projects/A/private",
+                     ".obsidian", "a]]b", "04-Resources/\U0001f512 Secret"):
+            with self.assertRaises(gs.DraftError, msg=home):
+                gs.write_draft(self.vault, dict(self.DRAFT, home=home))
+        for bad in ({"date": "20-10-2026"}, {"time": "25:00"}, {"video": "x/y"}, {"title": "///"},
+                    {"highlights": [], "body": ""}, {"highlights": [{"t": "1); x", "text": "a"}]}):
+            with self.assertRaises(gs.DraftError, msg=str(bad)):
+                gs.write_draft(self.vault, dict(self.DRAFT, home="", **bad))
+        self.assertFalse((self.vault / "04-Resources/Atomic/knowledge").exists()
+                         and any((self.vault / "04-Resources/Atomic/knowledge").iterdir()))
+
+    def test_pull_marks_only_after_write(self):
+        marks = []
+        drafts = {"drafts": [{"draft_id": 1, "draft": dict(self.DRAFT, home="")},
+                             {"draft_id": 2, "draft": dict(self.DRAFT, home="../evil")}]}
+        orig_get, orig_post = gs._get, gs._post
+        gs._get = lambda url, token, ep: drafts
+        gs._post = lambda url, token, body, ep=gs.ENDPOINT: marks.append((ep, body)) or {}
+        try:
+            with redirect_stderr(StringIO()), redirect_stdout(StringIO()):
+                written, failed = gs.pull_drafts(self.vault, "http://x", TOKEN, 7)
+        finally:
+            gs._get, gs._post = orig_get, orig_post
+        self.assertEqual((written, failed), (1, 1))
+        self.assertEqual(marks, [("/api/web/private/vault/world/atom-drafts/1/written",
+                                  {"workspace_id": 7, "path": "04-Resources/Atomic/knowledge/2026-10-20 - Гол санаа тест.md"})])
+        self.assertTrue((self.vault / marks[0][1]["path"]).is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

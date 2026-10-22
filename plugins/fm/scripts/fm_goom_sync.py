@@ -13,6 +13,10 @@ Kinds: project, task, reference, atom, decision, plus (Goomnet phase 6 World):
            With --apply the bytes go to POST /api/web/private/vault/media/upload-url then PUT to the presigned url;
            a 404 there (endpoint not built yet) skips the bytes with a warning, metadata is still sent.
 Notes with private: true, a lock in the name, and anything inside a folder named *private* or with a lock are skipped.
+Hall drafts (--apply only, before collecting): GET /api/web/private/vault/world/atom-drafts lists highlight drafts
+saved in Goomnet's gallery hall; each is re-validated locally, written to 04-Resources/Atomic/knowledge/<date> -
+<title>.md exactly like tools/fm-office/hall_data.write_atom (never overwrites: " (2)", " (3)"...), and only after a
+successful write marked with POST .../atom-drafts/{draft_id}/written {workspace_id, path}.
 --once: single run (accepted for Task Scheduler clarity; every run is one pass).
 
 Dry-run is the default: it prints per-kind counts and skipped notes, no network.
@@ -39,6 +43,9 @@ MEDIA_EXT = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", "
              ".mp4": "video/mp4"}
 EXTRA_EXT = {".html": "text/html", ".gif": "image/gif", ".svg": "image/svg+xml"}
 PARA = ("01-GTD", "02-Projects", "03-Areas", "04-Resources")
+DRAFTS_ENDPOINT = "/api/web/private/vault/world/atom-drafts"
+ATOM_DIR = "04-Resources/Atomic/knowledge"
+HIDDEN = {".obsidian", "_trash", "_system", ".trash", "00-soul", "finances", "private", ".git"}
 _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 BATCH = 500
 ENDPOINT = "/api/web/private/vault/sync"
@@ -382,6 +389,150 @@ def _post(url, token, payload, endpoint=ENDPOINT):
         return json.loads(resp.read().decode("utf-8"))
 
 
+class DraftError(ValueError):
+    pass
+
+
+def _ts(sec):
+    sec = int(max(0, float(sec)))
+    return f"{sec // 3600}:{sec // 60 % 60:02d}:{sec % 60:02d}" if sec >= 3600 else f"{sec // 60}:{sec % 60:02d}"
+
+
+def _clean_title(t):
+    t = re.sub(r'[\\/:*?"<>|\n\r]+', " ", str(t or "")).strip()
+    return re.sub(r"\s+", " ", t)[:60].strip()
+
+
+def _safe_home(vault, rel):
+    """rel must stay inside the vault and outside hidden/private folders (server data is untrusted)."""
+    root = Path(vault).resolve()
+    p = (root / rel).resolve()
+    if p == root or root not in p.parents:
+        raise DraftError("home outside vault")
+    for part in p.relative_to(root).parts:
+        low = part.lower()
+        if low in HIDDEN or part.startswith(".") or "private" in low or "\U0001f512" in part:
+            raise DraftError("home in a hidden or private folder")
+
+
+def write_draft(vault, draft):
+    """Writes one hall draft as an atom; same content as hall_data.write_atom with date/time from the draft.
+    Returns the vault-relative path. Raises DraftError on invalid data."""
+    if not isinstance(draft, dict):
+        raise DraftError("draft is not an object")
+    title = _clean_title(draft.get("title"))
+    if not title:
+        raise DraftError("empty title")
+    d = str(draft.get("date") or "")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
+        raise DraftError("bad date")
+    hhmm = str(draft.get("time") or "")
+    if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", hhmm):
+        raise DraftError("bad time")
+    vid = str(draft.get("video") or "")
+    if vid and not re.fullmatch(r"[\w-]{11}", vid):
+        raise DraftError("bad video id")
+    raw_hl = draft.get("highlights") or []
+    if not isinstance(raw_hl, list):
+        raise DraftError("bad highlights")
+    hl = []
+    for h in raw_hl[:50]:
+        if not isinstance(h, dict) or not str(h.get("text", "")).strip():
+            continue
+        t = h.get("t")
+        if t is not None and (isinstance(t, bool) or not isinstance(t, (int, float)) or t != t or abs(t) > 1e7):
+            raise DraftError("bad highlight time")
+        hl.append(h)
+    body = str(draft.get("body") or "").strip()[:6000]
+    if not hl and not body:
+        raise DraftError("empty content")
+    home = str(draft.get("home") or "").strip()
+    if home:
+        if any(c in home for c in "[]|\n\r\"") or "\\" in home:
+            raise DraftError("bad home")
+        _safe_home(vault, home)
+    root = Path(vault).resolve()
+    folder = root / ATOM_DIR
+    folder.mkdir(parents=True, exist_ok=True)
+    name, n = f"{d} - {title}", 2
+    while (folder / f"{name}.md").exists():
+        name, n = f"{d} - {title} ({n})", n + 1
+    url = f"https://www.youtube.com/watch?v={vid}" if vid else ""
+    src = str(draft.get("url") or "")
+    if not url and re.fullmatch(r"https?://[^\s\"]{4,500}", src):
+        url = src
+    lines = ["---", f"date: {d}", f"created: {d}", "type: atomic", "kind: highlight", "status: draft",
+             "confidence: stated", "source: gallery-hall", "ai-first: true", "tags: [atomic, highlight, youtube]"]
+    if url:
+        lines.append(f'url: "{url}"')
+    if home:
+        lines.append(f'up: "[[{home}]]"')
+    lines += ["---", f"# {title}", "", "## For future agent",
+              f"itge.e Gallery hall-д ({hhmm}) бичлэг үзэж байхдаа тэмдэглэсэн. `status: draft` — Wiki fact-check хийж, холбоосыг нь баталгаажуулна.", ""]
+    if body:
+        lines += [body, ""]
+    if hl:
+        lines += ["## Highlight", ""]
+        for h in hl:
+            txt = str(h["text"]).strip()[:500]
+            if h.get("t") is None:
+                lines.append(f"- > {txt}")
+                continue
+            t = _ts(h["t"])
+            link = f"[{t}]({url}&t={int(float(h['t']))}s)" if vid else t
+            lines.append(f"- {link} — {txt}")
+        lines.append("")
+    lines += ["## 🔗 Холбоос — яагаад"]
+    lines.append(f"- `гэр` [[{home}]] — үзэж байсан хавтас" if home else "- `гэр` [[04-Resources/Atomic/knowledge]] — Gallery hall-аас")
+    if url:
+        lines.append(f"- `эх` {url}")
+    path = folder / f"{name}.md"
+    with open(path, "x", encoding="utf-8", newline="\n") as fh:  # "x": never overwrite
+        fh.write("\n".join(lines) + "\n")
+    return path.relative_to(root).as_posix()
+
+
+def _get(url, token, endpoint):
+    req = urllib.request.Request(url + endpoint, headers={"Authorization": "Bearer " + token}, method="GET")
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def pull_drafts(vault, url, token, ws):
+    """Writes pending hall drafts into the vault and marks each written only after its file exists.
+    Returns (written, failed). Listing failures (incl. 404 = endpoint not built) warn and return (0, 0)."""
+    try:
+        res = _get(url, token, f"{DRAFTS_ENDPOINT}?workspace_id={ws}")
+    except urllib.error.HTTPError as e:
+        print(f"warning: hall drafts: HTTP {e.code}, skipped", file=sys.stderr)
+        return 0, 0
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        print(f"warning: hall drafts: {type(e).__name__}, skipped", file=sys.stderr)
+        return 0, 0
+    drafts = res.get("drafts") if isinstance(res, dict) else None
+    written = failed = 0
+    for entry in drafts if isinstance(drafts, list) else []:
+        did = entry.get("draft_id") if isinstance(entry, dict) else None
+        if not isinstance(did, int) or isinstance(did, bool):
+            failed += 1
+            continue
+        try:
+            rel = write_draft(vault, entry.get("draft"))
+        except (DraftError, OSError) as e:
+            print(f"warning: hall draft {did} not written: {e}", file=sys.stderr)
+            failed += 1
+            continue
+        try:
+            _post(url, token, {"workspace_id": ws, "path": rel}, f"{DRAFTS_ENDPOINT}/{did}/written")
+        except urllib.error.HTTPError as e:
+            print(f"warning: hall draft {did} written to {rel} but mark failed: HTTP {e.code}", file=sys.stderr)
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            print(f"warning: hall draft {did} written to {rel} but mark failed: {type(e).__name__}", file=sys.stderr)
+        written += 1
+        print(f"hall draft {did} -> {rel}")
+    return written, failed
+
+
 def _put(url, data, mime):
     req = urllib.request.Request(url, data=data, headers={"Content-Type": mime}, method="PUT")
     with urllib.request.urlopen(req, timeout=300) as resp:
@@ -441,6 +592,14 @@ def main(argv=None):
     if not vault.is_dir():
         print(f"vault directory not found: {vault}", file=sys.stderr)
         return 2
+    cfg = None
+    if args.apply:
+        try:
+            cfg = _load_config()
+        except SystemExit_ as e:
+            print(str(e), file=sys.stderr)
+            return 2
+        pull_drafts(vault, *cfg)
     items, skipped = collect(vault, kinds_set)
     manifest = build_manifest(items, skipped, kinds_set)
 
@@ -476,12 +635,7 @@ def main(argv=None):
     if not args.apply:
         return 0
 
-    try:
-        url, token, ws = _load_config()
-    except SystemExit_ as e:
-        print(str(e), file=sys.stderr)
-        return 2
-
+    url, token, ws = cfg
     upload_media(vault, url, token, ws, [i for i in items if i["kind"] == "media"])
 
     totals = {"upserted": 0, "unchanged": 0, "deleted": 0}
