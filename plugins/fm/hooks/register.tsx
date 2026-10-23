@@ -922,7 +922,8 @@ async function resolveContext($: EngineInterface, configured: string): Promise<{
       priv = isPrivateSession(s, role)
       if (!project) {
         for (const [osid, ov] of Object.entries((reg.sessions ?? {}) as Record<string, Record<string, unknown>>)) {
-          if (osid === sid || !ov) continue
+          // only same-role sub-sessions that hold a baton take a project off this pane (not other machines' / stale sessions)
+          if (osid === sid || !ov || !ov.baton || ov.role !== s.role) continue
           const k = projectKey(sessionScope(ov, reg.roles?.[ov.role as string] ?? {}))
           if (k && !taken.includes(k)) taken.push(k)
         }
