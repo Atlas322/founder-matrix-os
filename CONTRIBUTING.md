@@ -63,6 +63,30 @@ claude plugin validate --strict .
 - Plugin-ийг суулгалгүй туршиж үзэх: `claude --plugin-dir plugins/fm` → туршилтын хоосон хавтсанд `/fm:setup`.
 - CI (GitHub Actions) PR бүр дээр Ubuntu, Windows, macOS × Python 3.9, 3.12 дээр тестүүдийг ажиллуулна.
 
+### Цаглабарын (pane) TypeScript тест — bun
+
+`plugins/fm/hooks/parse.ts`, `register.tsx`-ийг өөрчилсөн бол `parse.test.ts`-ийг [bun](https://bun.sh)-оор ажиллуул. CI эдгээрийг **ажиллуулдаггүй** тул PR-ийн өмнө өөрөө шалгана.
+
+bun суулгах (нэгийг нь сонго):
+
+```
+npm install -g bun                             # Node.js байгаа бол (Windows, macOS, Linux)
+powershell -c "irm bun.sh/install.ps1 | iex"   # Windows
+curl -fsSL https://bun.sh/install | bash       # macOS, Linux
+bun --version                                  # шалгах (шинэ терминал нээ)
+```
+
+Ажиллуулах (repo-гийн үндсэн хавтаснаас):
+
+```
+bun test plugins/fm/hooks/parse.test.ts
+bun build plugins/fm/hooks/register.tsx --packages external --external "../types" --outdir <түр хавтас>   # register.tsx хөрвөж байгааг шалгах
+```
+
+- `N pass, 0 fail` гарах ёстой. `parse.ts`-д логик нэмбэл `parse.test.ts`-д тест нэм.
+- `tsaglabar.test.tsx` нь Claude Code-ийн `claude-code/testing` модулийг шаарддаг тул дан bun-оор ажиллахгүй (`Cannot find module 'claude-code/testing'`) — энэ нь таны алдаа биш.
+- bun нь зөвхөн хөгжүүлэгчид хэрэгтэй; plugin-ийг ашиглахад шаардлагагүй.
+
 ---
 
 ## 3. Хатуу дүрэм
