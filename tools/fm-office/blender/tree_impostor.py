@@ -1,8 +1,9 @@
 """Poly Haven fir_sapling (CC0, бүрэн нарийвчлал) → тунгалаг дэвсгэртэй impostor зураг (cross-billboard мод).
 blender -b -P tree_impostor.py → assets/khuvsgul/real/fir_card_{a,b,c}.png"""
 import bpy, os, math
-SRC = r'D:/CodeBase/founder-matrix-os/tools/fm-office/assets/khuvsgul/ph/fir_sapling/fir_sapling_1k.gltf'
-OUT = r'D:/CodeBase/founder-matrix-os/tools/fm-office/assets/khuvsgul/real'
+_FMO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # tools/fm-office (хувийн зам кодонд биш)
+SRC = os.path.join(_FMO, r'assets/khuvsgul/ph/fir_sapling/fir_sapling_1k.gltf')
+OUT = os.path.join(_FMO, r'assets/khuvsgul/real')
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=SRC)
 sc = bpy.context.scene

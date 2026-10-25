@@ -1,8 +1,9 @@
 """Poly Haven (CC0) glTF-ийг вэбэд тохируулна: нэгтгэх → decimate → бүтэц 512 → assets/khuvsgul/real/<name>.glb
 Ажиллуулах: blender -b -P ph_optimize.py -- <name>:<tris> ..."""
 import bpy, sys, os
-SRC = r'D:/CodeBase/founder-matrix-os/tools/fm-office/assets/khuvsgul/ph'
-OUT = r'D:/CodeBase/founder-matrix-os/tools/fm-office/assets/khuvsgul/real'
+_FMO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # tools/fm-office (хувийн зам кодонд биш)
+SRC = os.path.join(_FMO, r'assets/khuvsgul/ph')
+OUT = os.path.join(_FMO, r'assets/khuvsgul/real')
 os.makedirs(OUT, exist_ok=True)
 args = sys.argv[sys.argv.index('--') + 1:]
 for spec in args:

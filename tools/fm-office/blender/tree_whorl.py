@@ -2,8 +2,9 @@
 Вэбэд мод = их бие + энэ зургаар хийсэн унжсан диск 8–10 давхар (эзэлхүүнтэй шилмүүст мод).
 blender -b -P tree_whorl.py → assets/khuvsgul/real/fir_whorl.png"""
 import bpy, os, math, mathutils
-SRC = r'D:/CodeBase/founder-matrix-os/tools/fm-office/assets/khuvsgul/ph/fir_sapling/fir_sapling_1k.gltf'
-OUT = r'D:/CodeBase/founder-matrix-os/tools/fm-office/assets/khuvsgul/real'
+_FMO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # tools/fm-office (хувийн зам кодонд биш)
+SRC = os.path.join(_FMO, r'assets/khuvsgul/ph/fir_sapling/fir_sapling_1k.gltf')
+OUT = os.path.join(_FMO, r'assets/khuvsgul/real')
 bpy.ops.wm.read_factory_settings(use_empty=True); bpy.ops.import_scene.gltf(filepath=SRC)
 sc = bpy.context.scene
 for eng in ('BLENDER_EEVEE_NEXT', 'BLENDER_EEVEE', 'CYCLES'):
