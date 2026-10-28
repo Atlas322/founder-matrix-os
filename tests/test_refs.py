@@ -103,7 +103,7 @@ FAKE_FIG = r'''
 import json, sys
 from pathlib import Path
 log = Path(sys.argv[0]).with_name("calls.jsonl")
-n = sum(1 for _ in open(log)) if log.exists() else 0
+n = sum(1 for _ in open(log, encoding="utf-8")) if log.exists() else 0
 script = Path(sys.argv[sys.argv.index("-f") + 1]).name
 inj = {i.split("=", 1)[0]: json.loads(Path(i.split("=", 1)[1]).read_text(encoding="utf-8"))
        for k, i in zip(sys.argv, sys.argv[1:]) if k == "--inject"}
