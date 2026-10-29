@@ -28,6 +28,7 @@ TESTS = [
     "tests/test_recap.py",
     "tests/test_refs.py",
     "tests/test_migrate.py",
+    "tests/test_task_done_started.py",
     "plugins/auto-research-tools/tests/test_refresh_catalog.py",
     "tools/relay/tests/test_relay_config.py",
 ]
